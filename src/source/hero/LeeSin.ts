@@ -1,0 +1,60 @@
+function importModule() {
+  return {
+    type: "hero",
+    id: "LeeSin",
+    title: "盲僧",
+    name: "李青",
+    avatar: "LeeSin.png",
+    skins: [
+      { name: "default", skin: "LeeSin_0.jpg" },
+      { name: "传统僧侣 李青", skin: "LeeSin_1.jpg" },
+      { name: "防弹武僧 李青", skin: "LeeSin_2.jpg" },
+      { name: "龙的传人 李青", skin: "LeeSin_3.jpg" },
+      { name: "至高之拳 李青", skin: "LeeSin_4.jpg" },
+      { name: "泳池派对 李青", skin: "LeeSin_5.jpg" },
+      { name: "SKT T1 李青", skin: "LeeSin_6.jpg" },
+      { name: "地下拳王 李青", skin: "LeeSin_10.jpg" },
+      { name: "神拳 李青", skin: "LeeSin_11.jpg" },
+      { name: "制胜金靴 李青", skin: "LeeSin_12.jpg" },
+      { name: "黑夜使者 李青", skin: "LeeSin_27.jpg" },
+      { name: "至臻 黑夜使者 李青", skin: "LeeSin_28.jpg" },
+      { name: "FPX 李青", skin: "LeeSin_29.jpg" },
+      { name: "神龙尊者 圣龙李青", skin: "LeeSin_31.jpg" },
+      { name: "至臻 黑夜使者 李青 (2022)", skin: "LeeSin_39.jpg" },
+      { name: "巅峰之星 李青", skin: "LeeSin_41.jpg" },
+      { name: "天龙之子 李青", skin: "LeeSin_51.jpg" },
+      { name: "圣天龙 李青", skin: "LeeSin_52.jpg" },
+      { name: "T1 李青", skin: "LeeSin_68.jpg" },
+    ],
+    spells: [
+      { id: "LeeSinP", name: "疾风骤雨", icon: "LeeSinP.png", description: "" },
+      {
+        id: "LeeSinQ",
+        name: "天音波/回音击",
+        icon: "LeeSinQ.png",
+        description: "",
+      },
+      {
+        id: "LeeSinW",
+        name: "金钟罩/铁布衫",
+        icon: "LeeSinW.png",
+        description: "",
+      },
+      {
+        id: "LeeSinE",
+        name: "天雷破/摧筋断骨",
+        icon: "LeeSinE.png",
+        description: "",
+      },
+      { id: "LeeSinR", name: "猛龙摆尾", icon: "LeeSinR.png", description: "" },
+    ],
+    effects: {
+      LeeSinP: null,
+      LeeSinQ: null,
+      LeeSinW: null,
+      LeeSinE: null,
+      LeeSinR: null,
+    },
+  };
+}
+export { importModule };

@@ -1,0 +1,41 @@
+function importModule() {
+  return {
+    type: "hero",
+    id: "Lux",
+    title: "光辉女郎",
+    name: "拉克丝",
+    avatar: "Lux.png",
+    skins: [
+      { name: "default", skin: "Lux_0.jpg" },
+      { name: "奥术光辉 拉克丝", skin: "Lux_1.jpg" },
+      { name: "游侠法师 拉克丝", skin: "Lux_2.jpg" },
+      { name: "ODST地狱伞兵 拉克丝", skin: "Lux_3.jpg" },
+      { name: "星际迷航 拉克丝", skin: "Lux_4.jpg" },
+      { name: "钢铁军团 拉克丝", skin: "Lux_5.jpg" },
+      { name: "星之守护者 拉克丝", skin: "Lux_6.jpg" },
+      { name: "大元素使 拉克丝", skin: "Lux_7.jpg" },
+      { name: "春晖神女 拉克丝", skin: "Lux_8.jpg" },
+      { name: "睡衣守护者 拉克丝", skin: "Lux_14.jpg" },
+      { name: "战斗学院 拉克丝", skin: "Lux_15.jpg" },
+      { name: "至臻 战斗学院 拉克丝", skin: "Lux_16.jpg" },
+      { name: "暗星女王 拉克丝", skin: "Lux_17.jpg" },
+      { name: "耀星女神 拉克丝", skin: "Lux_18.jpg" },
+      { name: "太空律动 “闪耀灯球” 拉克丝", skin: "Lux_19.jpg" },
+      { name: "青花瓷 拉克丝", skin: "Lux_29.jpg" },
+      { name: "斗魂觉醒 拉克丝", skin: "Lux_38.jpg" },
+      { name: "至臻 战斗学院 拉克丝 (2022)", skin: "Lux_39.jpg" },
+      { name: "至臻 青花瓷 拉克丝", skin: "Lux_40.jpg" },
+      { name: "至高天 拉克丝", skin: "Lux_42.jpg" },
+      { name: "花仙子 拉克丝", skin: "Lux_61.jpg" },
+    ],
+    spells: [
+      { id: "LuxP", name: "光芒四射", icon: "LuxP.png", description: "" },
+      { id: "LuxQ", name: "光之束缚", icon: "LuxQ.png", description: "" },
+      { id: "LuxW", name: "曲光屏障", icon: "LuxW.png", description: "" },
+      { id: "LuxE", name: "透光奇点", icon: "LuxE.png", description: "" },
+      { id: "LuxR", name: "终极闪光", icon: "LuxR.png", description: "" },
+    ],
+    effects: { LuxP: null, LuxQ: null, LuxW: null, LuxE: null, LuxR: null },
+  };
+}
+export { importModule };

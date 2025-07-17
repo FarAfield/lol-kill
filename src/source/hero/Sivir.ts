@@ -1,0 +1,45 @@
+function importModule() {
+  return {
+    type: "hero",
+    id: "Sivir",
+    title: "战争女神",
+    name: "希维尔",
+    avatar: "Sivir.png",
+    skins: [
+      { name: "default", skin: "Sivir_0.jpg" },
+      { name: "战场公主 希维尔", skin: "Sivir_1.jpg" },
+      { name: "亮丽女神 希维尔", skin: "Sivir_2.jpg" },
+      { name: "女猎手 希维尔", skin: "Sivir_3.jpg" },
+      { name: "钢铁之心 希维尔", skin: "Sivir_4.jpg" },
+      { name: "创战纪 希维尔", skin: "Sivir_5.jpg" },
+      { name: "冰雪风暴 希维尔", skin: "Sivir_6.jpg" },
+      { name: "光明骑士 希维尔", skin: "Sivir_7.jpg" },
+      { name: "胜利女神 希维尔", skin: "Sivir_8.jpg" },
+      { name: "新创战纪 希维尔", skin: "Sivir_9.jpg" },
+      { name: "送披萨的小姐姐 希维尔", skin: "Sivir_10.jpg" },
+      { name: "腥红之月 希维尔", skin: "Sivir_16.jpg" },
+      { name: "奥德赛 希维尔", skin: "Sivir_25.jpg" },
+      { name: "咖啡甜心 希维尔", skin: "Sivir_34.jpg" },
+      { name: "日蚀骑士 希维尔", skin: "Sivir_43.jpg" },
+      { name: "剪纸仙灵 希维尔", skin: "Sivir_50.jpg" },
+      { name: "至臻 剪纸仙灵 希维尔", skin: "Sivir_51.jpg" },
+      { name: "伏虎之力 希维尔", skin: "Sivir_61.jpg" },
+      { name: "十五周年纪念 希维尔", skin: "Sivir_70.jpg" },
+    ],
+    spells: [
+      { id: "SivirP", name: "敏锐疾行", icon: "SivirP.png", description: "" },
+      { id: "SivirQ", name: "回旋之刃", icon: "SivirQ.png", description: "" },
+      { id: "SivirW", name: "弹射", icon: "SivirW.png", description: "" },
+      { id: "SivirE", name: "法术护盾", icon: "SivirE.png", description: "" },
+      { id: "SivirR", name: "狩猎", icon: "SivirR.png", description: "" },
+    ],
+    effects: {
+      SivirP: null,
+      SivirQ: null,
+      SivirW: null,
+      SivirE: null,
+      SivirR: null,
+    },
+  };
+}
+export { importModule };

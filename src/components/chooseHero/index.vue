@@ -10,8 +10,8 @@
     <div class="hero-list">
       <a-card
         v-for="item in canSelectedHeroList"
-        @click="selectedHero = item"
-        style="cursor: pointer"
+        @click="() => (selectedHero = item)"
+        :class="['card', { active: selectedHero?.id === item.id }]"
       >
         <div class="item">
           <a-image
@@ -101,7 +101,10 @@ function getImage(name: string, type: "avatar" | "skin") {
 }
 
 function handleOk() {
-  handleCancel();
+  emits("confirm", {
+    ...selectedHero.value,
+    skin: selectedSkin.value,
+  });
 }
 
 function handleCancel() {
@@ -113,23 +116,32 @@ function handleCancel() {
 .hero-list {
   display: flex;
   justify-content: center;
+  .card {
+    cursor: pointer;
+    margin: 0 12px;
+  }
+  .active {
+    outline: 2px solid rgb(var(--primary-6));
+  }
   .item {
-    height: 64px;
-    width: 156px;
+    width: 96px;
+    height: 128px;
     display: flex;
+    flex-direction: column;
+    align-items: center;
     .title {
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      margin-left: 8px;
+      margin-top: 12px;
       > div {
         text-align: center;
       }
       > div:nth-of-type(1) {
         font-weight: bold;
-        margin-bottom: 4px;
+        margin-bottom: 8px;
       }
     }
   }

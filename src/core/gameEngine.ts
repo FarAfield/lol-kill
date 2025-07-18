@@ -14,6 +14,7 @@ class GameEngine implements IGameEngine {
   /** GameEngine相关事件 */
   static start() {
     GameLog.success("System", "游戏开始");
+    return;
     // 初始化事件
     gameStore.event = new GameEvent("root");
     // 触发游戏事件

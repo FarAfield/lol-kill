@@ -21,14 +21,22 @@ export interface IGameCard {
 /**  GameEngine */
 export interface IGameEngine {
   delay(ms: number): Promise<void>;
+  debug(...args: Array<any>): void;
   createPlayer(): void;
   createCard(): void;
   washCard(): void;
   chooseHero(showModal: boolean): Promise<Array<IGameHero>>;
+  getTopCards(num: number): Array<IGameCard>;
+  getBottomCards(num: number): Array<IGameCard>;
   getHeroList(): Array<IGameHero>;
+  getRound(): number;
+  setRound(round: number): void;
+  getMaxRound(): number;
   getPlayerList(): Array<IGamePlayer>;
   getCardPileList(): Array<IGameCard>;
+  getDiscardPileList(): Array<IGameCard>;
   getCurrentPlayer(): null | IGamePlayer;
+  setCurrentPlayer(player: IGamePlayer): void;
   getMe(): null | IGamePlayer;
 }
 /**  GameEvent */
@@ -103,7 +111,7 @@ export interface IGamePlayer {
   clearMark(): void;
   countMark(key: string): number;
   hasMark(key: string): boolean;
-  drawCard(num: number): void;
+  drawCard(cards: Array<IGameCard>): void;
   discardCard(num: number): void;
   giftCard(
     cards: IGameCard | Array<IGameCard>,

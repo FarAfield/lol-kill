@@ -133,7 +133,7 @@ const keyword = ref("");
 const current = ref<null | (IGameHero & { src: string })>(null);
 const skinIndex = ref<number>(1);
 onMounted(async () => {
-  const modules = import.meta.glob("@/source/hero/**/*.ts");
+  const modules = import.meta.glob("@/source/hero/*.ts");
   let list: Array<IGameHero & { src: string }> = [];
   for (const path in modules) {
     const packageName = path.split("/").at(-2);
@@ -170,19 +170,19 @@ const currentIndex = computed(() => {
 });
 function getImage(name: string, type: "avatar" | "skin" | "spell") {
   return "";
-  switch (type) {
-    case "avatar":
-    case "spell":
-      return new URL(
-        `../../../assets/images/${type}/${name.replace(".png", "")}.png`,
-        import.meta.url
-      ).href;
-    case "skin":
-      return new URL(
-        `../../../assets/images/${type}/${name.replace(".jpg", "")}.jpg`,
-        import.meta.url
-      ).href;
-  }
+  // switch (type) {
+  //   case "avatar":
+  //   case "spell":
+  //     return new URL(
+  //       `../../../assets/images/${type}/${name.replace(".png", "")}.png`,
+  //       import.meta.url
+  //     ).href;
+  //   case "skin":
+  //     return new URL(
+  //       `../../../assets/images/${type}/${name.replace(".jpg", "")}.jpg`,
+  //       import.meta.url
+  //     ).href;
+  // }
 }
 function handleSelect(item: IGameHero & { src: string }) {
   current.value = item;

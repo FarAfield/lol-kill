@@ -92,15 +92,17 @@ function getCanSelectedList() {
 function getImage(name: string, type: "avatar" | "skin") {
   switch (type) {
     case "avatar":
-      return new URL(
-        `../../assets/images/${type}/${name.replace(".png", "")}.png`,
-        import.meta.url
-      ).href;
+      return "";
+    // return new URL(
+    //   `../../assets/images/${type}/${name.replace(".png", "")}.png`,
+    //   import.meta.url
+    // ).href;
     case "skin":
-      return new URL(
-        `../../assets/images/${type}/${name.replace(".jpg", "")}.jpg`,
-        import.meta.url
-      ).href;
+      return "";
+    // return new URL(
+    //   `../../assets/images/${type}/${name.replace(".jpg", "")}.jpg`,
+    //   import.meta.url
+    // ).href;
   }
 }
 

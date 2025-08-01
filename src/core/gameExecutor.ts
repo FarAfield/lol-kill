@@ -51,8 +51,48 @@ const GameExecutor: Record<string, Function> = {
       const playerList = game.getPlayerList();
       for (let i = 0; i < playerList.length; i++) {
         const player = playerList[i];
-        player.drawCard(2);
+        const cards = game.getTopCards(2);
+        player.drawCard(cards);
       }
+    }
+    return {
+      step1,
+    };
+  },
+  gamePhaseLoop: function (event: IGameEvent, game: IGameEngine) {
+    async function step1() {
+      let round = game.getRound();
+      const maxRound = game.getMaxRound();
+      const current = game.getCurrentPlayer();
+      const seatNum = current?.seatNum;
+      if (seatNum === 0) {
+        game.setRound(round + 1);
+        round = round + 1;
+      }
+      if (round > maxRound) {
+        event.finish();
+        return;
+      }
+      game.debug(`【${current?.name}】回合开始`);
+      event.trigger("phase");
+    }
+    async function step2() {
+      const playerList = game.getPlayerList();
+      const current = game.getCurrentPlayer();
+      const seatNum = current!.seatNum;
+      const nextSeatNum = seatNum + 1 >= playerList.length ? 0 : seatNum + 1;
+      game.setCurrentPlayer(playerList[nextSeatNum]);
+      event.goto(1);
+    }
+    return {
+      step1,
+      step2,
+    };
+  },
+  phase: function (event: IGameEvent, game: IGameEngine) {
+    async function step1() {
+      await game.delay(3000);
+      event.finish();
     }
     return {
       step1,

@@ -8,7 +8,7 @@ import { dynamicImportModule } from "@/core/utils";
 
 const list = ref([]);
 onMounted(async () => {
-  const modules = import.meta.glob("@/source/equip/**/*.ts");
+  const modules = import.meta.glob("@/source/equip/*.ts");
   for (const path in modules) {
     const packageName = path.split("/").at(-2);
     const fileName = path.split("/").at(-1)?.replace(".ts", "");

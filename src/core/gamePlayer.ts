@@ -4,6 +4,7 @@ import {
   IGamePlayer,
   IGameSpell,
 } from "@/core/game.types";
+import GameLog from "@/core/gameLog";
 
 class Player implements IGamePlayer {
   heroes: Array<IGameHero> = [];
@@ -90,7 +91,10 @@ class Player implements IGamePlayer {
     return this.marks[key] !== undefined;
   }
 
-  drawCard(num: number) {}
+  drawCard(cards: Array<IGameCard>) {
+    GameLog.log(`玩家${this.name}摸牌：${cards.map((c) => c.name).join(",")}`);
+    this.handCards.push(...cards);
+  }
 
   discardCard(num: number) {}
 

@@ -6,7 +6,7 @@ import GameCard from "@/core/gameCard";
 import GameAi from "@/core/gameAi";
 import GameUi from "@/core/gameUi";
 import useGameStore from "@/core/gameStore";
-import { IGameEngine, IGameEvent } from "@/core/game.types";
+import { IGameEngine, IGameEvent, IGamePlayer } from "@/core/game.types";
 import { getRandomNumber } from "@/core/utils";
 
 const gameStore = useGameStore();
@@ -107,7 +107,7 @@ class GameEngine implements IGameEngine {
         }
         if (true) {
           GameEngine.over();
-          continue;
+          return;
         }
       }
     }
@@ -130,6 +130,9 @@ class GameEngine implements IGameEngine {
   async delay(ms) {
     await new Promise((resolve) => setTimeout(resolve, ms));
   }
+  debug() {
+    GameLog.debug(...arguments);
+  }
 
   createPlayer() {
     const playerNum = gameStore.modeConfig.playerNum;
@@ -138,7 +141,7 @@ class GameEngine implements IGameEngine {
     gameStore.playerList = new Array(playerNum).fill(true).map((_, index) => {
       const player = new GamePlayer();
       player.setIdentity("player");
-      player.setSeatNum(index + 1);
+      player.setSeatNum(index);
       player.setMaxHpAndMaxPow(maxHp, maxPow);
       return player;
     });
@@ -173,9 +176,26 @@ class GameEngine implements IGameEngine {
   chooseHero(showModal: boolean = false) {
     return GameUi.chooseHero(showModal);
   }
+  getTopCards(num: number) {
+    const cards = gameStore.cardPileList.splice(-num, num);
+    return cards;
+  }
+  getBottomCards(num: number) {
+    const cards = gameStore.cardPileList.splice(0, num);
+    return cards;
+  }
   /** store相关事件 */
   getHeroList() {
     return gameStore.heroList;
+  }
+  getRound() {
+    return gameStore.round;
+  }
+  setRound(round: number) {
+    gameStore.round = round;
+  }
+  getMaxRound() {
+    return gameStore.modeConfig.maxRound;
   }
   getPlayerList() {
     return gameStore.playerList;
@@ -183,8 +203,14 @@ class GameEngine implements IGameEngine {
   getCardPileList() {
     return gameStore.cardPileList;
   }
+  getDiscardPileList() {
+    return gameStore.discardPileList;
+  }
   getCurrentPlayer() {
     return gameStore.current;
+  }
+  setCurrentPlayer(player: IGamePlayer) {
+    gameStore.current = player;
   }
   getMe() {
     return gameStore.me;

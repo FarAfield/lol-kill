@@ -81,10 +81,10 @@ const filterList = computed(() => {
 });
 function getImage(name: string, type: "equip" | "talent" | "rune") {
   return "";
-  return new URL(
-    `../../../assets/images/${type}/${name.replace(".png", "")}.png`,
-    import.meta.url
-  ).href;
+  // return new URL(
+  //   `../../../assets/images/${type}/${name.replace(".png", "")}.png`,
+  //   import.meta.url
+  // ).href;
 }
 </script>
 <style lang="less" scoped>

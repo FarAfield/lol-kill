@@ -48,10 +48,11 @@ export default defineStore("game", {
       hpUpperLimit: 100,
       powerUpperLimit: 10,
       cardNum: {
-        equip: 1,
+        equip: 100,
         talent: 1,
         rune: 1,
       },
+      maxRound: 3,
     },
     playerList: [],
     cardPileList: [],

@@ -86,7 +86,7 @@ class GameEvent implements IGameEvent {
     return this;
   }
   goto(step: number) {
-    this.step = step;
+    this.step = step - 1;
     return this;
   }
   trigger(name: string, aop: boolean = false) {

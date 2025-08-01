@@ -27,22 +27,19 @@ function createModal(vNode: VNode) {
   };
 }
 class GameUi {
-  static async chooseHero(): Promise<IGameHero> {
+  static async chooseHero(
+    showModal: boolean = false
+  ): Promise<Array<IGameHero>> {
     const [promise, resolve] = withPromise();
     const destroy = createModal(
       h(ChooseHero, {
-        showModal: true,
-        quantity: 3,
-        onConfirm: onConfirm,
-        onCancel: onCancel,
+        showModal,
+        quantity: showModal ? 5 : 3,
+        onSelect: onSelect,
       })
     );
-    function onConfirm(result: IGameHero & { skin: string }) {
-      resolve(result);
-      destroy();
-    }
-    function onCancel() {
-      resolve(null);
+    function onSelect(result: IGameHero) {
+      resolve([result]);
       destroy();
     }
     return promise;

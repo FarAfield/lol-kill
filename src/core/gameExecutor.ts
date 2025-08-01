@@ -34,22 +34,25 @@ const GameExecutor: Record<string, Function> = {
   },
   chooseHero: function (event: IGameEvent, game: IGameEngine) {
     async function step1() {
-      const heroList = game.getHeroList();
       const playerList = game.getPlayerList();
       const me = game.getMe();
       for (let i = 0; i < playerList.length; i++) {
         const player = playerList[i];
-        const optionalHeroList = game
-          .getUniqueRandomNumbers(0, heroList.length - 1, 3)
-          .map((i) => heroList[i]);
-        console.log(
-          `玩家${player.name}可选英雄：${optionalHeroList.map((hero) => hero.name).join("、")}`
-        );
-        const hero = optionalHeroList[game.getRandomNumber(0, 2)];
-        console.log(`玩家${player.name}选择英雄：${hero.name}`);
+        const hero = await game.chooseHero(player.seatNum === me?.seatNum);
         player.chooseHero(hero);
       }
-      console.log(playerList, me);
+    }
+    return {
+      step1,
+    };
+  },
+  gameDraw: function (event: IGameEvent, game: IGameEngine) {
+    async function step1() {
+      const playerList = game.getPlayerList();
+      for (let i = 0; i < playerList.length; i++) {
+        const player = playerList[i];
+        player.drawCard(2);
+      }
     }
     return {
       step1,

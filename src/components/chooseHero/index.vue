@@ -10,7 +10,7 @@
     <div class="hero-list">
       <a-card
         v-for="item in canSelectedHeroList"
-        @click="() => (selectedHero = item)"
+        @click="() => handleSelectHero(item)"
         :class="['card', { active: selectedHero?.id === item.id }]"
       >
         <div class="item">
@@ -33,9 +33,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import useGameStore from "@/core/gameStore";
-import { getUniqueRandomNumbers } from "@/core/utils";
+import { getUniqueRandomNumbers, getRandomNumber } from "@/core/utils";
 import { IGameHero } from "@/core/game.types";
 import { cloneDeep } from "lodash-es";
 
@@ -49,7 +49,7 @@ const props = defineProps({
     default: 3,
   },
 });
-const emits = defineEmits(["cancel", "confirm"]);
+const emits = defineEmits(["select"]);
 
 const gameStore = useGameStore();
 const visible = ref(props.showModal);
@@ -62,11 +62,16 @@ const heroList = computed(() =>
     (i) => !gameStore.playerList.map((j) => j.id).includes(i.id)
   )
 );
-const canSelectedSkinList = computed(() => selectedHero.value?.skins || []);
-
 onMounted(() => {
   canSelectedHeroList.value = getCanSelectedList();
-  console.log(heroList.value, canSelectedHeroList.value);
+  console.log(
+    "可选择英雄列表：",
+    canSelectedHeroList.value.map((i) => i.name)
+  );
+  // 若不显示弹窗，直接选择
+  if (!visible.value) {
+    nextTick(() => handleCancel());
+  }
 });
 
 function getCanSelectedList() {
@@ -85,30 +90,49 @@ function getCanSelectedList() {
   });
 }
 function getImage(name: string, type: "avatar" | "skin") {
-  return "";
-  //   switch (type) {
-  //     case "avatar":
-  //       return new URL(
-  //         `../../assets/images/${type}/${name.replace(".png", "")}.png`,
-  //         import.meta.url
-  //       ).href;
-  //     case "skin":
-  //       return new URL(
-  //         `../../assets/images/${type}/${name.replace(".jpg", "")}.jpg`,
-  //         import.meta.url
-  //       ).href;
-  //   }
+  switch (type) {
+    case "avatar":
+      return new URL(
+        `../../assets/images/${type}/${name.replace(".png", "")}.png`,
+        import.meta.url
+      ).href;
+    case "skin":
+      return new URL(
+        `../../assets/images/${type}/${name.replace(".jpg", "")}.jpg`,
+        import.meta.url
+      ).href;
+  }
+}
+
+function handleSelectHero(hero: IGameHero) {
+  selectedHero.value = hero;
+  selectedSkin.value =
+    hero.skins[getRandomNumber(0, hero.skins.length - 1)].skin;
 }
 
 function handleOk() {
-  emits("confirm", {
+  console.log("选择的英雄：", selectedHero.value!.name);
+  emits("select", {
     ...selectedHero.value,
-    skin: selectedSkin.value,
+    avatar: selectedSkin.value,
   });
 }
 
 function handleCancel() {
-  emits("cancel");
+  // 随机选择英雄和皮肤
+  selectedHero.value =
+    canSelectedHeroList.value[
+      getRandomNumber(0, canSelectedHeroList.value.length - 1)
+    ];
+  selectedSkin.value =
+    selectedHero.value.skins[
+      getRandomNumber(0, selectedHero.value.skins.length - 1)
+    ].skin;
+  console.log("选择的英雄：", selectedHero.value!.name);
+  emits("select", {
+    ...selectedHero.value,
+    avatar: selectedSkin.value,
+  });
 }
 </script>
 
@@ -116,9 +140,10 @@ function handleCancel() {
 .hero-list {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   .card {
     cursor: pointer;
-    margin: 0 12px;
+    margin: 12px;
   }
   .active {
     outline: 2px solid rgb(var(--primary-6));
@@ -138,6 +163,7 @@ function handleCancel() {
       margin-top: 12px;
       > div {
         text-align: center;
+        white-space: nowrap;
       }
       > div:nth-of-type(1) {
         font-weight: bold;

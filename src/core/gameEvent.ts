@@ -1,5 +1,5 @@
 import GameLog from "@/core/gameLog";
-import { IGameEvent } from "@/core/game.types";
+import { IGameCard, IGamePlayer, IGameEvent } from "@/core/game.types";
 
 class GameEvent implements IGameEvent {
   // 基础属性
@@ -16,6 +16,12 @@ class GameEvent implements IGameEvent {
   executor: null | Function;
   result: null | Record<string, any>;
   // 游戏属性
+  source: null | IGamePlayer;
+  player: null | IGamePlayer;
+  target: null | IGamePlayer;
+  targets: null | Array<IGamePlayer>;
+  card: null | IGameCard;
+  cards: null | Array<IGameCard>;
 
   constructor(name: string, aop: boolean = false) {
     this.id = Math.round(Math.random() * 1000000);
@@ -29,6 +35,12 @@ class GameEvent implements IGameEvent {
     this.timing = Number(aop);
     this.executor = null;
     this.result = null;
+    this.source = null;
+    this.player = null;
+    this.target = null;
+    this.targets = null;
+    this.card = null;
+    this.cards = null;
   }
 
   finish() {

@@ -4,6 +4,7 @@ import GameExecutor from "@/core/gameExecutor";
 import GamePlayer from "@/core/gamePlayer";
 import GameCard from "@/core/gameCard";
 import GameAi from "@/core/gameAi";
+import GameUi from "@/core/gameUi";
 import useGameStore from "@/core/gameStore";
 import { IGameEngine, IGameEvent } from "@/core/game.types";
 import { getRandomNumber } from "@/core/utils";
@@ -14,7 +15,6 @@ class GameEngine implements IGameEngine {
   /** GameEngine相关事件 */
   static start() {
     GameLog.success("System", "游戏开始");
-    return;
     // 初始化事件
     gameStore.event = new GameEvent("root");
     // 触发游戏事件
@@ -133,13 +133,13 @@ class GameEngine implements IGameEngine {
 
   createPlayer() {
     const playerNum = gameStore.modeConfig.playerNum;
+    const maxHp = gameStore.modeConfig.hpUpperLimit;
+    const maxPow = gameStore.modeConfig.powerUpperLimit;
     gameStore.playerList = new Array(playerNum).fill(true).map((_, index) => {
       const player = new GamePlayer();
-      player.seatNum = index + 1;
-      player.maxHp = gameStore.modeConfig.hpUpperLimit;
-      player.hp = gameStore.modeConfig.hpUpperLimit;
-      player.maxPow = gameStore.modeConfig.powerUpperLimit;
-      player.pow = gameStore.modeConfig.powerUpperLimit;
+      player.setIdentity("player");
+      player.setSeatNum(index + 1);
+      player.setMaxHpAndMaxPow(maxHp, maxPow);
       return player;
     });
     gameStore.current = gameStore.playerList[0];
@@ -169,6 +169,9 @@ class GameEngine implements IGameEngine {
     gameStore.cardPileList = gameStore.cardPileList.sort(
       () => Math.random() - 0.5
     );
+  }
+  chooseHero(showModal: boolean = false) {
+    return GameUi.chooseHero(showModal);
   }
   /** store相关事件 */
   getHeroList() {

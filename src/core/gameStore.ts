@@ -21,6 +21,7 @@ interface GameState {
   modeConfig: Record<string, any>;
   playerList: Array<IGamePlayer>;
   cardPileList: Array<IGameCard>;
+  discardPileList: Array<IGameCard>;
   current: null | IGamePlayer;
   me: null | IGamePlayer;
 }
@@ -54,6 +55,7 @@ export default defineStore("game", {
     },
     playerList: [],
     cardPileList: [],
+    discardPileList: [],
     current: null,
     me: null,
   }),

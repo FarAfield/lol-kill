@@ -14,14 +14,12 @@ function getUniqueRandomNumbers(min: number, max: number, num: number) {
   if (num > max - min + 1) {
     return [];
   }
-  const numbers: Array<number> = [];
-  while (numbers.length < num) {
+  const numbers = new Set<number>();
+  while (numbers.size < num) {
     const randomNum = getRandomNumber(min, max);
-    if (!numbers.includes(randomNum)) {
-      numbers.push(randomNum);
-    }
+    numbers.add(randomNum);
   }
-  return numbers;
+  return Array.from(numbers);
 }
 
 export { dynamicImportModule, getRandomNumber, getUniqueRandomNumbers };

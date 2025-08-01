@@ -1,3 +1,36 @@
+/**  GameCard */
+export interface IGameCard {
+  package: string;
+  type: string;
+  id: string;
+  name: string;
+  image: string;
+  description: string;
+  tags: Array<string>;
+  knowers: Array<string>;
+  isVirtual: boolean;
+  addTag(tag: string): void;
+  removeTag(tag: string): void;
+  clearTags(): void;
+  hasTag(tag: string): boolean;
+  addKnower(player: IGamePlayer): void;
+  removeKnower(player: IGamePlayer): void;
+  clearKnowers(): void;
+  isKnower(player: IGamePlayer): boolean;
+}
+/**  GameEngine */
+export interface IGameEngine {
+  delay(ms: number): Promise<void>;
+  createPlayer(): void;
+  createCard(): void;
+  washCard(): void;
+  chooseHero(showModal: boolean): Promise<Array<IGameHero>>;
+  getHeroList(): Array<IGameHero>;
+  getPlayerList(): Array<IGamePlayer>;
+  getCardPileList(): Array<IGameCard>;
+  getCurrentPlayer(): null | IGamePlayer;
+  getMe(): null | IGamePlayer;
+}
 /**  GameEvent */
 export interface IGameEvent {
   name: string;
@@ -10,6 +43,12 @@ export interface IGameEvent {
   timing: number;
   executor: null | Function;
   result: null | Record<string, any>;
+  source: null | IGamePlayer;
+  player: null | IGamePlayer;
+  target: null | IGamePlayer;
+  targets: null | Array<IGamePlayer>;
+  card: null | IGameCard;
+  cards: null | Array<IGameCard>;
   finish(): IGameEvent;
   getParent(nameOrDeep: string | number): null | IGameEvent;
   insertNext(name: string, aop?: boolean): IGameEvent;
@@ -17,21 +56,6 @@ export interface IGameEvent {
   setExecutor(executor: Function): IGameEvent;
   goto(step: number): IGameEvent;
   trigger(name: string, aop?: boolean): IGameEvent;
-}
-/**  GameCard */
-export interface IGameCard {
-  package: string;
-  type: string;
-  id: string;
-  name: string;
-  image: string;
-  description: string;
-  knowers: Array<string>;
-  isVirtual: boolean;
-  addKnower(player: IGamePlayer): void;
-  removeKnower(player: IGamePlayer): void;
-  clearKnowers(): void;
-  isKnower(player: IGamePlayer): boolean;
 }
 /**  GamePlayer */
 export interface IGameHero {
@@ -49,8 +73,13 @@ export interface IGameSpell {
   icon: string;
   description: string;
 }
-export interface IGamePlayer extends IGameHero {
-  skin: string;
+export interface IGamePlayer {
+  heroes: Array<IGameHero>;
+  id: string;
+  title: string;
+  name: string;
+  avatar: string;
+  spells: Array<IGameSpell>;
   identity: string;
   seatNum: number;
   maxHp: number;
@@ -58,22 +87,29 @@ export interface IGamePlayer extends IGameHero {
   maxPow: number;
   pow: number;
   judgeCards: Array<IGameCard>;
-  handCards: Array<IGameCard>;
   equipCards: Array<IGameCard>;
+  handCards: Array<IGameCard>;
   skipPhaseList: Array<string>;
   marks: Record<string, any>;
-  chooseHero(hero: IGameHero): void;
-}
-/**  GameEngine */
-export interface IGameEngine {
-  delay(ms: number): Promise<void>;
-  createPlayer(): void;
-  createCard(): void;
-  washCard(): void;
-  //
-  getHeroList(): Array<IGameHero>;
-  getPlayerList(): Array<IGamePlayer>;
-  getCardPileList(): Array<IGameCard>;
-  getCurrentPlayer(): null | IGamePlayer;
-  getMe(): null | IGamePlayer;
+  chooseHero(heroes: Array<IGameHero>): void;
+  setIdentity(identity: string): void;
+  setSeatNum(seatNum: number): void;
+  setMaxHpAndMaxPow(maxHp: number, maxPow: number): void;
+  addJudgeCard(card: IGameCard): void;
+  removeJudgeCard(card: IGameCard): void;
+  addMark(key: string, value: number): void;
+  updateMark(key: string, value: number): void;
+  removeMark(key: string): void;
+  clearMark(): void;
+  countMark(key: string): number;
+  hasMark(key: string): boolean;
+  drawCard(num: number): void;
+  discardCard(num: number): void;
+  giftCard(
+    cards: IGameCard | Array<IGameCard>,
+    targets: IGamePlayer | Array<IGamePlayer>
+  ): void;
+  recastCard(cards: IGameCard | Array<IGameCard>): void;
+  upsertEquip(card: IGameCard, index: number): void;
+  swapEquip(): void;
 }

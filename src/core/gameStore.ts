@@ -1,65 +1,79 @@
 import { defineStore } from "pinia";
-import {
-  IGameEvent,
-  IGameHero,
-  IGamePlayer,
-  IGameCard,
-} from "@/core/game.types";
-
-interface GameState {
-  heroModule: Array<any>;
-  equipModule: Array<any>;
-  talentModule: Array<any>;
-  runeModule: Array<any>;
-  heroList: Array<IGameHero>;
-  cardList: Array<IGameCard>;
-  effectMap: Record<string, Function>;
-  event: null | IGameEvent;
-  pause: boolean;
-  over: boolean;
-  round: number;
-  modeConfig: Record<string, any>;
-  playerList: Array<IGamePlayer>;
-  cardPileList: Array<IGameCard>;
-  discardPileList: Array<IGameCard>;
-  current: null | IGamePlayer;
-  me: null | IGamePlayer;
-}
+import { IGameStoreState, IGamePlayer } from "@/core/game.types";
 
 export default defineStore("game", {
-  state: (): GameState => ({
+  state: (): IGameStoreState => ({
     // 导入的模块资源
     heroModule: [],
     equipModule: [],
-    talentModule: [],
+    magicModule: [],
     runeModule: [],
-    // 解析后的资源
-    heroList: [],
-    cardList: [],
-    effectMap: {},
-    // 游戏流程
-    event: null,
+    // 解析后的游戏资源
+    fullHeroList: [],
+    fullCardList: [],
+    fullEffectMap: {},
+    // 游戏配置信息
+    config: {
+      mode: "standard",
+      playerNum: 2,
+      maxHp: 100,
+      maxPower: 10,
+      equipNum: 10,
+      magicNum: 10,
+      runeNum: 10,
+      maxRound: 3,
+      initCardNum: 4,
+      phaseCardNum: 2,
+    },
+    // 游戏运行时数据
+    round: 0,
     pause: false,
     over: false,
-    round: 0,
-    // 游戏信息
-    modeConfig: {
-      playerNum: 2,
-      hpUpperLimit: 100,
-      powerUpperLimit: 10,
-      cardNum: {
-        equip: 100,
-        talent: 1,
-        rune: 1,
-      },
-      maxRound: 3,
-    },
+    event: null,
     playerList: [],
-    cardPileList: [],
-    discardPileList: [],
+    globalEffectMap: {},
+    effectMap: {},
+    cardList: [],
+    discardList: [],
     current: null,
     me: null,
   }),
   getters: {},
-  actions: {},
+  actions: {
+    // get
+    getGameConfig() {
+      return this.config;
+    },
+    getRound() {
+      return this.round;
+    },
+    getPlayerList() {
+      return this.playerList;
+    },
+    getGlobalEffectMap() {
+      return this.globalEffectMap;
+    },
+    getEffectMap() {
+      return this.effectMap;
+    },
+    getCardList() {
+      return this.cardList;
+    },
+    getDiscardList() {
+      return this.discardList;
+    },
+    getCurrentPlayer() {
+      return this.current;
+    },
+    getMe() {
+      return this.me;
+    },
+    // set
+    setRound(round: number) {
+      this.round = round;
+    },
+    setCurrentPlayer(current: IGamePlayer) {
+      this.current = current;
+    },
+  },
 });

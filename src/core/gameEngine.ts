@@ -6,12 +6,25 @@ import GameCard from "@/core/gameCard";
 import GameAi from "@/core/gameAi";
 import GameUi from "@/core/gameUi";
 import useGameStore from "@/core/gameStore";
-import { IGameEngine, IGameEvent, IGamePlayer } from "@/core/game.types";
+import { IGameEngine, IGameEvent } from "@/core/game.types";
 import { getRandomNumber } from "@/core/utils";
 
 const gameStore = useGameStore();
+
 class GameEngine implements IGameEngine {
-  constructor() {}
+  static instance;
+  constructor() {
+    if (!GameEngine.instance) {
+      Object.keys(gameStore).forEach((key) => {
+        if (["get", "set"].some((i) => key.startsWith(i))) {
+          this[key] = gameStore[key];
+        }
+      });
+      GameEngine.instance = this;
+    }
+    return GameEngine.instance;
+  }
+
   /** GameEngine相关事件 */
   static start() {
     GameLog.success("System", "游戏开始");
@@ -118,7 +131,8 @@ class GameEngine implements IGameEngine {
       if (typeof event.executor !== "function") {
         event.setExecutor(parseEventFunction(event));
       }
-      await event.executor!(event, new GameEngine()).catch((err) => {
+      const instance = new GameEngine();
+      await event.executor!(event, instance).catch((err) => {
         GameLog.error("System", `【${event.name}】执行异常`);
         console.log(err);
         GameEngine.pause();
@@ -135,9 +149,11 @@ class GameEngine implements IGameEngine {
   }
 
   createPlayer() {
-    const playerNum = gameStore.modeConfig.playerNum;
-    const maxHp = gameStore.modeConfig.hpUpperLimit;
-    const maxPow = gameStore.modeConfig.powerUpperLimit;
+    const [playerNum, maxHp, maxPow] = [
+      gameStore.config.playerNum,
+      gameStore.config.maxHp,
+      gameStore.config.maxPower,
+    ];
     gameStore.playerList = new Array(playerNum).fill(true).map((_, index) => {
       const player = new GamePlayer();
       player.setIdentity("player");
@@ -149,71 +165,36 @@ class GameEngine implements IGameEngine {
     gameStore.me = gameStore.playerList[getRandomNumber(0, playerNum - 1)];
   }
   createCard() {
-    const cardNum = gameStore.modeConfig.cardNum;
-    const equipNum = cardNum.equip;
-    const talentNum = cardNum.talent;
-    const runeNum = cardNum.rune;
-    const equipCardList = gameStore.cardList.filter(
-      (i) => i.package === "equip"
-    );
-    const talentCardList = gameStore.cardList.filter(
-      (i) => i.package === "talent"
-    );
-    const runeCardList = gameStore.cardList.filter((i) => i.package === "rune");
+    const [equipNum, magicNum, runeNum, fullCardList] = [
+      gameStore.config.equipNum,
+      gameStore.config.magicNum,
+      gameStore.config.runeNum,
+      gameStore.fullCardList,
+    ];
     function arrayRepeat<T extends any>(array: Array<T>, num: number) {
       return new Array(num).fill(array).flat() as Array<T>;
     }
-    const cardPile = arrayRepeat(equipCardList, equipNum)
-      .concat(arrayRepeat(talentCardList, talentNum))
-      .concat(arrayRepeat(runeCardList, runeNum));
-    gameStore.cardPileList = cardPile.map((i) => new GameCard(i));
+    function getFullCardListByPackage(packageName: string) {
+      return fullCardList.filter((i) => i.package === packageName);
+    }
+    const cardPile = arrayRepeat(getFullCardListByPackage("equip"), equipNum)
+      .concat(arrayRepeat(getFullCardListByPackage("magic"), magicNum))
+      .concat(arrayRepeat(getFullCardListByPackage("rune"), runeNum));
+    gameStore.cardList = cardPile.map((i) => new GameCard(i));
   }
   washCard() {
-    gameStore.cardPileList = gameStore.cardPileList.sort(
-      () => Math.random() - 0.5
-    );
+    gameStore.cardList = gameStore.cardList.sort(() => Math.random() - 0.5);
   }
   chooseHero(showModal: boolean = false) {
     return GameUi.chooseHero(showModal);
   }
   getTopCards(num: number) {
-    const cards = gameStore.cardPileList.splice(-num, num);
+    const cards = gameStore.cardList.splice(-num, num);
     return cards;
   }
   getBottomCards(num: number) {
-    const cards = gameStore.cardPileList.splice(0, num);
+    const cards = gameStore.cardList.splice(0, num);
     return cards;
-  }
-  /** store相关事件 */
-  getHeroList() {
-    return gameStore.heroList;
-  }
-  getRound() {
-    return gameStore.round;
-  }
-  setRound(round: number) {
-    gameStore.round = round;
-  }
-  getMaxRound() {
-    return gameStore.modeConfig.maxRound;
-  }
-  getPlayerList() {
-    return gameStore.playerList;
-  }
-  getCardPileList() {
-    return gameStore.cardPileList;
-  }
-  getDiscardPileList() {
-    return gameStore.discardPileList;
-  }
-  getCurrentPlayer() {
-    return gameStore.current;
-  }
-  setCurrentPlayer(player: IGamePlayer) {
-    gameStore.current = player;
-  }
-  getMe() {
-    return gameStore.me;
   }
 }
 function parseEventFunction(event: IGameEvent) {

@@ -1,4 +1,5 @@
 import { IGameCard, IGamePlayer } from "@/core/game.types";
+import { getUUID } from "@/core/utils";
 
 class Card implements IGameCard {
   package: string;
@@ -18,13 +19,20 @@ class Card implements IGameCard {
   constructor(card: IGameCard) {
     this.package = card.package;
     this.type = card.type;
-    this.id = card.id + Math.round(Math.random() * 1000000);
+    this.id = card.id + "_" + getUUID();
     this.name = card.name;
     this.image = card.image;
     this.description = card.description;
   }
 
-  // 卡牌销毁,移除卡牌标签以及知情者
+  getCardId() {
+    return this.id.split("_")[0];
+  }
+
+  setIsVirtual(isVirtual: boolean) {
+    this.isVirtual = isVirtual;
+  }
+
   destroy() {
     this.tags = [];
     this.knowers = [];

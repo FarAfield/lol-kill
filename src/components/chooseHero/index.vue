@@ -58,7 +58,7 @@ const selectedHero = ref<IGameHero>();
 const selectedSkin = ref<string>("");
 
 const heroList = computed(() =>
-  gameStore.heroList.filter(
+  gameStore.fullHeroList.filter(
     (i) => !gameStore.playerList.map((j) => j.id).includes(i.id)
   )
 );

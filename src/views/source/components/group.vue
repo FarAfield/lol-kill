@@ -56,7 +56,7 @@ const props = defineProps({
     default: () => [],
   },
   type: {
-    type: String as PropType<"equip" | "talent" | "rune">,
+    type: String as PropType<"equip" | "magic" | "rune">,
     default: "equip",
   },
 });
@@ -79,7 +79,7 @@ const filterList = computed(() => {
     return allList.value;
   }
 });
-function getImage(name: string, type: "equip" | "talent" | "rune") {
+function getImage(name: string, type: "equip" | "magic" | "rune") {
   return "";
   // return new URL(
   //   `../../../assets/images/${type}/${name.replace(".png", "")}.png`,

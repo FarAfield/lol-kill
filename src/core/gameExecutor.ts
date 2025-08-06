@@ -1,7 +1,7 @@
-import { IGameEvent, IGameEngine } from "@/core/game.types";
+import { IGameEvent, IGameCore } from "@/core/game.types";
 
 const GameExecutor: Record<string, Function> = {
-  game: function (event: IGameEvent, game: IGameEngine) {
+  game: function (event: IGameEvent, game: IGameCore) {
     function step1() {
       // 创建玩家
       game.createPlayer();
@@ -32,7 +32,7 @@ const GameExecutor: Record<string, Function> = {
       step5,
     };
   },
-  chooseHero: function (event: IGameEvent, game: IGameEngine) {
+  chooseHero: function (event: IGameEvent, game: IGameCore) {
     async function step1() {
       const playerList = game.getPlayerList();
       const me = game.getMe();
@@ -46,12 +46,13 @@ const GameExecutor: Record<string, Function> = {
       step1,
     };
   },
-  gameDraw: function (event: IGameEvent, game: IGameEngine) {
+  gameDraw: function (event: IGameEvent, game: IGameCore) {
     async function step1() {
       const playerList = game.getPlayerList();
+      const initCardNum = game.getGameConfig().initCardNum;
       for (let i = 0; i < playerList.length; i++) {
         const player = playerList[i];
-        const cards = game.getTopCards(2);
+        const cards = game.getTopCards(initCardNum);
         player.drawCard(cards);
       }
     }
@@ -59,10 +60,10 @@ const GameExecutor: Record<string, Function> = {
       step1,
     };
   },
-  gamePhaseLoop: function (event: IGameEvent, game: IGameEngine) {
+  gamePhaseLoop: function (event: IGameEvent, game: IGameCore) {
     async function step1() {
       let round = game.getRound();
-      const maxRound = game.getMaxRound();
+      const maxRound = game.getGameConfig().maxRound;
       const current = game.getCurrentPlayer();
       const seatNum = current?.seatNum;
       if (seatNum === 0) {
@@ -73,7 +74,7 @@ const GameExecutor: Record<string, Function> = {
         event.finish();
         return;
       }
-      game.debug(`【${current?.name}】回合开始`);
+      game.debug(`【${current!.name}】回合开始`);
       event.trigger("phase");
     }
     async function step2() {
@@ -89,7 +90,7 @@ const GameExecutor: Record<string, Function> = {
       step2,
     };
   },
-  phase: function (event: IGameEvent, game: IGameEngine) {
+  phase: function (event: IGameEvent, game: IGameCore) {
     async function step1() {
       await game.delay(3000);
       event.finish();

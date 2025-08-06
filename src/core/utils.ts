@@ -1,3 +1,5 @@
+import { UUID } from "uuidjs";
+
 function dynamicImportModule(
   packageName: string,
   fileName: string
@@ -21,5 +23,13 @@ function getUniqueRandomNumbers(min: number, max: number, num: number) {
   }
   return Array.from(numbers);
 }
+function getUUID(): string {
+  return UUID.generate();
+}
 
-export { dynamicImportModule, getRandomNumber, getUniqueRandomNumbers };
+export {
+  dynamicImportModule,
+  getRandomNumber,
+  getUniqueRandomNumbers,
+  getUUID,
+};

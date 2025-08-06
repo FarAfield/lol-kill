@@ -9,6 +9,9 @@ export interface IGameCard {
   tags: Array<string>;
   knowers: Array<string>;
   isVirtual: boolean;
+  getCardId(): string;
+  setIsVirtual(isVirtual: boolean): void;
+  destroy(): void;
   addTag(tag: string): void;
   removeTag(tag: string): void;
   clearTags(): void;
@@ -28,17 +31,8 @@ export interface IGameEngine {
   chooseHero(showModal: boolean): Promise<Array<IGameHero>>;
   getTopCards(num: number): Array<IGameCard>;
   getBottomCards(num: number): Array<IGameCard>;
-  getHeroList(): Array<IGameHero>;
-  getRound(): number;
-  setRound(round: number): void;
-  getMaxRound(): number;
-  getPlayerList(): Array<IGamePlayer>;
-  getCardPileList(): Array<IGameCard>;
-  getDiscardPileList(): Array<IGameCard>;
-  getCurrentPlayer(): null | IGamePlayer;
-  setCurrentPlayer(player: IGamePlayer): void;
-  getMe(): null | IGamePlayer;
 }
+export interface IGameCore extends IGameEngine, IGameStoreActions {}
 /**  GameEvent */
 export interface IGameEvent {
   name: string;
@@ -57,11 +51,14 @@ export interface IGameEvent {
   targets: null | Array<IGamePlayer>;
   card: null | IGameCard;
   cards: null | Array<IGameCard>;
-  finish(): IGameEvent;
   getParent(nameOrDeep: string | number): null | IGameEvent;
+  isAop(): boolean;
+  getResult(key: undefined | string): null | Record<string, any>;
+  setResult(key: string, value: any): void;
+  setExecutor(executor: Function): IGameEvent;
+  finish(): IGameEvent;
   insertNext(name: string, aop?: boolean): IGameEvent;
   insertAfter(name: string, aop?: boolean): IGameEvent;
-  setExecutor(executor: Function): IGameEvent;
   goto(step: number): IGameEvent;
   trigger(name: string, aop?: boolean): IGameEvent;
 }
@@ -120,4 +117,53 @@ export interface IGamePlayer {
   recastCard(cards: IGameCard | Array<IGameCard>): void;
   upsertEquip(card: IGameCard, index: number): void;
   swapEquip(): void;
+}
+/**  GameStore */
+export interface IGameConfig {
+  mode: string;
+  playerNum: number;
+  maxHp: number;
+  maxPower: number;
+  equipNum: number;
+  magicNum: number;
+  runeNum: number;
+  maxRound: number;
+  initCardNum: number;
+  phaseCardNum: number;
+}
+export interface IGameStoreState {
+  heroModule: Array<any>;
+  equipModule: Array<any>;
+  magicModule: Array<any>;
+  runeModule: Array<any>;
+  fullHeroList: Array<IGameHero>;
+  fullCardList: Array<IGameCard>;
+  fullEffectMap: Record<string, Function>;
+  config: IGameConfig;
+  round: number;
+  pause: boolean;
+  over: boolean;
+  event: null | IGameEvent;
+  playerList: Array<IGamePlayer>;
+  globalEffectMap: Record<string, Function>;
+  effectMap: Record<string, Function>;
+  cardList: Array<IGameCard>;
+  discardList: Array<IGameCard>;
+  current: null | IGamePlayer;
+  me: null | IGamePlayer;
+}
+export interface IGameStoreActions {
+  // get
+  getGameConfig(): IGameConfig;
+  getRound(): number;
+  getPlayerList(): Array<IGamePlayer>;
+  getGlobalEffectMap(): Record<string, Function>;
+  getEffectMap(): Record<string, Function>;
+  getCardList(): Array<IGameCard>;
+  getDiscardList(): Array<IGameCard>;
+  getCurrentPlayer(): null | IGamePlayer;
+  getMe(): null | IGamePlayer;
+  // set
+  setRound(round: number): void;
+  setCurrentPlayer(current: IGamePlayer): void;
 }

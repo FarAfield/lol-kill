@@ -15,7 +15,8 @@
     "lodash-es": "^4.17.21",
     "vue-router": "^4.5.1",
     "pinia": "^3.0.3",
-    "dayjs": "^1.11.13"
+    "dayjs": "^1.11.13",
+    "uuidjs": "^5.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",

@@ -1,9 +1,10 @@
 import GameLog from "@/core/gameLog";
 import { IGameCard, IGamePlayer, IGameEvent } from "@/core/game.types";
+import { getUUID } from "@/core/utils";
 
 class GameEvent implements IGameEvent {
   // 基础属性
-  protected id: number;
+  protected id: string;
   name: string;
   done: boolean;
   // 事件属性
@@ -24,7 +25,7 @@ class GameEvent implements IGameEvent {
   cards: null | Array<IGameCard>;
 
   constructor(name: string, aop: boolean = false) {
-    this.id = Math.round(Math.random() * 1000000);
+    this.id = getUUID();
     this.name = name;
     this.done = false;
     this.parent = null;
@@ -43,11 +44,6 @@ class GameEvent implements IGameEvent {
     this.cards = null;
   }
 
-  finish() {
-    this.done = true;
-    GameLog.debug(`【${this.name}】执行完成`);
-    return this;
-  }
   getParent(nameOrDeep: string | number): null | IGameEvent {
     let event: null | IGameEvent = this;
     if (typeof nameOrDeep === "string") {
@@ -71,6 +67,30 @@ class GameEvent implements IGameEvent {
     }
     return null;
   }
+  isAop(): boolean {
+    return this.aop;
+  }
+  getResult(key: undefined | string) {
+    if (!key) {
+      return this.result;
+    }
+    return this.result?.[key];
+  }
+  setResult(key: string, value: any) {
+    if (!this.result) {
+      this.result = {};
+    }
+    this.result[key] = value;
+  }
+  setExecutor(executor: Function) {
+    this.executor = executor;
+    return this;
+  }
+  finish(): IGameEvent {
+    this.done = true;
+    GameLog.debug(`【${this.name}】执行完成`);
+    return this;
+  }
   insertNext(name: string, aop: boolean = false) {
     const next = new GameEvent(name, aop);
     this.next.push(next);
@@ -80,10 +100,6 @@ class GameEvent implements IGameEvent {
     const after = new GameEvent(name, aop);
     this.after.push(after);
     return after;
-  }
-  setExecutor(executor: Function) {
-    this.executor = executor;
-    return this;
   }
   goto(step: number) {
     this.step = step - 1;

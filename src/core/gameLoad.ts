@@ -10,27 +10,27 @@ class GameLoad {
     // 解析英雄信息
     for (const i of gameStore.heroModule) {
       const hero = omit(cloneDeep(i), ["effects"]);
-      Object.assign(gameStore.effectMap, i.effects);
-      gameStore.heroList.push(hero);
+      Object.assign(gameStore.fullEffectMap, i.effects);
+      gameStore.fullHeroList.push(hero);
     }
-    // 解析装备、天赋、符文信息
+    // 解析装备、法术、符文信息
     for (const i of gameStore.equipModule) {
       const card = omit(cloneDeep(i), ["effects"]);
-      Object.assign(gameStore.effectMap, i.effects);
+      Object.assign(gameStore.fullEffectMap, i.effects);
       card.package = "equip";
-      gameStore.cardList.push(card);
+      gameStore.fullCardList.push(card);
     }
-    for (const i of gameStore.talentModule) {
+    for (const i of gameStore.magicModule) {
       const card = omit(cloneDeep(i), ["effects"]);
-      Object.assign(gameStore.effectMap, i.effects);
-      card.package = "talent";
-      gameStore.cardList.push(card);
+      Object.assign(gameStore.fullEffectMap, i.effects);
+      card.package = "magic";
+      gameStore.fullCardList.push(card);
     }
     for (const i of gameStore.runeModule) {
       const card = omit(cloneDeep(i), ["effects"]);
-      Object.assign(gameStore.effectMap, i.effects);
+      Object.assign(gameStore.fullEffectMap, i.effects);
       card.package = "rune";
-      gameStore.cardList.push(card);
+      gameStore.fullCardList.push(card);
     }
     GameLog.success("System", "资源加载完成");
     // 启动游戏

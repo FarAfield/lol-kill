@@ -147,6 +147,9 @@ class GameEngine implements IGameEngine {
   debug() {
     GameLog.debug(...arguments);
   }
+  info() {
+    GameLog.info(...arguments);
+  }
 
   createPlayer() {
     const [playerNum, maxHp, maxPow] = [
@@ -186,6 +189,7 @@ class GameEngine implements IGameEngine {
     gameStore.cardList = gameStore.cardList.sort(() => Math.random() - 0.5);
   }
   chooseHero(showModal: boolean = false) {
+    // 收集技能 todo
     return GameUi.chooseHero(showModal);
   }
   getTopCards(num: number) {

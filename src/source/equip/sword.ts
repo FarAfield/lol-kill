@@ -1,3 +1,5 @@
+import { IGameCore, IGameEvent } from "@/core/game.types";
+
 function importModule() {
   return [
     {
@@ -7,7 +9,15 @@ function importModule() {
       image: "BloodThirstSword.png",
       description: "",
       effects: {
-        BloodThirstSword: () => {},
+        BloodThirstSword: (event: IGameEvent, game: IGameCore) => {
+          return {
+            trigger: { player: "current", event: "useCard" },
+            action: () => {
+              const current = game.getCurrentPlayer();
+              current!.hp += 10;
+            },
+          };
+        },
       },
     },
   ];

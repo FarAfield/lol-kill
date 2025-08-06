@@ -37,6 +37,7 @@ import { ref, computed, onMounted, nextTick } from "vue";
 import useGameStore from "@/core/gameStore";
 import { getUniqueRandomNumbers, getRandomNumber } from "@/core/utils";
 import { IGameHero } from "@/core/game.types";
+import GameLog from "@/core/gameLog";
 import { cloneDeep } from "lodash-es";
 
 const props = defineProps({
@@ -64,9 +65,9 @@ const heroList = computed(() =>
 );
 onMounted(() => {
   canSelectedHeroList.value = getCanSelectedList();
-  console.log(
-    "可选择英雄列表：",
-    canSelectedHeroList.value.map((i) => i.name)
+  GameLog.success(
+    "System",
+    `可选择英雄列表：${canSelectedHeroList.value.map((i) => i.name).join(",")}`
   );
   // 若不显示弹窗，直接选择
   if (!visible.value) {
@@ -113,7 +114,7 @@ function handleSelectHero(hero: IGameHero) {
 }
 
 function handleOk() {
-  console.log("选择的英雄：", selectedHero.value!.name);
+  GameLog.info(`选择的英雄：${selectedHero.value!.name}`);
   emits("select", {
     ...selectedHero.value,
     avatar: selectedSkin.value,
@@ -130,7 +131,7 @@ function handleCancel() {
     selectedHero.value.skins[
       getRandomNumber(0, selectedHero.value.skins.length - 1)
     ].skin;
-  console.log("选择的英雄：", selectedHero.value!.name);
+  GameLog.info(`选择的英雄：${selectedHero.value!.name}`);
   emits("select", {
     ...selectedHero.value,
     avatar: selectedSkin.value,

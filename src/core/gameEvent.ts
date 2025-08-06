@@ -88,7 +88,7 @@ class GameEvent implements IGameEvent {
   }
   finish(): IGameEvent {
     this.done = true;
-    GameLog.debug(`【${this.name}】执行完成`);
+    GameLog.log(`【${this.name}】执行完成`);
     return this;
   }
   insertNext(name: string, aop: boolean = false) {

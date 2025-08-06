@@ -74,7 +74,7 @@ const GameExecutor: Record<string, Function> = {
         event.finish();
         return;
       }
-      game.debug(`【${current!.name}】回合开始`);
+      game.info(`【${current!.name}】回合开始`);
       event.trigger("phase");
     }
     async function step2() {
@@ -91,9 +91,49 @@ const GameExecutor: Record<string, Function> = {
     };
   },
   phase: function (event: IGameEvent, game: IGameCore) {
-    async function step1() {
-      await game.delay(3000);
-      event.finish();
+    function step1() {
+      event.trigger("phasePre");
+    }
+    function step2() {
+      event.trigger("phaseJudge");
+    }
+    function step3() {
+      event.trigger("phaseDraw");
+    }
+    function step4() {
+      event.trigger("phaseUse");
+    }
+    function step5() {
+      event.trigger("phaseDiscard");
+    }
+    function step6() {
+      event.trigger("phasePost");
+    }
+    return {
+      step1,
+      step2,
+      step3,
+      step4,
+      step5,
+      step6,
+    };
+  },
+  phaseDraw: function (event: IGameEvent, game: IGameCore) {
+    function step1() {
+      const current = game.getCurrentPlayer();
+      const phaseCardNum = game.getGameConfig().phaseCardNum;
+      const cards = game.getTopCards(phaseCardNum);
+      current!.drawCard(cards);
+    }
+    return {
+      step1,
+    };
+  },
+  phaseUse: function (event: IGameEvent, game: IGameCore) {
+    function step1() {
+      const current = game.getCurrentPlayer();
+      const cards = current!.handCards;
+      game.delay(1000);
     }
     return {
       step1,

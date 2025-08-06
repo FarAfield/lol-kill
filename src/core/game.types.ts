@@ -25,6 +25,7 @@ export interface IGameCard {
 export interface IGameEngine {
   delay(ms: number): Promise<void>;
   debug(...args: Array<any>): void;
+  info(...args: Array<any>): void;
   createPlayer(): void;
   createCard(): void;
   washCard(): void;

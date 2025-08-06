@@ -92,7 +92,7 @@ class Player implements IGamePlayer {
   }
 
   drawCard(cards: Array<IGameCard>) {
-    GameLog.log(`玩家${this.name}摸牌：${cards.map((c) => c.name).join(",")}`);
+    GameLog.info(`【${this.name}】摸牌：${cards.map((c) => c.name).join(",")}`);
     this.handCards.push(...cards);
   }
 

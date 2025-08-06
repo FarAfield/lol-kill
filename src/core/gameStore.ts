@@ -18,7 +18,7 @@ export default defineStore("game", {
       playerNum: 2,
       maxHp: 100,
       maxPower: 10,
-      equipNum: 10,
+      equipNum: 100,
       magicNum: 10,
       runeNum: 10,
       maxRound: 3,

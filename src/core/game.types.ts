@@ -61,7 +61,7 @@ export interface IGameEvent {
   insertNext(name: string, aop?: boolean): IGameEvent;
   insertAfter(name: string, aop?: boolean): IGameEvent;
   goto(step: number): IGameEvent;
-  trigger(name: string, aop?: boolean): IGameEvent;
+  trigger(name: string, aop?: boolean, type?: "before" | "after"): IGameEvent;
 }
 /**  GamePlayer */
 export interface IGameHero {
@@ -109,6 +109,7 @@ export interface IGamePlayer {
   clearMark(): void;
   countMark(key: string): number;
   hasMark(key: string): boolean;
+  isDead(): boolean;
   drawCard(cards: Array<IGameCard>): void;
   discardCard(num: number): void;
   giftCard(
@@ -120,6 +121,15 @@ export interface IGamePlayer {
   swapEquip(): void;
 }
 /**  GameStore */
+type RecursivePartial<T> = {
+  [P in keyof T]?: T[P] extends Array<infer U>
+    ? Array<RecursivePartial<U>>
+    : T[P] extends Function
+      ? T[P]
+      : T[P] extends object
+        ? RecursivePartial<T[P]>
+        : T[P];
+};
 export interface IGameConfig {
   mode: string;
   playerNum: number;
@@ -132,6 +142,22 @@ export interface IGameConfig {
   initCardNum: number;
   phaseCardNum: number;
 }
+export type IGameEffect = RecursivePartial<{
+  priority: number;
+  trigger: {
+    player: string | Array<string>;
+    source: string | Array<string>;
+    target: string | Array<string>;
+    global: string | Array<string>;
+  };
+  enable: boolean | Function;
+  content: Function;
+  filter: Function;
+  filterCard: Function;
+  filterTarget: Function;
+  locked: boolean;
+  limited: boolean;
+}>;
 export interface IGameStoreState {
   heroModule: Array<any>;
   equipModule: Array<any>;
@@ -139,15 +165,16 @@ export interface IGameStoreState {
   runeModule: Array<any>;
   fullHeroList: Array<IGameHero>;
   fullCardList: Array<IGameCard>;
-  fullEffectMap: Record<string, Function>;
+  fullEffectMap: Record<string, IGameEffect>;
   config: IGameConfig;
   round: number;
   pause: boolean;
   over: boolean;
   event: null | IGameEvent;
   playerList: Array<IGamePlayer>;
-  globalEffectMap: Record<string, Function>;
-  effectMap: Record<string, Function>;
+  globalEffectMap: Record<string, IGameEffect>;
+  triggerEffectMap: Record<string, IGameEffect>;
+  activeEffectMap: Record<string, IGameEffect>;
   cardList: Array<IGameCard>;
   discardList: Array<IGameCard>;
   current: null | IGamePlayer;
@@ -158,8 +185,9 @@ export interface IGameStoreActions {
   getGameConfig(): IGameConfig;
   getRound(): number;
   getPlayerList(): Array<IGamePlayer>;
-  getGlobalEffectMap(): Record<string, Function>;
-  getEffectMap(): Record<string, Function>;
+  getGlobalEffectMap(): Record<string, IGameEffect>;
+  getTriggerEffectMap(): Record<string, IGameEffect>;
+  getActiveEffectMap(): Record<string, IGameEffect>;
   getCardList(): Array<IGameCard>;
   getDiscardList(): Array<IGameCard>;
   getCurrentPlayer(): null | IGamePlayer;

@@ -174,6 +174,9 @@ class GameEngine implements IGameEngine {
       gameStore.config.runeNum,
       gameStore.fullCardList,
     ];
+    // 注册卡牌技能
+    this.registerEffect(fullCardList.map((i) => i.id));
+    // 生成卡牌
     function arrayRepeat<T extends any>(array: Array<T>, num: number) {
       return new Array(num).fill(array).flat() as Array<T>;
     }
@@ -188,9 +191,25 @@ class GameEngine implements IGameEngine {
   washCard() {
     gameStore.cardList = gameStore.cardList.sort(() => Math.random() - 0.5);
   }
-  chooseHero(showModal: boolean = false) {
-    // 收集技能 todo
-    return GameUi.chooseHero(showModal);
+  async chooseHero(showModal: boolean = false) {
+    const heroes = await GameUi.chooseHero(showModal);
+    // 注册英雄技能
+    this.registerEffect(heroes.map((i) => i.spells.map((j) => j.id)).flat());
+    // 返回所选英雄组
+    return heroes;
+  }
+  protected registerEffect(array: Array<string>) {
+    array.forEach((i) => {
+      if (gameStore.fullEffectMap[i]?.trigger) {
+        if (gameStore.fullEffectMap[i]?.trigger?.global) {
+          gameStore.globalEffectMap[i] = gameStore.fullEffectMap[i];
+        } else {
+          gameStore.triggerEffectMap[i] = gameStore.fullEffectMap[i];
+        }
+      } else {
+        gameStore.activeEffectMap[i] = gameStore.fullEffectMap[i];
+      }
+    });
   }
   getTopCards(num: number) {
     const cards = gameStore.cardList.splice(-num, num);

@@ -95,16 +95,16 @@ const GameExecutor: Record<string, Function> = {
       event.trigger("phasePre");
     }
     function step2() {
-      event.trigger("phaseJudge");
+      event.trigger("phaseJudge", true);
     }
     function step3() {
-      event.trigger("phaseDraw");
+      event.trigger("phaseDraw", true);
     }
     function step4() {
-      event.trigger("phaseUse");
+      event.trigger("phaseUse", true);
     }
     function step5() {
-      event.trigger("phaseDiscard");
+      event.trigger("phaseDiscard", true);
     }
     function step6() {
       event.trigger("phasePost");

@@ -32,7 +32,8 @@ export default defineStore("game", {
     event: null,
     playerList: [],
     globalEffectMap: {},
-    effectMap: {},
+    triggerEffectMap: {},
+    activeEffectMap: {},
     cardList: [],
     discardList: [],
     current: null,
@@ -53,8 +54,11 @@ export default defineStore("game", {
     getGlobalEffectMap() {
       return this.globalEffectMap;
     },
-    getEffectMap() {
-      return this.effectMap;
+    getTriggerEffectMap() {
+      return this.triggerEffectMap;
+    },
+    getActiveEffectMap() {
+      return this.activeEffectMap;
     },
     getCardList() {
       return this.cardList;

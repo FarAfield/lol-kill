@@ -90,6 +90,9 @@ class Player implements IGamePlayer {
   hasMark(key: string) {
     return this.marks[key] !== undefined;
   }
+  isDead() {
+    return this.hp <= 0;
+  }
 
   drawCard(cards: Array<IGameCard>) {
     GameLog.info(`【${this.name}】摸牌：${cards.map((c) => c.name).join(",")}`);

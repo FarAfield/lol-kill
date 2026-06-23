@@ -1,73 +1,87 @@
-# lol-kill
+# lol-kill · 联盟杀
 
-This template should help get you started developing with Vue 3 in Vite.
+基于 **Vue 3 + Vite + Pinia** 构建的联盟主题卡牌游戏。
 
-## Recommended IDE Setup
+## 技术栈
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+| 技术 | 说明 |
+|------|------|
+| [Vue 3](https://vuejs.org/) | 渐进式 JavaScript 框架 |
+| [Vite](https://vite.dev/) | 下一代前端构建工具 |
+| [Pinia](https://pinia.vuejs.org/) | 现代化状态管理 |
+| [Vue Router](https://router.vuejs.org/) | 官方路由管理 |
+| [TypeScript](https://www.typescriptlang.org/) | 类型安全的开发体验 |
+| [Naive UI](https://www.naiveui.com/) | 组件库 |
+| [Less](https://lesscss.org/) | CSS 预处理器 |
 
-## Recommended Browser Setup
+## 项目结构
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+```
+src/
+├── __tests__/           # 单元测试
+│   └── App.spec.ts
+├── router/              # 路由配置
+│   └── index.ts
+├── views/               # 页面视图
+│   └── home/
+│       └── index.vue
+├── App.vue              # 根组件
+└── main.ts              # 应用入口
+```
 
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+## 快速开始
 
 ```sh
+# 安装依赖
 npm install
-```
 
-### Compile and Hot-Reload for Development
-
-```sh
+# 启动开发服务器（热重载）
 npm run dev
-```
 
-### Type-Check, Compile and Minify for Production
-
-```sh
-npm run build
-```
-
-### Run Unit Tests with [Vitest](https://vitest.dev/)
-
-```sh
-npm run test:unit
-```
-
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
-
-```sh
-# Install browsers for the first run
-npx playwright install
-
-# When testing on CI, must build the project first
+# 构建生产版本
 npm run build
 
-# Runs the end-to-end tests
-npm run test:e2e
-# Runs the tests only on Chromium
-npm run test:e2e -- --project=chromium
-# Runs the tests of a specific file
-npm run test:e2e -- tests/example.spec.ts
-# Runs the tests in debug mode
-npm run test:e2e -- --debug
+# 预览生产构建
+npm run preview
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+## 代码检查
 
 ```sh
+# 运行全部检查（Oxlint + ESLint）
 npm run lint
+
+# Oxlint 检查与自动修复
+npm run lint:oxlint
+
+# ESLint 检查与自动修复
+npm run lint:eslint
+
+# Prettier 格式化
+npm run format
+
+# TypeScript 类型检查
+npm run type-check
 ```
+
+## 测试
+
+```sh
+# 单元测试（Vitest）
+npm run test:unit
+
+# E2E 测试（Playwright）
+npm run test:e2e
+```
+
+## 编辑器推荐
+
+- [VS Code](https://code.visualstudio.com/) + [Vue (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+- 安装以下扩展获得完整开发体验（已在 `.vscode/extensions.json` 中配置推荐）：
+  - **Vue (Volar)** — Vue 3 语言支持
+  - **ESLint** — 代码规范检查
+  - **Prettier** — 代码格式化
+  - **EditorConfig** — 跨编辑器风格统一
+  - **Oxc** — 高性能 Rust linter
+  - **Vitest** — 单元测试集成
+  - **Playwright** — E2E 测试集成

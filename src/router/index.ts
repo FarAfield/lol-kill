@@ -17,12 +17,12 @@ const constantRoutes = [
   //   component: () => import("@/views/test/index.vue"),
   //   meta: { title: "测试" },
   // },
-  // {
-  //   path: "/game",
-  //   name: "game",
-  //   component: () => import("@/views/game/index.vue"),
-  //   meta: { title: "游戏" },
-  // },
+  {
+    path: '/game',
+    name: 'game',
+    component: () => import('@/views/game/index.vue'),
+    meta: { title: '游戏桌面' },
+  },
   // {
   //   path: "/hero",
   //   name: "hero",

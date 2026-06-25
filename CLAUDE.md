@@ -21,7 +21,7 @@
 
 ```
 core/               # 纯 TS 引擎，零视图依赖，零副作用
-├── contracts/      # 全部接口定义（IEvent, ISkill, ICard, IPlayer, IGameState...）
+├── contracts/      # 全部接口定义（IEvent, IEffect, ICard, IPlayer, IGameState...）
 ├── engine/         # 游戏主控、状态机、技能上下文、效果解析器
 ├── event/          # 事件系统（LIFO 栈）— 所有结算的核心通道
 ├── system/         # 游戏子系统（牌堆、伤害、距离、目标选择、死亡处理）
@@ -30,10 +30,11 @@ core/               # 纯 TS 引擎，零视图依赖，零副作用
 └── boot/           # 启动引导、Source 动态加载
 
 source/             # 静态游戏资源（声明式数据，不包含逻辑）
-├── heroes/         # 武将技能定义
-├── cards/          # 卡牌效果定义
+├── heroes/         # 英雄数据（直接导出 IHero[]）
+├── cards/          # 卡牌数据（直接导出 ICard[]，含默认运行时状态）
 ├── modes/          # 游戏模式配置（标准场、3v3、1v1 等）
-└── base/           # 阶段定义、规则常量、触发时机枚举
+└── base/           # Effect 定义、规则常量
+    └── effects/    # 全局 Effect 注册表（所有效果在此定义，卡牌/英雄通过 effectIds 引用）
 
 assets/             # 静态资源（图片、字体、音频等）
 components/         # Vue 可复用组件
@@ -58,8 +59,8 @@ utils/              # 纯工具函数
 │                              ↓                          │
 │  Core Layer (Pure TS)                                   │
 │  GameEngine → EventDispatcher → EventChain(LIFO)        │
-│                  → EventTrigger → 技能 content           │
-│                  → ISkillContext（受限读写接口）         │
+│                  → EventTrigger → Effect content        │
+│                  → IEffectContext（受限读写接口）         │
 │                              ↓                          │
 │  数据持久化: IStoreService (DI) → Pinia Store → Vue 响应式 │
 │  游戏数据:   GameState (内存纯对象，非响应式)            │
@@ -125,16 +126,76 @@ utils/              # 纯工具函数
 
 ### 触发时机 (Trigger Timing)
 
-以下枚举定义在 `source/base/triggers.ts`，是技能触发的基础：
+以下枚举定义在 `src/core/contracts/enums.ts`：
 
 | 分类       | 时机                                                                 |
 | ---------- | -------------------------------------------------------------------- |
-| 回合阶段   | `phaseBegin`, `phasePrepare`, `phaseJudge`, `phaseDraw`, `phasePlay`, `phaseDiscard`, `phaseEnd` |
-| 卡牌使用   | `cardUseBefore`, `cardUse`, `cardUseAfter`, `cardTargetSpecify`, `cardTargetSpecified`, `cardEffect` |
-| 伤害结算   | `damageBefore`, `damage`, `damageAfter`, `damaged`, `damagedAfter`   |
-| 判定       | `judgeBefore`, `judge`, `judgeAfter`                                 |
-| 死亡       | `playerDying`, `playerDeath`, `playerDeadAfter`                      |
-| 全局       | `gameStart`, `gameOver`, `roundStart`, `roundEnd`, `turnStart`, `turnEnd` |
+| 全局       | `GameStart`, `RoundStart`, `TurnStart`, `TurnEnd`, `RoundEnd`, `GameOver` |
+| 回合阶段   | `PhasePre`, `PhaseJudge`, `PhaseDraw`, `PhaseUse`, `PhaseDiscard`, `PhasePost` |
+| 卡牌       | `CardUse`, `CardTarget`, `CardEffect`                          |
+| 伤害       | `Damage`, `Damaged`                                               |
+| 判定       | `Judge`                                                             |
+| 死亡       | `PlayerDying`, `PlayerDeath`                                      |
+
+> **设计要点**: 触发时机不再包含 `*Before` / `*After` 后缀。
+> Before/After 等阶段语义由 `TriggerStage` 表达——技能在注册时声明
+> `{ timing: TriggerTiming, stage: 'Before' | 'Begin' | ... | 'After' }`。
+> 这避免了「damageBefore 自身是否还能有 before」的语义混淆。
+> TriggerStage 共 7 个阶段：`Before` / `Begin` / `Prepare` / `Content` / `Prevent` / `End` / `After`。
+
+### 触发时机与流水线阶段的映射 (TriggerTiming ↔ EventStatus)
+
+效果（Effect）通过 `ITriggerCondition` 中的 `TriggerEntry[]` 声明触发条件。
+每个 `TriggerEntry` 包含 `timing`（监听的事件类型）和 `stage`（在该事件的哪个流水线阶段触发）。
+
+**映射规则**:
+
+TriggerStage 是 EventStatus 中「可作为技能触发点」的子集。
+每个 TriggerStage 直接映射到同名 EventStatus 值。
+
+| TriggerStage | → EventStatus  | 三国杀典型示例                     |
+| ------------ | -------------- | ---------------------------------- |
+| `'Before'`   | → `BEFORE`   | "当你使用杀时"（卡牌生效前）        |
+| `'Begin'`    | → `BEGIN`    | "回合开始时"、"出牌阶段开始时"      |
+| `'Prepare'`  | → `PREPARE`  | "指定目标后"（合法性校验完毕）      |
+| `'Content'`  | → `CONTENT`  | "当你造成伤害时"（事件核心执行中）  |
+| `'Prevent'`  | → `PREVENT`  | "当你受到伤害时"（响应/伤害预防）   |
+| `'End'`      | → `END`      | "使用杀结算完毕后"                  |
+| `'After'`    | → `AFTER`    | "当你造成伤害后"、"当你受到伤害后"  |
+
+不可作为触发点的 EventStatus：`Waiting`、`SkipCheck`、`Cancelled`、`Prevented`、`Completed`
+→ 这些是事件内部流转状态，技能不应挂载钩子。
+
+大多数系统事件的默认阶段为 `Content`。`TurnStart` / `RoundStart` 等边界事件
+默认在 `Begin` 阶段触发。
+
+**AOP 钩子注入流程**:
+
+```
+1. GameEngine 创建事件 (IGameEvent)，设置 type = 某个 TriggerTiming
+       │
+2. EventDispatcher 调用 EventTrigger，遍历全部已注册 Effect 的 ITriggerCondition
+   → 匹配: entry.timing === event.type && entry.stage === 当前期望的阶段
+   → 按 priority 排序
+       │
+3. EventDispatcher 按流水线推进事件:
+   WAITING → SKIP_CHECK → BEFORE → BEGIN → PREPARE → CONTENT
+     → PREVENT → END → AFTER → COMPLETED
+       │
+   每进入一个阶段，查询 EventTrigger 获取匹配该阶段的钩子并依次执行
+       │
+4. 钩子执行完毕（或被 cancel/prevent）→ 进入下一阶段 → 重复步骤 3
+```
+
+**source vs player 的区别**:
+
+| 属性   | 含义                                                       | 示例                                                      |
+| ------ | --------------------------------------------------------- | --------------------------------------------------------- |
+| source | 事件的实际触发者（谁做了这件事），可为空                   | 闪电 → source = undefined（无明确来源）                   |
+| player | 事件的驱动者（谁在主导这条事件链），可为空                 | A 借刀杀人让 B 对 C 出杀 → player = A                    |
+
+多数情况下 source === player。两者均可为空（如系统事件闪电无明确来源）。
+在事件链中，子事件的 `player` 继承自顶层事件的 `player`。
 
 ### 事件暂停与响应窗口
 
@@ -155,18 +216,18 @@ utils/              # 纯工具函数
   NotStarted ──→ PrepareGame ──→ ROUND_START             │
                                       │                   │
                                       ▼                   │
-              ┌─────────── PHASE_PREPARE ──────────┐      │
+              ┌─────────── PHASE_PRE ──────────┐      │
               │              │                      │      │
               ▼              ▼                      ▼      │
-        PHASE_JUDGE    PHASE_DRAW    PHASE_PLAY  PHASE_DISCARD
+        PHASE_JUDGE    PHASE_DRAW    PHASE_USE  PHASE_DISCARD
               │              │                      │      │
               └──────────────┴──────────────────────┘      │
                                       │                   │
                                       ▼                   │
-                                PHASE_END ──→ ROUND_END   │
+                                PHASE_POST ──→ ROUND_END   │
                                       │                   │
                     GAME_OVER ←───────┘                   │
-                    (主公死亡 / 全部反贼死亡 / 等)          │
+                    (天命星灵死亡 / 全部飞升者死亡 / 等)        │
                     └─────────────────────────────────────┘
 ```
 
@@ -188,7 +249,7 @@ utils/              # 纯工具函数
 | ------------ | ----------- | ----------------------------------- |
 | 牌堆         | `deck`      | 未使用的卡牌，抽牌来源              |
 | 手牌区       | `hand`      | 玩家持有的手牌，对其他玩家不可见    |
-| 装备区       | `equip`     | 玩家已装备的武器/防具/马            |
+| 装备区       | `equip`     | 玩家已装备的武器/防具/马/宝物       |
 | 判定区       | `judge`     | 延时类锦囊（乐不思蜀/兵粮寸断/闪电）|
 | 弃牌堆       | `discard`   | 已使用/弃置的卡牌                   |
 | 处理区       | `processing`| 正在结算中的卡牌（临时区域）        |
@@ -210,33 +271,18 @@ utils/              # 纯工具函数
 ### 卡牌类型体系
 
 ```
-Card (抽象基类)
-├── BasicCard (基本牌)
-│   ├── Sha (杀)         — 对目标造成伤害
-│   ├── Shan (闪)        — 响应杀，避免伤害
-│   ├── Tao (桃)         — 回复体力
-│   └── Jiu (酒)         — 濒死回复/伤害+1
-├── TrickCard (锦囊牌)
-│   ├── ImmediateTrick (非延时锦囊)
-│   │   ├── GuoHeChaiQiao (过河拆桥)
-│   │   ├── ShunShouQianYang (顺手牵羊)
-│   │   ├── WuZhongShengYou (无中生有)
-│   │   ├── WuGuFengDeng (五谷丰登)
-│   │   ├── TaoYuanJieYi (桃园结义)
-│   │   ├── NanManRuQin (南蛮入侵)
-│   │   ├── WanJianQiFa (万箭齐发)
-│   │   ├── WuXieKeJi (无懈可击)
-│   │   ├── JieDaoShaRen (借刀杀人)
-│   │   └── JueDou (决斗)
-│   └── DelayedTrick (延时锦囊)
-│       ├── LeBuSiShu (乐不思蜀)
-│       ├── BingLiangCunDuan (兵粮寸断)
-│       └── ShanDian (闪电)
-└── EquipCard (装备牌)
-    ├── Weapon (武器)    — 攻击范围+特效
-    ├── Armor (防具)     — 防御效果
-    ├── OffensiveHorse (+1马 / 进攻马)
-    └── DefensiveHorse (-1马 / 防御马)
+Card (统一接口 ICard)
+├── BasicCard (基本牌)    — 攻击/防御/回复/增益
+├── RuneCard (符文牌)     — 即时或延时生效
+├── TalentCard (天赋牌)   — 发动后永久生效
+└── EquipCard (装备牌)    — 武器/防具
+```
+
+> **设计要点**: 不再区分「卡牌定义」和「卡牌实体」——所有卡牌统一为 `ICard`。
+> source/ 中的卡牌数据直接导出 `ICard[]`（含默认运行时状态值）。
+> 具体卡牌名称（杀、闪、桃 等）由 source/cards/ 中的声明式数据定义，
+> 引擎通过 `tags: Set<string>` 字段进行分类和筛选。
+> 卡牌效果通过 `effectIds: string[]` 引用全局 EffectRegistry。
 ```
 
 ---
@@ -284,37 +330,43 @@ Card (抽象基类)
 ### 技能定义结构
 
 ```ts
-interface Skill {
+interface IEffect {
   id: string                    // 唯一标识
-  name: string                  // 技能名称
+  name: string                  // 效果名称
   description: string           // 描述文本
   type: SkillType               // active | passive | locked | limited | awaken
   priority: number              // 同时机优先级（越高越先执行）
-  frequency: 'once' | 'unlimited' | 'oncePerTurn' | 'oncePerRound'
-  
-  // 触发条件
+  frequency: Frequency          // once | unlimited | oncePerTurn | oncePerRound
+
+  // 触发条件（三个监听范围 × 七个流水线阶段）
   trigger: {
-    player?: TriggerTiming[]    // 自身触发时机
-    global?: TriggerTiming[]    // 全局触发时机
-    target?: TriggerTiming[]    // 作为目标时触发
+    source?: TriggerEntry[]     // 自身作为事件来源时触发（匹配 event.source）
+    global?: TriggerEntry[]     // 全局事件触发（任意玩家均匹配）
+    target?: TriggerEntry[]     // 自身作为事件目标时触发（匹配 event.targets）
   }
-  
-  // 发动条件
-  filter?: (context: ISkillContext) => boolean
-  
+  // 每个 TriggerEntry: { timing: TriggerTiming, stage: TriggerStage }
+  // TriggerStage = 'Before' | 'Begin' | 'Prepare' | 'Content' | 'Prevent' | 'End' | 'After'
+
+  // 发动条件（trigger 匹配后进一步筛选）
+  filter?: (context: IEffectContext) => boolean
+
   // 目标选择（主动技）
-  selectTarget?: (context: ISkillContext) => TargetSelector
-  
+  selectTarget?: (context: IEffectContext) => ITargetSelector
+
   // 卡牌选择（需要弃牌/展示牌时）
-  selectCard?: (context: ISkillContext) => CardSelector
-  
+  selectCard?: (context: IEffectContext) => ICardSelector
+
   // 技能核心逻辑
-  content: (context: ISkillContext) => Promise<void>
-  
+  content: (context: IEffectContext) => Promise<void>
+
+  // 视作（viewAs）—— 关羽·武圣、赵云·龙胆等
+  viewAs?: (card: ICard, context: IEffectContext) => Partial<ICard> | null
+  viewAsFilter?: (card: ICard, context: IEffectContext) => boolean
+
   // 状态标记
-  enabled?: boolean             // 是否可用（觉醒技初始禁用）
-  usedThisTurn?: boolean        // 本回合是否已使用
-  usedThisRound?: boolean       // 本轮是否已使用
+  enabled: boolean              // 是否可用（觉醒技初始禁用）
+  usedThisTurn: boolean         // 本回合是否已使用
+  usedThisRound: boolean        // 本轮是否已使用
 }
 ```
 
@@ -324,17 +376,17 @@ interface Skill {
 
 ### 身份配置 (标准8人场)
 
-| 身份   | 数量 | 胜利条件                         |
-| ------ | ---- | -------------------------------- |
-| 主公   | 1    | 消灭所有反贼和内奸               |
-| 忠臣   | 2    | 与主公相同，保护主公存活         |
-| 反贼   | 4    | 消灭主公                         |
-| 内奸   | 1    | 消灭所有其他角色，最后单挑主公   |
+| 身份       | 标识         | 数量 | 胜利条件                                     |
+| ---------- | ------------ | ---- | -------------------------------------------- |
+| 天命星灵   | `Aspect`     | 1    | 消灭所有飞升者和潜伏者                       |
+| 守护者     | `Guardian`   | 2    | 与天命星灵相同，保护天命星灵存活             |
+| 飞升者     | `Ascended`   | 4    | 消灭天命星灵                                 |
+| 潜伏者     | `Infiltrator`| 1    | 消灭所有其他角色，最后单挑天命星灵           |
 
 ### 身份公开规则
-- 主公身份在游戏开始时公开
+- 天命星灵身份在游戏开始时公开
 - 其他身份在角色死亡时公开
-- 反贼杀死反贼时，击杀者摸3张牌（奖惩机制）
+- 飞升者杀死飞升者时，击杀者摸3张牌（奖惩机制）
 
 ---
 
@@ -380,13 +432,15 @@ interface Skill {
 | `TargetSystem`        | system/         | 目标合法性校验与筛选                               |
 | `DeathSystem`         | system/         | 濒死求桃、死亡结算、奖惩                           |
 | `DeckManager`         | system/         | 牌堆管理（洗牌/发牌/回收）                         |
+| `CardAuditor`         | system/         | 卡牌数量异常检测（调试用）                         |
 | `Player`              | entity/         | 玩家实体（身份/体力/手牌/装备/技能）               |
 | `Card`                | entity/         | 卡牌实体（类型/花色/点数/效果）                    |
 | `Hero`                | entity/         | 武将实体（名称/体力上限/技能列表）                 |
-| `Skill`               | entity/         | 技能数据定义                                       |
 | `GameState`           | entity/         | 游戏全局状态（回合/阶段/存活玩家/牌堆）            |
 | `GameController`      | services/       | UI ↔ 引擎桥接层（适配器模式）                     |
 | `AIController`        | services/       | AI 决策逻辑（策略模式）                            |
+| `LogSerializer`       | services/       | 游戏日志序列化/反序列化                            |
+| `ReplayEngine`        | engine/         | 游戏回放（日志 → 状态重建）                        |
 
 ---
 
@@ -410,8 +464,8 @@ interface Skill {
 | 项目         | 约定                                       | 示例                                    |
 | ------------ | ------------------------------------------ | --------------------------------------- |
 | 文件命名     | `kebab-case`                               | `damage-system.ts`, `game-engine.ts`    |
-| 类/接口      | PascalCase，接口以 `I` 开头                | `GameEngine`, `IPlayer`, `ISkillContext` |
+| 类/接口      | PascalCase，接口以 `I` 开头                | `GameEngine`, `IPlayer`, `IEffectContext` |
 | 函数/变量    | camelCase                                  | `drawCards()`, `currentPhase`           |
-| 常量/枚举    | UPPER_SNAKE_CASE                           | `PHASE_PREPARE`, `TRIGGER_CARD_USE`     |
+| 常量/枚举    | UPPER_SNAKE_CASE                           | `PHASE_PRE`, `TRIGGER_CARD_USE`     |
 | Vue 组件     | PascalCase                                 | `GameBoard.vue`, `CardHand.vue`         |
 | Pinia Store  | `use` 前缀 + camelCase                     | `useGameStore`, `usePlayerStore`        |

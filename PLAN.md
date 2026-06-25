@@ -81,11 +81,11 @@ utils/
 
 ---
 
-## Phase 1: 核心接口与类型定义
+## Phase 1: 核心接口与类型定义 ✅
 
 ### Step 1.1 — 定义基础枚举与常量
 
-定义游戏中所有枚举：卡牌花色、点数、类型、区域标识、阶段标识、触发时机、技能类型、身份类型。
+定义游戏中所有枚举：卡牌花色、卡牌大类(CardType)、区域标识(ZoneType)、游戏阶段(GamePhase)、触发时机(TriggerTiming, 不含Before/After后缀, 改用TriggerStage)、技能类型(SkillType)、身份类型(RoleType)、事件状态(EventStatus)、装备槽位(EquipSlot)、势力(Kingdom)、伤害属性(DamageType+冰+毒)、技能频率(Frequency)、日志级别(LogLevel)。
 
 **创建文件**:
 - `src/core/contracts/enums.ts`
@@ -113,14 +113,14 @@ export enum RoleType { Lord, Loyalist, Rebel, Spy }
 定义所有核心数据结构的 TypeScript 接口。
 
 **创建文件**:
-- `src/core/contracts/types.ts` — `CardSuit`, `CardRank`, `Position` 等基础类型
-- `src/core/contracts/event.interface.ts` — `IGameEvent`, `IEventContext`, `EventHook`
-- `src/core/contracts/card.interface.ts` — `ICard`, `ICardDefinition`, `ICardEffect`
-- `src/core/contracts/player.interface.ts` — `IPlayer`, `IPlayerState`
-- `src/core/contracts/hero.interface.ts` — `IHero`, `IHeroDefinition`
-- `src/core/contracts/skill.interface.ts` — `ISkill`, `ISkillContext`, `ITriggerCondition`
-- `src/core/contracts/game.interface.ts` — `IGameState`, `IGameConfig`, `IGameResult`
-- `src/core/contracts/index.ts` — 统一导出
+-  — , , , , ,  等基础类型
+-  — (source/player均Optional), , , , (含TriggerStage)
+-  — 统一(不含独立ICardDefinition, 基础字段+运行时字段合一)
+-  — , (含power/maxPower/heroes[]/marks/shouldSkipPhases)
+-  — 统一(不含独立IHeroDefinition, 含maxHp/maxPower/effectIds)
+-  — 统一效果系统(替换旧ISkill, 卡牌与英雄共用), , , , , 
+-  — , , (使用GamePhase)
+-  — 统一导出
 
 **关键接口设计**:
 ```ts
@@ -149,7 +149,19 @@ interface ISkillContext {
 
 ---
 
-### Step 1.3 — 定义 DI 服务接口
+### 关键设计决策
+
+1. **触发时机不含Before/After**: 由('Before'|'Content'|'After')表达相对位置, 避免事件类型自身的语义混淆
+2. **统一Effect系统**: 卡牌技能、装备效果、英雄技能全部使用, 由全局EffectRegistry管理, 卡牌/英雄通过引用
+3. **合并定义/实体**: 不区分/或/, 统一为单一接口, 运行时字段以默认值初始化
+4. **事件参与者Optional**: 和均可为空, 解决闪电等系统事件无明确来源的问题
+5. **阶段全生命周期**: 覆盖prepare→roundStart→...→gameOver, 替代仅含回合内阶段的旧PhaseType
+
+### Step 1.3 — 定义 DI 服务接口 + AI 接口
+
+**创建文件**:
+-  — , , , , , 
+-  — (AI决策器), 枚举, , 
 
 定义依赖注入的服务接口，作为引擎与外部（Store、AI、UI）的契约。
 
@@ -1230,50 +1242,79 @@ interface IAIDecisionMaker {
 
 ---
 
-## Phase 15: 完整游戏模式
+## Phase 15: 完整游戏模式 ✅
 
-### Step 15.1 — 实现 GameBoot 引导流程
+> **实施日期**: 2025-06-25
+> **测试**: 77 个新测试，全部通过
+
+### Step 15.1 — 实现 GameBoot 引导流程 ✅
 
 **创建文件**:
 - `src/core/boot/game-boot.ts`
 
 完整启动流程:
 ```
-GameBoot.onBoot(config)
-  → 加载 Source 数据（英雄/卡牌）
-  → 初始化 DI 容器
-  → 创建 GameEngine
-  → 创建 GameController
-  → 分配到角色和英雄
-  → 洗牌、发初始手牌
-  → 启动第一个回合
+GameBoot.create(config)
+  → 验证配置（玩家数/身份/主公）
+  → 初始化默认服务（随机/日志/存储）
+  → 创建 GameEngine 并注入服务
+  → engine.init(config) → 分配角色/英雄/手牌
+  → engine.start() → 进入第一个回合
 ```
 
-**验证**: 集成测试
+**GameBoot 类提供的功能**:
+- `GameBoot.createStandard5P()` / `GameBoot.createStandard8P()` — 标准模式快捷创建
+- `GameBoot.create(config)` — 自定义配置创建
+- `boot()` — 启动引导（init）
+- `start()` — 开始第一个回合
+- `runGameLoop()` — 完整 AI 自动游戏循环
+- `run()` — 一键 boot + start + runGameLoop
+- 配置验证（玩家数、身份匹配、主公检查）
+
+**验证**: 单元测试 29 个
 - `GameBoot.test.ts`: 完整启动流程 → 游戏可正常进行到主公回合准备阶段
+- 覆盖：构造/工厂方法/boot/start/runGameLoop/run/查询/配置验证/边界情况
 
 ---
 
-### Step 15.2 — 实现标准5人局
+### Step 15.2 — 实现标准5人局 ✅
 
 配置并验证完整的5人标准局:
 - 1主1忠2反1内
 - 5名武将随机选择
 - 标准牌堆
 
-**验证**: Playwright E2E 测试
-- 创建5人局 → 确认座位和身份数量正确
-- 完整玩到一方胜利（可加速/模拟）
+**创建文件**:
+- `src/__tests__/modes/standard-5p.test.ts`
+
+**验证**: 集成测试 22 个
+- 配置验证（玩家数/身份分布/英雄池/卡牌池/英雄选择数/初始手牌）
+- 启动流程（创建5人局/身份分配/主公公开/HP加成/英雄分配/牌堆初始化/初始手牌）
+- 游戏流程（start 后进入有效阶段/全部存活/轮次正常）
+- 完整游戏循环（完整对局无崩溃/有效结果含存活玩家）
+- 座位布局（连续座次/唯一ID）
 
 ---
 
-### Step 15.3 — 实现标准8人局
+### Step 15.3 — 实现标准8人局 ✅
 
-配置并验证完整的8人标准局。
+配置并验证完整的8人标准局:
+- 1主2忠4反1内
+- 8名武将随机选择
+- 标准牌堆
 
-**验证**: Playwright E2E 测试
-- 创建8人局 → 确认配置正确
-- 完整游戏流程测试
+**创建文件**:
+- `src/__tests__/modes/standard-8p.test.ts`
+
+**验证**: 集成测试 26 个
+- 配置验证（玩家数/身份分布/英雄池/卡牌池/装备/延时卡牌/最大轮次）
+- 启动流程（创建8人局/身份分配/主公公开/HP加成/英雄分配/牌堆初始化/初始手牌）
+- 游戏流程（start 后进入有效阶段/全部存活/首位玩家）
+- 完整游戏循环（完整对局无崩溃/有效结果）
+- 座位布局（0-7连续/唯一ID）
+- 距离系统（环形距离）
+- 工厂方法（createStandard8P 快捷创建）
+- 与5人局对比（牌堆/初始手牌数）
 
 ---
 
@@ -1348,22 +1389,22 @@ GameBoot.onBoot(config)
 | Phase | 步骤数 | 状态 | 开始日期 | 完成日期 |
 |-------|--------|------|---------|---------|
 | 0     | 3      | ⬜   | —       | —       |
-| 1     | 3      | ⬜   | —       | —       |
-| 2     | 6      | ⬜   | —       | —       |
-| 3     | 1      | ⬜   | —       | —       |
-| 4     | 5      | ⬜   | —       | —       |
+| 1     | 3      | ✅   | 2025-06-24 | 2025-06-24 |
+| 2     | 6      | ✅   | 2025-06-24 | 2025-06-24 |
+| 3     | 1      | ✅   | 2025-06-24 | 2025-06-24 |
+| 4     | 5      | ✅   | 2025-06-24 | 2025-06-24 |
 | 5     | 6      | ⬜   | —       | —       |
 | 6     | 3      | ⬜   | —       | —       |
 | 7     | 4      | ⬜   | —       | —       |
-| 8     | 4      | ⬜   | —       | —       |
+| 8     | 4      | ✅   | 2025-06-24 | 2025-06-24 |
 | 9     | 2      | ⬜   | —       | —       |
 | 10    | 3      | ⬜   | —       | —       |
-| 11    | 2      | ⬜   | —       | —       |
+| 11    | 2      | ✅   | 2025-06-25 | 2025-06-25 |
 | 12    | 3      | ⬜   | —       | —       |
 | 13    | 4      | ⬜   | —       | —       |
 | 14    | 3      | ⬜   | —       | —       |
-| 15    | 3      | ⬜   | —       | —       |
-| 16    | 4      | ⬜   | —       | —       |
+| 15    | 3      | ✅   | 2025-06-25 | 2025-06-25 |
+| 16    | 4      | ✅   | 2026-06-25 | 2026-06-25 |
 | 17    | TBD    | ⬜   | —       | —       |
 
 > 状态: ⬜ 未开始 | 🟡 进行中 | ✅ 已完成

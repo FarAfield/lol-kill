@@ -1,2 +1,5 @@
-// Base game constants — unified export barrel
-export {}
+// Base game data — unified export barrel
+
+export * from './constants'
+export * from './phases'
+export * from './triggers'

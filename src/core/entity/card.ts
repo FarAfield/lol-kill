@@ -1,25 +1,11 @@
-// ============================================================
-// 联盟杀 · Card 实体
-//
-// 统一卡牌实体——不再区分「定义」与「实例」。
-// source/ 中的卡牌数据通过 Card.create() 创建实例。
-// 牌堆中同一类卡牌有多张独立 Card 实例，每张拥有唯一 id。
-// ============================================================
-
-import { ZoneType, CardType, CardSuit } from '@core/contracts/enums'
-import type { CardId, CardRank } from '@core/contracts/types'
+import { ZoneType, CardType, CardSuit, CardRank, EquipSlot } from '@core/contracts/enums'
+import { IdGenerator } from '@core/utils'
 import type { ICard, CardDefinition } from '@core/contracts/card.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
-import type { EquipSlot } from '@core/contracts/enums'
-
-// Re-export CardDefinition for convenience
-export type { CardDefinition } from '@core/contracts/card.interface'
-
-// ── 卡牌实体 ──
 
 export class Card implements ICard {
-  // ── 基础属性（创建后只读） ──
-  readonly id: CardId
+  readonly instanceId: string
+  readonly id: string
   readonly name: string
   readonly type: CardType
   readonly suit: CardSuit
@@ -31,18 +17,19 @@ export class Card implements ICard {
   readonly attackRange?: number
   readonly isDelayed: boolean
   readonly canBeCanceled: boolean
-
-  // ── 运行时状态 ──
+  /** -------运行时状态-------- */
   owner?: IPlayer
   zone: ZoneType
   visibleTo: IPlayer[]
   virtual: boolean
+  isFaceDown: boolean
 
-  // ── 实例计数器 ──
-  private static _counter = 0
+  /** 全局共享 ID 生成器（所有 Card 实例共用，保证 ID 递增不重复） */
+  private static _idGenerator = new IdGenerator()
 
+  // 构造函数
   private constructor(data: {
-    id: CardId
+    id: string
     name: string
     type: CardType
     suit: CardSuit
@@ -58,7 +45,9 @@ export class Card implements ICard {
     zone: ZoneType
     visibleTo: IPlayer[]
     virtual: boolean
+    isFaceDown: boolean
   }) {
+    this.instanceId = Card._idGenerator.next(data.id)
     this.id = data.id
     this.name = data.name
     this.type = data.type
@@ -75,27 +64,16 @@ export class Card implements ICard {
     this.zone = data.zone
     this.visibleTo = data.visibleTo
     this.virtual = data.virtual
+    this.isFaceDown = data.isFaceDown
   }
 
-  // ── 工厂方法 ──
-
   /**
+   * 工厂方法
    * 从 CardDefinition 创建 Card 实例。
-   *
-   * 自动生成唯一实例 ID，并将运行时字段初始化为默认值：
-   * - owner = undefined
-   * - zone = ZoneType.Deck
-   * - visibleTo = []
-   * - virtual = false
-   *
-   * @param def        卡牌定义（来自 source/）
-   * @param instanceId 可选的实例 ID，不提供则自动生成
-   * @returns 新的 Card 实例
    */
-  static create(def: CardDefinition, instanceId?: string): Card {
-    const id = instanceId ?? `${def.name}_${Card._counter++}`
+  static create(def: CardDefinition): Card {
     return new Card({
-      id,
+      id: def.id,
       name: def.name,
       type: def.type,
       suit: def.suit,
@@ -111,40 +89,33 @@ export class Card implements ICard {
       zone: ZoneType.Deck,
       visibleTo: [],
       virtual: false,
+      isFaceDown: false,
     })
   }
 
   /**
    * 创建一个已指定 zone 的 Card 实例。
-   *
    * 用于 source/ 数据中需要指定初始区域的场景（如装备区已有卡牌）。
-   *
    * @param def  卡牌定义
    * @param zone 初始区域
-   * @param instanceId 可选的实例 ID
    */
-  static createInZone(def: CardDefinition, zone: ZoneType, instanceId?: string): Card {
-    const card = Card.create(def, instanceId)
+  static createInZone(def: CardDefinition, zone: ZoneType): Card {
+    const card = Card.create(def)
     card.zone = zone
     return card
   }
 
-  // ── 区域操作 ──
-
   /**
    * 将卡牌移动到指定区域。
-   *
    * 同时更新可见性：
    * - Deck / Discard → 清空 visibleTo
    * - Hand → 仅 owner 可见
    * - Equip / Judge → 所有玩家可见
    * - Processing → 所有玩家可见
-   *
    * @param zone 目标区域
    */
   moveTo(zone: ZoneType): void {
     this.zone = zone
-
     switch (zone) {
       case ZoneType.Deck:
       case ZoneType.Discard:
@@ -160,10 +131,8 @@ export class Card implements ICard {
         break
     }
   }
-
   /**
    * 将卡牌移动到指定区域并更新所属玩家。
-   *
    * @param zone   目标区域
    * @param player 新的所属玩家
    */
@@ -171,8 +140,6 @@ export class Card implements ICard {
     this.owner = player
     this.moveTo(zone)
   }
-
-  // ── 查询 ──
 
   /**
    * 检查卡牌是否拥有指定标签。
@@ -196,14 +163,14 @@ export class Card implements ICard {
   }
 
   /**
-   * 检查卡牌是否为符文（锦囊）牌。
+   * 检查卡牌是否为符文牌。
    */
   get isRune(): boolean {
     return this.type === CardType.Rune
   }
 
   /**
-   * 检查卡牌是否为延时锦囊。
+   * 检查卡牌是否为延时符文牌。
    */
   get isDelayedRune(): boolean {
     return this.type === CardType.Rune && this.isDelayed
@@ -223,11 +190,9 @@ export class Card implements ICard {
     this.visibleTo = players
   }
 
-  /**
-   * 重置实例计数器（主要用于测试）。
-   */
-  static resetCounter(): void {
-    Card._counter = 0
+  /** 重置 ID 生成器（重放 / 测试前调用） */
+  static resetIdGenerator(): void {
+    Card._idGenerator.reset()
   }
 
   /**
@@ -235,6 +200,7 @@ export class Card implements ICard {
    */
   toJSON(): Omit<ICard, 'tags'> & { tags: string[] } {
     return {
+      instanceId: this.instanceId,
       id: this.id,
       name: this.name,
       type: this.type,
@@ -251,6 +217,7 @@ export class Card implements ICard {
       zone: this.zone,
       visibleTo: this.visibleTo,
       virtual: this.virtual,
+      isFaceDown: this.isFaceDown,
     }
   }
 }

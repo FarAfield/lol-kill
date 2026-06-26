@@ -1,6 +1,6 @@
 <template>
   <n-modal
-    v-model:show="visible"
+    :show="visible"
     :closable="canCancel"
     :mask-closable="false"
     preset="card"
@@ -51,13 +51,12 @@
             }"
             @click="handleSelectCard(card.id)"
           >
-            <CardFace
-              :card="card"
-              :selected="selectedCardId === card.id"
-            />
+            <CardFace :card="card" :selected="selectedCardId === card.id" />
             <div class="card-check" v-if="selectedCardId === card.id">
               <n-icon size="20" color="#18a058">
-                <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/></svg>
+                <svg viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor" />
+                </svg>
               </n-icon>
             </div>
           </div>
@@ -67,13 +66,7 @@
       <!-- 操作按钮 -->
       <div class="response-actions">
         <n-space justify="end" :size="12">
-          <n-button
-            v-if="canCancel"
-            size="medium"
-            @click="handleCancel"
-          >
-            不出
-          </n-button>
+          <n-button v-if="canCancel" size="medium" @click="handleCancel"> 不出 </n-button>
           <n-button
             type="primary"
             size="medium"
@@ -90,13 +83,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import {
-  NModal,
-  NButton,
-  NText,
-  NSpace,
-  NIcon,
-} from 'naive-ui'
+import { NModal, NButton, NText, NSpace, NIcon } from 'naive-ui'
 import type { ICard } from '@core/contracts/card.interface'
 import CardFace from '@/components/card/CardFace.vue'
 
@@ -248,8 +235,12 @@ function handleClose(show: boolean): void {
 }
 
 @keyframes pulse-text {
-  from { opacity: 1; }
-  to { opacity: 0.5; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.5;
+  }
 }
 
 // ── 卡牌选择 ──
@@ -275,7 +266,9 @@ function handleClose(show: boolean): void {
   position: relative;
   cursor: pointer;
   border-radius: 8px;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
 
   &:hover:not(.disabled) {
     transform: translateY(-4px);

@@ -4,7 +4,6 @@
 
 // ── 基础类型别名 ──
 export type {
-  CardRank,
   Position,
   CardId,
   PlayerId,
@@ -20,6 +19,7 @@ export type {
 export {
   CardSuit,
   CardType,
+  CardRank,
   ZoneType,
   GamePhase,
   TriggerTiming,

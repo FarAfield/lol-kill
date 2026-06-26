@@ -117,6 +117,7 @@ export class GameController {
   private decisionService: IUIDecisionService | null = null
   private piniaStore: IGameStore | null = null
   private isRunning = false
+  private gameResult: IGameResult | null = null
 
   constructor() {
     this.storeService = new StoreService()
@@ -491,6 +492,39 @@ export class GameController {
     return this.engine?.isGameOver ?? false
   }
 
+  /**
+   * 主动检查游戏是否满足结束条件。
+   *
+   * 在 UI 驱动的逐步推进模式下，每次玩家操作后应调用此方法。
+   * 如果游戏满足结束条件，会自动标记 finished 并返回结果。
+   *
+   * @returns 游戏结果（如果游戏结束），null 表示游戏继续
+   */
+  checkGameOver(): IGameResult | null {
+    if (!this.engine) return null
+
+    // 已经结束则返回已有结果
+    if (this.gameResult) return this.gameResult
+
+    // 调用 DeathSystem 检查胜利条件
+    const result = this.engine.deathSystem.checkGameOver()
+    if (result) {
+      // 标记游戏结束
+      this.engine.state.markFinished()
+      this.gameResult = result
+      this.syncToStore()
+    }
+
+    return result
+  }
+
+  /**
+   * 获取游戏结果（仅在游戏结束后有效）。
+   */
+  getGameResult(): IGameResult | null {
+    return this.gameResult
+  }
+
   // ── 私有方法 ──
 
   /**
@@ -614,6 +648,7 @@ export class GameController {
     }
     this.engine = null
     this.isRunning = false
+    this.gameResult = null
   }
 
   /**

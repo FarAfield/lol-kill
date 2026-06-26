@@ -143,6 +143,8 @@ import { useGameStore } from '@/store/game-store'
 import { GameController } from '@/services/game-controller'
 import { GamePhase, SkillType, LogLevel } from '@core/contracts/enums'
 import type { ICard } from '@core/contracts/card.interface'
+import type { IGameConfig, IGameResult } from '@core/contracts/game.interface'
+import { standard5pConfig } from '@source/modes/standard-5p'
 import GameBoard from '@/components/game/GameBoard.vue'
 import CardHand from '@/components/card/CardHand.vue'
 import PhaseBar from '@/components/game/PhaseBar.vue'
@@ -285,12 +287,14 @@ function handleHoverTarget(targetId: string | null): void {
 
 async function handleConfirmPlay(): Promise<void> {
   await cardPlay.confirmPlay()
+  checkGameOverStatus()
 }
 
 async function handleEndPhase(): Promise<void> {
   cardPlay.cancelSelection()
   discardSelectedIds.value = []
   await controller.value?.endPhase()
+  checkGameOverStatus()
 }
 
 function handleCancelAll(): void {
@@ -315,6 +319,7 @@ function handleDiscardSelect(cardId: string): void {
 async function handleConfirmDiscard(): Promise<void> {
   await controller.value?.discardCards([...discardSelectedIds.value])
   discardSelectedIds.value = []
+  checkGameOverStatus()
 }
 
 // ── 响应处理 ──
@@ -335,24 +340,86 @@ async function handleActivateSkill(effectId: string): Promise<void> {
       : [],
     [],
   )
+  checkGameOverStatus()
+}
+
+// ── 游戏结束检测 ──
+
+/** 检查游戏是否结束，若结束则显示结果弹窗 */
+function checkGameOverStatus(): void {
+  const ctrl = controller.value
+  if (!ctrl) return
+
+  const result = ctrl.checkGameOver()
+  if (result) {
+    gameResult.value = result
+    gameOverPlayers.value = ctrl.getGameState()?.players ?? []
+    showGameOver.value = true
+
+    logStore.addLog({
+      id: `log_gameover_${Date.now()}`,
+      timestamp: Date.now(),
+      round: result.totalRounds,
+      phase: GamePhase.GameOver,
+      message: `游戏结束: ${result.reason}`,
+      level: LogLevel.Info,
+    })
+  }
 }
 
 // ── 游戏流程 ──
 
-async function handleStartGame(): void {
+async function handleStartGame(): Promise<void> {
+  const ctrl = controller.value
+  if (!ctrl) return
+
   showWelcome.value = false
   gameStartTime.value = Date.now()
   logStore.clear()
-  // TODO: 在 Phase 15 中通过 GameBoot 完整初始化
-  // 当前阶段仅展示 UI 布局
-  logStore.addLog({
-    id: `log_${Date.now()}`,
-    timestamp: Date.now(),
-    round: 0,
-    phase: GamePhase.NotStarted,
-    message: '游戏准备开始...',
-    level: LogLevel.Debug,
-  })
+
+  try {
+    // 使用标准 5 人局配置初始化游戏
+    const config: IGameConfig = { ...standard5pConfig }
+
+    logStore.addLog({
+      id: `log_${Date.now()}`,
+      timestamp: Date.now(),
+      round: 0,
+      phase: GamePhase.NotStarted,
+      message: `正在初始化游戏 (模式: ${config.mode}, ${config.playerCount} 人局)...`,
+      level: LogLevel.Info,
+    })
+
+    // 创建并初始化游戏引擎
+    await ctrl.createGame(config)
+
+    logStore.addLog({
+      id: `log_${Date.now() + 1}`,
+      timestamp: Date.now(),
+      round: 0,
+      phase: GamePhase.Prepare,
+      message: `游戏初始化完成 — ${config.playerCount} 名玩家就绪，开始第一回合`,
+      level: LogLevel.Info,
+    })
+
+    // 启动游戏：进入第一个玩家的回合
+    await ctrl.startGame()
+
+    // 启动后检查游戏状态
+    checkGameOverStatus()
+  } catch (err) {
+    console.error('[GameView] 游戏初始化失败:', err)
+    logStore.addLog({
+      id: `log_error_${Date.now()}`,
+      timestamp: Date.now(),
+      round: 0,
+      phase: GamePhase.NotStarted,
+      message: `游戏初始化失败: ${err instanceof Error ? err.message : String(err)}`,
+      level: LogLevel.Error,
+    })
+    // 初始化失败时重新显示欢迎弹窗
+    showWelcome.value = true
+  }
 }
 
 function handleLeave(): void {
@@ -363,14 +430,20 @@ function handleLeave(): void {
 }
 
 /** 再来一局 */
-function handlePlayAgain(): void {
+async function handlePlayAgain(): Promise<void> {
   showGameOver.value = false
   gameResult.value = null
   gameOverPlayers.value = []
   logStore.clear()
   animation.clearHistory()
-  // 重新初始化游戏
-  handleStartGame()
+  // 清理上一局状态并重新初始化
+  controller.value?.destroy()
+  gameStore.reset()
+  // 重新创建 controller 并绑定 store
+  const ctrl = new GameController()
+  ctrl.bindStore(gameStore as unknown as { syncFromEngine: (s: never) => void; reset: () => void })
+  controller.value = ctrl
+  await handleStartGame()
 }
 
 /** 返回大厅 */
@@ -385,7 +458,10 @@ function handleGoLobby(): void {
 
 // ── 生命周期 ──
 onMounted(() => {
-  controller.value = new GameController()
+  const ctrl = new GameController()
+  // gameStore 满足 IGameStore 接口（syncFromEngine / reset），直接绑定
+  ctrl.bindStore(gameStore as unknown as { syncFromEngine: (s: never) => void; reset: () => void })
+  controller.value = ctrl
 })
 
 onUnmounted(() => {

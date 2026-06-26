@@ -19,6 +19,7 @@ import type { CardDefinition } from '@core/entity/card'
  * 过河拆桥 — 弃置目标角色区域内一张牌。
  */
 export const GuoHeChaiQiao: CardDefinition = {
+  id: 'guoHeChaiQiao',
   name: '过河拆桥',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -34,6 +35,7 @@ export const GuoHeChaiQiao: CardDefinition = {
  * 顺手牵羊 — 获得目标角色区域内一张牌。
  */
 export const ShunShouQianYang: CardDefinition = {
+  id: 'shunShouQianYang',
   name: '顺手牵羊',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -49,6 +51,7 @@ export const ShunShouQianYang: CardDefinition = {
  * 无中生有 — 摸2张牌。
  */
 export const WuZhongShengYou: CardDefinition = {
+  id: 'wuZhongShengYou',
   name: '无中生有',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -64,6 +67,7 @@ export const WuZhongShengYou: CardDefinition = {
  * 南蛮入侵 — 所有其他角色需出杀，否则受到1点伤害。
  */
 export const NanManRuQin: CardDefinition = {
+  id: 'nanManRuQin',
   name: '南蛮入侵',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -79,6 +83,7 @@ export const NanManRuQin: CardDefinition = {
  * 万箭齐发 — 所有其他角色需出闪，否则受到1点伤害。
  */
 export const WanJianQiFa: CardDefinition = {
+  id: 'wanJianQiFa',
   name: '万箭齐发',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -94,6 +99,7 @@ export const WanJianQiFa: CardDefinition = {
  * 决斗 — 与目标轮流出杀，先不出者受到1点伤害。
  */
 export const JueDou: CardDefinition = {
+  id: 'jueDou',
   name: '决斗',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -109,6 +115,7 @@ export const JueDou: CardDefinition = {
  * 无懈可击 — 抵消一张锦囊牌效果。
  */
 export const WuXieKeJi: CardDefinition = {
+  id: 'wuXieKeJi',
   name: '无懈可击',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -124,6 +131,7 @@ export const WuXieKeJi: CardDefinition = {
  * 五谷丰登 — 亮出等同于存活角色数的牌，依次各选一张。
  */
 export const WuGuFengDeng: CardDefinition = {
+  id: 'wuGuFengDeng',
   name: '五谷丰登',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -139,6 +147,7 @@ export const WuGuFengDeng: CardDefinition = {
  * 桃园结义 — 所有角色回复1点体力。
  */
 export const TaoYuanJieYi: CardDefinition = {
+  id: 'taoYuanJieYi',
   name: '桃园结义',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -154,6 +163,7 @@ export const TaoYuanJieYi: CardDefinition = {
  * 借刀杀人 — 令一名角色对其攻击范围内另一角色出杀，否则将其武器交给你。
  */
 export const JieDaoShaRen: CardDefinition = {
+  id: 'jieDaoShaRen',
   name: '借刀杀人',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -171,6 +181,7 @@ export const JieDaoShaRen: CardDefinition = {
  * 乐不思蜀 — 判定生效后跳过出牌阶段。
  */
 export const LeBuSiShu: CardDefinition = {
+  id: 'leBuSiShu',
   name: '乐不思蜀',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -186,6 +197,7 @@ export const LeBuSiShu: CardDefinition = {
  * 兵粮寸断 — 判定生效后跳过摸牌阶段。
  */
 export const BingLiangCunDuan: CardDefinition = {
+  id: 'bingLiangCunDuan',
   name: '兵粮寸断',
   type: CardType.Rune,
   suit: CardSuit.None,
@@ -201,6 +213,7 @@ export const BingLiangCunDuan: CardDefinition = {
  * 闪电 — 判定生效后受到3点雷电伤害。
  */
 export const ShanDian: CardDefinition = {
+  id: 'shanDian',
   name: '闪电',
   type: CardType.Rune,
   suit: CardSuit.None,

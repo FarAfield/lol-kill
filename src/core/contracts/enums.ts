@@ -36,6 +36,31 @@ export enum ZoneType {
 }
 
 /**
+ * 卡牌点数（A–K）
+ *
+ * 与标准扑克牌点数对应：
+ * - 1  = A (Ace)
+ * - 11 = J (Jack)
+ * - 12 = Q (Queen)
+ * - 13 = K (King)
+ */
+export enum CardRank {
+  A = 1,
+  Two = 2,
+  Three = 3,
+  Four = 4,
+  Five = 5,
+  Six = 6,
+  Seven = 7,
+  Eight = 8,
+  Nine = 9,
+  Ten = 10,
+  J = 11,
+  Q = 12,
+  K = 13,
+}
+
+/**
  * 游戏阶段（全生命周期）
  *
  * 涵盖从游戏准备到结束的全部阶段。

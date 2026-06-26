@@ -20,6 +20,7 @@ import type { CardDefinition } from '@core/entity/card'
  * 效果：对目标角色造成1点伤害（可被闪响应）
  */
 export const Sha: CardDefinition = {
+  id: 'sha',
   name: '杀',
   type: CardType.Basic,
   suit: CardSuit.None,
@@ -39,6 +40,7 @@ export const Sha: CardDefinition = {
  * 效果：抵消一张杀或万箭齐发的效果
  */
 export const Shan: CardDefinition = {
+  id: 'shan',
   name: '闪',
   type: CardType.Basic,
   suit: CardSuit.None,
@@ -58,6 +60,7 @@ export const Shan: CardDefinition = {
  * 效果：目标回复1点体力；在濒死时使用可救活濒死角色
  */
 export const Tao: CardDefinition = {
+  id: 'tao',
   name: '桃',
   type: CardType.Basic,
   suit: CardSuit.None,
@@ -78,6 +81,7 @@ export const Tao: CardDefinition = {
  * 效果（濒死时）：回复1点体力
  */
 export const Jiu: CardDefinition = {
+  id: 'jiu',
   name: '酒',
   type: CardType.Basic,
   suit: CardSuit.None,

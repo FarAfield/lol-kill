@@ -51,7 +51,7 @@ describe('RoleSystem', () => {
   describe('assignRoles', () => {
     function createPlayers(count: number): Player[] {
       return Array.from({ length: count }, (_, i) =>
-        Player.create(`p${i}`, i),
+        new Player({ id: `p${i}`, seatIndex: i }),
       )
     }
 
@@ -186,28 +186,17 @@ describe('RoleSystem', () => {
 
   describe('getVisibleRole', () => {
     it('should return role if revealed', () => {
-      const player = Player.create('p1', 1, undefined, {
-        role: RoleType.Ascended,
-        roleRevealed: true,
-      })
+      const player = new Player({ id: 'p1', seatIndex: 1, role: RoleType.Ascended, roleRevealed: true })
       expect(roleSystem.getVisibleRole(player)).toBe(RoleType.Ascended)
     })
 
     it('should return role if player is dead', () => {
-      const player = Player.create('p1', 1, undefined, {
-        role: RoleType.Ascended,
-        alive: false,
-        roleRevealed: false,
-      })
+      const player = new Player({ id: 'p1', seatIndex: 1, role: RoleType.Ascended, alive: false, roleRevealed: false })
       expect(roleSystem.getVisibleRole(player)).toBe(RoleType.Ascended)
     })
 
     it('should return undefined if role is hidden and alive', () => {
-      const player = Player.create('p1', 1, undefined, {
-        role: RoleType.Ascended,
-        roleRevealed: false,
-        alive: true,
-      })
+      const player = new Player({ id: 'p1', seatIndex: 1, role: RoleType.Ascended, roleRevealed: false, alive: true })
       expect(roleSystem.getVisibleRole(player)).toBeUndefined()
     })
   })
@@ -216,7 +205,7 @@ describe('RoleSystem', () => {
     it('should show all roles to lord', () => {
       const roles = RoleSystem.getStandardRoles(5)
       const players = Array.from({ length: 5 }, (_, i) =>
-        Player.create(`p${i}`, i),
+        new Player({ id: `p${i}`, seatIndex: i }),
       )
       roleSystem.assignRoles(players, roles)
 
@@ -239,7 +228,7 @@ describe('RoleSystem', () => {
     it('should hide hidden roles from other players', () => {
       const roles = RoleSystem.getStandardRoles(5)
       const players = Array.from({ length: 5 }, (_, i) =>
-        Player.create(`p${i}`, i),
+        new Player({ id: `p${i}`, seatIndex: i }),
       )
       roleSystem.assignRoles(players, roles)
 
@@ -259,7 +248,7 @@ describe('RoleSystem', () => {
 
     it('should show dead players roles', () => {
       const players = Array.from({ length: 5 }, (_, i) =>
-        Player.create(`p${i}`, i),
+        new Player({ id: `p${i}`, seatIndex: i }),
       )
       const roles = RoleSystem.getStandardRoles(5)
       roleSystem.assignRoles(players, roles)
@@ -280,22 +269,10 @@ describe('RoleSystem', () => {
 
   describe('getAlivePlayersByRole', () => {
     it('should return only alive players of specified role', () => {
-      const p1 = Player.create('p1', 0, undefined, {
-        role: RoleType.Aspect,
-        alive: true,
-      })
-      const p2 = Player.create('p2', 1, undefined, {
-        role: RoleType.Ascended,
-        alive: true,
-      })
-      const p3 = Player.create('p3', 2, undefined, {
-        role: RoleType.Ascended,
-        alive: false,
-      })
-      const p4 = Player.create('p4', 3, undefined, {
-        role: RoleType.Ascended,
-        alive: true,
-      })
+      const p1 = new Player({ id: 'p1', seatIndex: 0, role: RoleType.Aspect, alive: true })
+      const p2 = new Player({ id: 'p2', seatIndex: 1, role: RoleType.Ascended, alive: true })
+      const p3 = new Player({ id: 'p3', seatIndex: 2, role: RoleType.Ascended, alive: false })
+      const p4 = new Player({ id: 'p4', seatIndex: 3, role: RoleType.Ascended, alive: true })
 
       const alive = roleSystem.getAlivePlayersByRole(
         [p1, p2, p3, p4],
@@ -309,7 +286,7 @@ describe('RoleSystem', () => {
   describe('getLord', () => {
     it('should return the lord player', () => {
       const players = Array.from({ length: 5 }, (_, i) =>
-        Player.create(`p${i}`, i),
+        new Player({ id: `p${i}`, seatIndex: i }),
       )
       const roles = RoleSystem.getStandardRoles(5)
       roleSystem.assignRoles(players, roles)
@@ -322,7 +299,7 @@ describe('RoleSystem', () => {
 
     it('should return undefined if no lord', () => {
       const players = [
-        Player.create('p1', 0, undefined, { role: RoleType.Ascended }),
+        new Player({ id: 'p1', seatIndex: 0, role: RoleType.Ascended }),
       ]
       expect(roleSystem.getLord(players)).toBeUndefined()
     })
@@ -332,10 +309,7 @@ describe('RoleSystem', () => {
 
   describe('revealRole', () => {
     it('should set roleRevealed to true', () => {
-      const player = Player.create('p1', 1, undefined, {
-        role: RoleType.Ascended,
-        roleRevealed: false,
-      })
+      const player = new Player({ id: 'p1', seatIndex: 1, role: RoleType.Ascended, roleRevealed: false })
       roleSystem.revealRole(player)
       expect(player.roleRevealed).toBe(true)
     })
@@ -343,18 +317,12 @@ describe('RoleSystem', () => {
 
   describe('isRoleRevealed', () => {
     it('should return true when role is revealed', () => {
-      const player = Player.create('p1', 1, undefined, {
-        role: RoleType.Ascended,
-        roleRevealed: true,
-      })
+      const player = new Player({ id: 'p1', seatIndex: 1, role: RoleType.Ascended, roleRevealed: true })
       expect(roleSystem.isRoleRevealed(player)).toBe(true)
     })
 
     it('should return false when role is not revealed', () => {
-      const player = Player.create('p1', 1, undefined, {
-        role: RoleType.Ascended,
-        roleRevealed: false,
-      })
+      const player = new Player({ id: 'p1', seatIndex: 1, role: RoleType.Ascended, roleRevealed: false })
       expect(roleSystem.isRoleRevealed(player)).toBe(false)
     })
   })

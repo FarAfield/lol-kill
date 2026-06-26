@@ -1,11 +1,3 @@
-// ============================================================
-// 联盟杀 · 玩家接口
-//
-// 统一 IPlayer —— 不再拆分 IPlayerState。
-// 所有玩家数据由引擎维护，通过 IStoreService 同步到 UI 层。
-// UI 从 Pinia Store 读取的数据结构与 IPlayer 一致。
-// ============================================================
-
 import type { PlayerId, Position } from './types'
 import type { RoleType, GamePhase } from './enums'
 import type { IHero } from './hero.interface'

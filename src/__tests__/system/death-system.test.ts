@@ -46,19 +46,19 @@ describe('DeathSystem', () => {
 
   describe('checkDying', () => {
     it('should return true for alive player with hp <= 0', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       player.hp = 0
       expect(deathSystem.checkDying(player)).toBe(true)
     })
 
     it('should return false for alive player with hp > 0', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       player.hp = 3
       expect(deathSystem.checkDying(player)).toBe(false)
     })
 
     it('should return false for dead player with hp <= 0', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       player.alive = false
       player.hp = 0
       expect(deathSystem.checkDying(player)).toBe(false)
@@ -67,9 +67,9 @@ describe('DeathSystem', () => {
 
   describe('getDyingPlayers', () => {
     it('should return all dying players', () => {
-      const p1 = Player.create('p1', 0)
-      const p2 = Player.create('p2', 1)
-      const p3 = Player.create('p3', 2)
+      const p1 = new Player({ id: 'p1', seatIndex: 0 })
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
+      const p3 = new Player({ id: 'p3', seatIndex: 2 })
       p1.hp = 0
       p2.hp = 3
       p3.hp = 0
@@ -84,8 +84,8 @@ describe('DeathSystem', () => {
 
   describe('askForPeach', () => {
     it('should save dying player when someone uses a peach', async () => {
-      const p1 = Player.create('p1', 0) // dying
-      const p2 = Player.create('p2', 1)
+      const p1 = new Player({ id: 'p1', seatIndex: 0 }) // dying
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       p1.hp = 0
       state.players = [p1, p2]
       state.currentPlayerIndex = 0
@@ -104,8 +104,8 @@ describe('DeathSystem', () => {
     })
 
     it('should return false when no one uses a peach', async () => {
-      const p1 = Player.create('p1', 0)
-      const p2 = Player.create('p2', 1)
+      const p1 = new Player({ id: 'p1', seatIndex: 0 })
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       p1.hp = 0
       state.players = [p1, p2]
 
@@ -120,10 +120,10 @@ describe('DeathSystem', () => {
     })
 
     it('should skip dead players when asking for peach', async () => {
-      const p1 = Player.create('p1', 0) // dying
-      const p2 = Player.create('p2', 1)
+      const p1 = new Player({ id: 'p1', seatIndex: 0 }) // dying
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       p2.alive = false // dead
-      const p3 = Player.create('p3', 2)
+      const p3 = new Player({ id: 'p3', seatIndex: 2 })
       p1.hp = 0
       state.players = [p1, p2, p3]
 
@@ -142,7 +142,7 @@ describe('DeathSystem', () => {
 
   describe('handleDeath', () => {
     it('should mark player as dead', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const card1 = createPeachCard()
       card1.zone = ZoneType.Hand
       card1.owner = player
@@ -158,9 +158,7 @@ describe('DeathSystem', () => {
     })
 
     it('should reveal role on death', () => {
-      const player = Player.create('p1', 0, testHero, {
-        role: RoleType.Ascended,
-      })
+      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0, role: RoleType.Ascended })
       expect(player.roleRevealed).toBe(false)
 
       deathSystem.handleDeath(player)
@@ -169,7 +167,7 @@ describe('DeathSystem', () => {
     })
 
     it('should discard all cards from all zones', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const handCard = createPeachCard()
       handCard.zone = ZoneType.Hand
       handCard.owner = player
@@ -201,7 +199,7 @@ describe('DeathSystem', () => {
 
   describe('checkGameOver', () => {
     function createPlayerWithRole(id: string, seat: number, role: RoleType, alive: boolean): Player {
-      return Player.create(id, seat, testHero, { role, alive })
+      return new Player({ id, seatIndex: seat, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0, role, alive })
     }
 
     it('should return null when game is ongoing', () => {
@@ -260,8 +258,8 @@ describe('DeathSystem', () => {
 
   describe('handleReward', () => {
     it('should set reward mark when rebel is killed', () => {
-      const rebel = Player.create('rebel', 1, testHero, { role: RoleType.Ascended })
-      const killer = Player.create('killer', 0, testHero)
+      const rebel = new Player({ id: 'rebel', seatIndex: 1, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0, role: RoleType.Ascended })
+      const killer = new Player({ id: 'killer', seatIndex: 0, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
 
       deathSystem.handleReward(rebel, killer)
 
@@ -269,8 +267,8 @@ describe('DeathSystem', () => {
     })
 
     it('should not set reward if killer is dead', () => {
-      const rebel = Player.create('rebel', 1, testHero, { role: RoleType.Ascended })
-      const killer = Player.create('killer', 0, testHero)
+      const rebel = new Player({ id: 'rebel', seatIndex: 1, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0, role: RoleType.Ascended })
+      const killer = new Player({ id: 'killer', seatIndex: 0, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
       killer.alive = false
 
       deathSystem.handleReward(rebel, killer)
@@ -295,9 +293,9 @@ describe('DeathSystem', () => {
   describe('edge cases: consecutive near-death', () => {
     it('should treat each near-death event as independent peach-asking', async () => {
       // Setup: 3 players, p0 and p1 both near death, p2 is alive
-      const p0 = Player.create('p0', 0, testHero)
-      const p1 = Player.create('p1', 1, testHero)
-      const p2 = Player.create('p2', 2, testHero)
+      const p0 = new Player({ id: 'p0', seatIndex: 0, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
+      const p1 = new Player({ id: 'p1', seatIndex: 1, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
+      const p2 = new Player({ id: 'p2', seatIndex: 2, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
 
       // Both p0 and p1 are near death
       p0.hp = 0
@@ -320,9 +318,9 @@ describe('DeathSystem', () => {
     })
 
     it('should not reset a saved player when another player continues dying', async () => {
-      const p0 = Player.create('p0', 0, testHero)
-      const p1 = Player.create('p1', 1, testHero)
-      const p2 = Player.create('p2', 2, testHero)
+      const p0 = new Player({ id: 'p0', seatIndex: 0, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
+      const p1 = new Player({ id: 'p1', seatIndex: 1, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
+      const p2 = new Player({ id: 'p2', seatIndex: 2, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
 
       p0.hp = 0
       p1.hp = 0
@@ -392,7 +390,7 @@ describe('DeathSystem', () => {
  * Helper: create a dead player for testing.
  */
 function createDeadPlayer(id: string, seat: number) {
-  const player = Player.create(id, seat, testHero)
+  const player = new Player({ id, seatIndex: seat, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
   player.alive = false
   return player
 }

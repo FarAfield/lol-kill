@@ -65,7 +65,7 @@ describe('SkillRegistry', () => {
 
   describe('registerPlayerEffects', () => {
     it('应为玩家注册单个效果', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const effect = createTestEffect('e1')
       effectRegistry.register(effect)
 
@@ -77,7 +77,7 @@ describe('SkillRegistry', () => {
     })
 
     it('应为玩家批量注册多个效果', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const effects = [
         createTestEffect('e1'),
         createTestEffect('e2'),
@@ -94,7 +94,7 @@ describe('SkillRegistry', () => {
     })
 
     it('不应重复注册相同的效果', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const effect = createTestEffect('e1')
       effectRegistry.register(effect)
 
@@ -106,8 +106,8 @@ describe('SkillRegistry', () => {
     })
 
     it('应为不同玩家注册相同的效果', () => {
-      const p1 = Player.create('p1', 0)
-      const p2 = Player.create('p2', 1)
+      const p1 = new Player({ id: 'p1', seatIndex: 0 })
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       const effect = createTestEffect('e1')
       effectRegistry.register(effect)
 
@@ -128,7 +128,7 @@ describe('SkillRegistry', () => {
       const effect2 = createTestEffect('hujia')
       effectRegistry.registerAll([effect1, effect2])
 
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const hero = createTestHero(['jianxiong', 'hujia'])
 
       const count = skillRegistry.loadHeroSkills(player, hero)
@@ -142,7 +142,7 @@ describe('SkillRegistry', () => {
       const effect1 = createTestEffect('e1')
       effectRegistry.register(effect1)
 
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const hero = createTestHero(['e1', 'not_registered'])
 
       const count = skillRegistry.loadHeroSkills(player, hero)
@@ -152,7 +152,7 @@ describe('SkillRegistry', () => {
     })
 
     it('英雄无效果时返回0', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const hero = createTestHero([])
 
       const count = skillRegistry.loadHeroSkills(player, hero)
@@ -170,8 +170,8 @@ describe('SkillRegistry', () => {
       const e3 = createTestEffect('e3')
       effectRegistry.registerAll([e1, e2, e3])
 
-      const p1 = Player.create('p1', 0, createTestHero(['e1', 'e2']))
-      const p2 = Player.create('p2', 1, createTestHero(['e3']))
+      const p1 = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero(['e1', 'e2'])], hp: 4, maxHp: 4 })
+      const p2 = new Player({ id: 'p2', seatIndex: 1, heroes: [createTestHero(['e3'])], hp: 4, maxHp: 4 })
 
       const total = skillRegistry.loadAllHeroSkills([p1, p2])
 
@@ -185,8 +185,8 @@ describe('SkillRegistry', () => {
       const e1 = createTestEffect('e1')
       effectRegistry.register(e1)
 
-      const p1 = Player.create('p1', 0, createTestHero(['e1']))
-      const p2 = Player.create('p2', 1, createTestHero(['e1']))
+      const p1 = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero(['e1'])], hp: 4, maxHp: 4 })
+      const p2 = new Player({ id: 'p2', seatIndex: 1, heroes: [createTestHero(['e1'])], hp: 4, maxHp: 4 })
       p2.alive = false
 
       const total = skillRegistry.loadAllHeroSkills([p1, p2])
@@ -199,7 +199,7 @@ describe('SkillRegistry', () => {
 
   describe('unregisterPlayer', () => {
     it('应注销玩家的所有效果', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const e1 = createTestEffect('e1')
       const e2 = createTestEffect('e2')
       effectRegistry.registerAll([e1, e2])
@@ -217,7 +217,7 @@ describe('SkillRegistry', () => {
 
   describe('unregisterEffect', () => {
     it('应注销玩家的单个效果', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const e1 = createTestEffect('e1')
       const e2 = createTestEffect('e2')
       effectRegistry.registerAll([e1, e2])
@@ -235,7 +235,7 @@ describe('SkillRegistry', () => {
 
   describe('enableEffect / disableEffect', () => {
     it('应启用觉醒技', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const awakenEffect = createTestEffect('awaken_skill', {
         type: SkillType.Awaken,
         enabled: false,
@@ -250,14 +250,14 @@ describe('SkillRegistry', () => {
     })
 
     it('启用未注册的效果应失败', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const result = skillRegistry.enableEffect(player, 'not_registered')
 
       expect(result).toBe(false)
     })
 
     it('应禁用效果', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const effect = createTestEffect('e1', { enabled: true })
       effectRegistry.register(effect)
       skillRegistry.registerPlayerEffects(player, [effect])
@@ -273,7 +273,7 @@ describe('SkillRegistry', () => {
 
   describe('getPlayerEffectIds / getPlayerEffects', () => {
     it('应返回玩家已注册的效果ID列表', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const e1 = createTestEffect('e1')
       const e2 = createTestEffect('e2')
       effectRegistry.registerAll([e1, e2])
@@ -285,7 +285,7 @@ describe('SkillRegistry', () => {
     })
 
     it('应返回玩家已注册的效果实例', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const e1 = createTestEffect('e1')
       effectRegistry.register(e1)
       skillRegistry.registerPlayerEffects(player, [e1])
@@ -300,7 +300,7 @@ describe('SkillRegistry', () => {
 
   describe('clear', () => {
     it('应清空所有注册', () => {
-      const player = Player.create('p1', 0)
+      const player = new Player({ id: 'p1', seatIndex: 0 })
       const effect = createTestEffect('e1')
       effectRegistry.register(effect)
       skillRegistry.registerPlayerEffects(player, [effect])

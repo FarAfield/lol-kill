@@ -26,7 +26,7 @@ function createTestConfig(overrides?: Partial<IGameConfig>): IGameConfig {
 }
 
 function createTestPlayer(id: string, seat: number, role?: RoleType): Player {
-  return Player.create(id, seat, undefined, { role })
+  return new Player({ id, seatIndex: seat, role })
 }
 
 function createTestCardDef(name: string = '测试'): CardDefinition {

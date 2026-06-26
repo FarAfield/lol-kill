@@ -25,11 +25,7 @@ describe('WinCondition', () => {
     role: RoleType,
     alive: boolean,
   ): Player {
-    return Player.create(id, seat, undefined, {
-      role,
-      alive,
-      roleRevealed: role === RoleType.Aspect || !alive,
-    })
+    return new Player({ id, seatIndex: seat, role, alive, roleRevealed: role === RoleType.Aspect || !alive })
   }
 
   // ── checkVictory — 标准场景 ──

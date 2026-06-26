@@ -111,8 +111,8 @@ describe('曹操 · 奸雄', () => {
     state = new GameState()
     deps = createDeps(state)
 
-    caoCao = Player.create('caocao', 0, createTestHero({ id: 'caocao', effectIds: ['jianxiong'] }))
-    source = Player.create('source', 1, createTestHero({ id: 'enemy' }))
+    caoCao = new Player({ id: 'caocao', seatIndex: 0, heroes: [createTestHero({ id: 'caocao', effectIds: ['jianxiong'] })], hp: 4, maxHp: 4 })
+    source = new Player({ id: 'source', seatIndex: 1, heroes: [createTestHero({ id: 'enemy' })], hp: 4, maxHp: 4 })
 
     state.players = [caoCao, source]
 
@@ -198,8 +198,8 @@ describe('曹操 · 护驾', () => {
     const state = new GameState()
     const deps = createDeps(state)
 
-    const caoCao = Player.create('caocao', 0, createTestHero({ effectIds: ['hujia'] }))
-    const source = Player.create('source', 1, createTestHero())
+    const caoCao = new Player({ id: 'caocao', seatIndex: 0, heroes: [createTestHero({ effectIds: ['hujia'] })], hp: 4, maxHp: 4 })
+    const source = new Player({ id: 'source', seatIndex: 1, heroes: [createTestHero()], hp: 4, maxHp: 4 })
     state.players = [caoCao, source]
 
     const shaCard = Card.create(createCardDef({ name: '杀', tags: ['sha'] }))
@@ -228,8 +228,8 @@ describe('曹操 · 护驾', () => {
     const state = new GameState()
     const deps = createDeps(state)
 
-    const caoCao = Player.create('caocao', 0, createTestHero({ effectIds: ['hujia'] }))
-    const source = Player.create('source', 1, createTestHero())
+    const caoCao = new Player({ id: 'caocao', seatIndex: 0, heroes: [createTestHero({ effectIds: ['hujia'] })], hp: 4, maxHp: 4 })
+    const source = new Player({ id: 'source', seatIndex: 1, heroes: [createTestHero()], hp: 4, maxHp: 4 })
     state.players = [caoCao, source]
 
     const taoCard = Card.create(createCardDef({ name: '桃', tags: ['tao'] }))
@@ -266,8 +266,8 @@ describe('司马懿 · 反馈', () => {
     state = new GameState()
     deps = createDeps(state)
 
-    simaYi = Player.create('simayi', 0, createTestHero({ id: 'simayi', effectIds: ['fankui'] }))
-    source = Player.create('source', 1, createTestHero({ id: 'enemy' }))
+    simaYi = new Player({ id: 'simayi', seatIndex: 0, heroes: [createTestHero({ id: 'simayi', effectIds: ['fankui'] })], hp: 4, maxHp: 4 })
+    source = new Player({ id: 'source', seatIndex: 1, heroes: [createTestHero({ id: 'enemy' })], hp: 4, maxHp: 4 })
 
     // 给来源一些手牌
     for (let i = 0; i < 3; i++) {
@@ -357,8 +357,8 @@ describe('夏侯惇 · 刚烈', () => {
     state = new GameState()
     deps = createDeps(state)
 
-    xiahouDun = Player.create('xiahoudun', 0, createTestHero({ id: 'xiahoudun', effectIds: ['ganglie'] }))
-    source = Player.create('source', 1, createTestHero({ id: 'enemy' }))
+    xiahouDun = new Player({ id: 'xiahoudun', seatIndex: 0, heroes: [createTestHero({ id: 'xiahoudun', effectIds: ['ganglie'] })], hp: 4, maxHp: 4 })
+    source = new Player({ id: 'source', seatIndex: 1, heroes: [createTestHero({ id: 'enemy' })], hp: 4, maxHp: 4 })
 
     // 给来源一些手牌
     for (let i = 0; i < 3; i++) {
@@ -437,9 +437,9 @@ describe('张辽 · 突袭', () => {
     state = new GameState()
     deps = createDeps(state)
 
-    zhangLiao = Player.create('zhangliao', 0, createTestHero({ id: 'zhangliao', effectIds: ['tuxi'] }))
-    other1 = Player.create('other1', 1, createTestHero({ id: 'other1' }))
-    other2 = Player.create('other2', 2, createTestHero({ id: 'other2' }))
+    zhangLiao = new Player({ id: 'zhangliao', seatIndex: 0, heroes: [createTestHero({ id: 'zhangliao', effectIds: ['tuxi'] })], hp: 4, maxHp: 4 })
+    other1 = new Player({ id: 'other1', seatIndex: 1, heroes: [createTestHero({ id: 'other1' })], hp: 4, maxHp: 4 })
+    other2 = new Player({ id: 'other2', seatIndex: 2, heroes: [createTestHero({ id: 'other2' })], hp: 4, maxHp: 4 })
 
     // 给其他玩家手牌
     for (let i = 0; i < 3; i++) {
@@ -507,7 +507,7 @@ describe('刘备 · 仁德', () => {
   it('出牌阶段应标记仁德可用', async () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const liuBei = Player.create('liubei', 0, createTestHero({ id: 'liubei', effectIds: ['rende'] }))
+    const liuBei = new Player({ id: 'liubei', seatIndex: 0, heroes: [createTestHero({ id: 'liubei', effectIds: ['rende'] })], hp: 4, maxHp: 4 })
 
     // 给刘备手牌
     const card = Card.create(createCardDef({ name: '手牌', tags: ['basic'] }))
@@ -550,7 +550,7 @@ describe('关羽 · 武圣', () => {
   it('红色牌应可通过 viewAsFilter', () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const guanYu = Player.create('guanyu', 0, createTestHero({ id: 'guanyu', effectIds: ['wusheng'] }))
+    const guanYu = new Player({ id: 'guanyu', seatIndex: 0, heroes: [createTestHero({ id: 'guanyu', effectIds: ['wusheng'] })], hp: 4, maxHp: 4 })
     state.players = [guanYu]
 
     const redCard = Card.create(createCardDef({
@@ -574,7 +574,7 @@ describe('关羽 · 武圣', () => {
   it('viewAs: 红色牌应转换为杀', () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const guanYu = Player.create('guanyu', 0, createTestHero({ id: 'guanyu', effectIds: ['wusheng'] }))
+    const guanYu = new Player({ id: 'guanyu', seatIndex: 0, heroes: [createTestHero({ id: 'guanyu', effectIds: ['wusheng'] })], hp: 4, maxHp: 4 })
     state.players = [guanYu]
 
     const redCard = Card.create(createCardDef({
@@ -601,7 +601,7 @@ describe('关羽 · 武圣', () => {
   it('黑色牌不应通过 viewAsFilter', () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const guanYu = Player.create('guanyu', 0, createTestHero({ id: 'guanyu', effectIds: ['wusheng'] }))
+    const guanYu = new Player({ id: 'guanyu', seatIndex: 0, heroes: [createTestHero({ id: 'guanyu', effectIds: ['wusheng'] })], hp: 4, maxHp: 4 })
     state.players = [guanYu]
 
     const blackCard = Card.create(createCardDef({
@@ -632,7 +632,7 @@ describe('张飞 · 咆哮', () => {
   it('回合开始时应将攻击次数限制设为无限', async () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const zhangFei = Player.create('zhangfei', 0, createTestHero({ id: 'zhangfei', effectIds: ['paoxiao'] }))
+    const zhangFei = new Player({ id: 'zhangfei', seatIndex: 0, heroes: [createTestHero({ id: 'zhangfei', effectIds: ['paoxiao'] })], hp: 4, maxHp: 4 })
     state.players = [zhangFei]
 
     const turnStartEvent = new GameEvent({
@@ -672,7 +672,7 @@ describe('赵云 · 龙胆', () => {
   it('viewAs: 杀应转换为闪', () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const zhaoYun = Player.create('zhaoyun', 0, createTestHero({ id: 'zhaoyun', effectIds: ['longdan'] }))
+    const zhaoYun = new Player({ id: 'zhaoyun', seatIndex: 0, heroes: [createTestHero({ id: 'zhaoyun', effectIds: ['longdan'] })], hp: 4, maxHp: 4 })
     state.players = [zhaoYun]
 
     const shaCard = Card.create(createCardDef({
@@ -699,7 +699,7 @@ describe('赵云 · 龙胆', () => {
   it('viewAs: 闪应转换为杀', () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const zhaoYun = Player.create('zhaoyun', 0, createTestHero({ id: 'zhaoyun', effectIds: ['longdan'] }))
+    const zhaoYun = new Player({ id: 'zhaoyun', seatIndex: 0, heroes: [createTestHero({ id: 'zhaoyun', effectIds: ['longdan'] })], hp: 4, maxHp: 4 })
     state.players = [zhaoYun]
 
     const shanCard = Card.create(createCardDef({
@@ -725,7 +725,7 @@ describe('赵云 · 龙胆', () => {
   it('viewAsFilter: 非杀非闪的牌不应通过', () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const zhaoYun = Player.create('zhaoyun', 0, createTestHero({ id: 'zhaoyun', effectIds: ['longdan'] }))
+    const zhaoYun = new Player({ id: 'zhaoyun', seatIndex: 0, heroes: [createTestHero({ id: 'zhaoyun', effectIds: ['longdan'] })], hp: 4, maxHp: 4 })
     state.players = [zhaoYun]
 
     const taoCard = Card.create(createCardDef({
@@ -755,7 +755,7 @@ describe('孙权 · 制衡', () => {
   it('出牌阶段应标记制衡可用', async () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const sunQuan = Player.create('sunquan', 0, createTestHero({ id: 'sunquan', effectIds: ['zhiheng'] }))
+    const sunQuan = new Player({ id: 'sunquan', seatIndex: 0, heroes: [createTestHero({ id: 'sunquan', effectIds: ['zhiheng'] })], hp: 4, maxHp: 4 })
 
     // 给孙权手牌
     const card = Card.create(createCardDef({ name: '手牌', tags: ['basic'] }))
@@ -805,7 +805,7 @@ describe('吕蒙 · 克己', () => {
   it('未使用杀时应跳过弃牌阶段', async () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const lvMeng = Player.create('lvmeng', 0, createTestHero({ id: 'lvmeng', effectIds: ['keji'] }))
+    const lvMeng = new Player({ id: 'lvmeng', seatIndex: 0, heroes: [createTestHero({ id: 'lvmeng', effectIds: ['keji'] })], hp: 4, maxHp: 4 })
     state.players = [lvMeng]
 
     // 确保没有使用杀标记
@@ -834,7 +834,7 @@ describe('吕蒙 · 克己', () => {
   it('使用过杀后应正常进入弃牌阶段', () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const lvMeng = Player.create('lvmeng', 0, createTestHero({ id: 'lvmeng', effectIds: ['keji'] }))
+    const lvMeng = new Player({ id: 'lvmeng', seatIndex: 0, heroes: [createTestHero({ id: 'lvmeng', effectIds: ['keji'] })], hp: 4, maxHp: 4 })
     state.players = [lvMeng]
 
     // 标记使用了杀

@@ -101,8 +101,8 @@ describe('EventCompiler', () => {
     // 创建测试英雄
     const hero = createTestHero()
 
-    player1 = Player.create('p1', 0, hero)
-    player2 = Player.create('p2', 1, hero)
+    player1 = new Player({ id: 'p1', seatIndex: 0, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
+    player2 = new Player({ id: 'p2', seatIndex: 1, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
 
     state = new GameState({
       players: [player1, player2],

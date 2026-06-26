@@ -14,7 +14,7 @@ import type { IPlayer } from '@core/contracts/player.interface'
 function createPlayers(count: number, state: GameState): IPlayer[] {
   const players: IPlayer[] = []
   for (let i = 0; i < count; i++) {
-    const player = Player.create(`player_${i}`, i)
+    const player = new Player({ id: `player_${i}`, seatIndex: i })
     players.push(player)
   }
   state.players = players

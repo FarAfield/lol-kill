@@ -92,11 +92,7 @@ describe('张飞 · 咆哮 + 诸葛连弩 — 技能与装备交互', () => {
   it('咆哮设置的无限攻击次数应与连弩不冲突', async () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const zhangFei = Player.create('zhangfei', 0, createHero({
-      id: 'zhangfei',
-      name: '张飞',
-      effectIds: ['paoxiao'],
-    }))
+    const zhangFei = new Player({ id: 'zhangfei', seatIndex: 0, heroes: [createHero({ id: 'zhangfei', name: '张飞', effectIds: ['paoxiao'] })], hp: 4, maxHp: 4 })
     state.players = [zhangFei]
 
     // 咆哮回合开始
@@ -143,16 +139,8 @@ describe('赵云 · 龙胆 + 关羽 · 武圣 — 视作转换链', () => {
     const state = new GameState()
     const deps = createDeps(state)
 
-    const zhaoYun = Player.create('zhaoyun', 0, createHero({
-      id: 'zhaoyun',
-      name: '赵云',
-      effectIds: ['longdan'],
-    }))
-    const guanYu = Player.create('guanyu', 0, createHero({
-      id: 'guanyu',
-      name: '关羽',
-      effectIds: ['wusheng'],
-    }))
+    const zhaoYun = new Player({ id: 'zhaoyun', seatIndex: 0, heroes: [createHero({ id: 'zhaoyun', name: '赵云', effectIds: ['longdan'] })], hp: 4, maxHp: 4 })
+    const guanYu = new Player({ id: 'guanyu', seatIndex: 0, heroes: [createHero({ id: 'guanyu', name: '关羽', effectIds: ['wusheng'] })], hp: 4, maxHp: 4 })
     state.players = [zhaoYun, guanYu]
 
     // 测试龙胆：闪→杀
@@ -193,11 +181,7 @@ describe('赵云 · 龙胆 + 关羽 · 武圣 — 视作转换链', () => {
   it('两种视作技能的虚拟牌标记应一致', () => {
     const state = new GameState()
     const deps = createDeps(state)
-    const zhaoYun = Player.create('zhaoyun', 0, createHero({
-      id: 'zhaoyun',
-      name: '赵云',
-      effectIds: ['longdan'],
-    }))
+    const zhaoYun = new Player({ id: 'zhaoyun', seatIndex: 0, heroes: [createHero({ id: 'zhaoyun', name: '赵云', effectIds: ['longdan'] })], hp: 4, maxHp: 4 })
 
     state.players = [zhaoYun]
 
@@ -233,13 +217,9 @@ describe('曹操 · 奸雄 + 司马懿 · 反馈 — 同时受伤触发', () => 
     const state = new GameState()
     const deps = createDeps(state)
 
-    const caoCao = Player.create('caocao', 0, createHero({
-      id: 'caocao', name: '曹操', effectIds: ['jianxiong'],
-    }))
-    const simaYi = Player.create('simayi', 1, createHero({
-      id: 'simayi', name: '司马懿', effectIds: ['fankui'],
-    }))
-    const source = Player.create('source', 2, createHero({ id: 'enemy', name: '敌人', effectIds: [] }))
+    const caoCao = new Player({ id: 'caocao', seatIndex: 0, heroes: [createHero({ id: 'caocao', name: '曹操', effectIds: ['jianxiong'] })], hp: 4, maxHp: 4 })
+    const simaYi = new Player({ id: 'simayi', seatIndex: 1, heroes: [createHero({ id: 'simayi', name: '司马懿', effectIds: ['fankui'] })], hp: 4, maxHp: 4 })
+    const source = new Player({ id: 'source', seatIndex: 2, heroes: [createHero({ id: 'enemy', name: '敌人', effectIds: [] })], hp: 4, maxHp: 4 })
 
     // 给来源手牌
     const damageCardCao = Card.create(createCardDef({ name: '万箭齐发', tags: ['attack'] }))
@@ -324,13 +304,9 @@ describe('曹操 · 护驾 — 魏势力协助', () => {
     const deps = createDeps(state)
 
     // 曹操 (Demacia = 魏)
-    const caoCao = Player.create('caocao', 0, createHero({
-      id: 'caocao', name: '曹操', effectIds: ['hujia'],
-    }))
+    const caoCao = new Player({ id: 'caocao', seatIndex: 0, heroes: [createHero({ id: 'caocao', name: '曹操', effectIds: ['hujia'] })], hp: 4, maxHp: 4 })
     // 魏势力角色
-    const weiAlly = Player.create('weially', 1, createHero({
-      id: 'xiahoudun', name: '夏侯惇', effectIds: ['ganglie'],
-    }))
+    const weiAlly = new Player({ id: 'weially', seatIndex: 1, heroes: [createHero({ id: 'xiahoudun', name: '夏侯惇', effectIds: ['ganglie'] })], hp: 4, maxHp: 4 })
 
     state.players = [caoCao, weiAlly]
 
@@ -407,7 +383,7 @@ describe('SkillRegistry — 多英雄技能加载', () => {
       createHero({ id: 'zhaoyun', name: '赵云', effectIds: ['longdan'] }),
     ]
 
-    const players = heroes.map((h, i) => Player.create(`p${i}`, i, h))
+    const players = heroes.map((h, i) => new Player({ id: `p${i}`, seatIndex: i, heroes: [h], hp: h.maxHp, maxHp: h.maxHp, power: h.maxPower ?? 0, maxPower: h.maxPower ?? 0 }))
 
     const total = skillRegistry.loadAllHeroSkills(players)
     expect(total).toBe(5) // 曹操(2) + 张飞(1) + 关羽(1) + 赵云(1) = 5

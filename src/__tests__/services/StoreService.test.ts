@@ -18,10 +18,10 @@ function createTestState(overrides?: Partial<IGameState>): IGameState {
   })
 
   const players = [
-    Player.create('p0', 0),
-    Player.create('p1', 1),
-    Player.create('p2', 2),
-    Player.create('p3', 3),
+    new Player({ id: 'p0', seatIndex: 0 }),
+    new Player({ id: 'p1', seatIndex: 1 }),
+    new Player({ id: 'p2', seatIndex: 2 }),
+    new Player({ id: 'p3', seatIndex: 3 }),
   ]
 
   return new GameState({
@@ -111,7 +111,7 @@ describe('StoreService', () => {
 
   describe('syncPlayerState', () => {
     it('应该能同步单个玩家状态', () => {
-      const player = Player.create('test_player', 5)
+      const player = new Player({ id: 'test_player', seatIndex: 5 })
       player.hp = 2
       player.maxHp = 4
 

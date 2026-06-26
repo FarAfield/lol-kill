@@ -124,9 +124,9 @@ describe('Equipment Card Effects', () => {
     ])
 
     const hero = createTestHero()
-    p1 = Player.create('p1', 0, hero)
-    p2 = Player.create('p2', 1, hero)
-    p3 = Player.create('p3', 2, hero)
+    p1 = new Player({ id: 'p1', seatIndex: 0, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
+    p2 = new Player({ id: 'p2', seatIndex: 1, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
+    p3 = new Player({ id: 'p3', seatIndex: 2, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
   })
 
   // ==============================================================
@@ -368,7 +368,7 @@ describe('Equipment Card Effects', () => {
     })
 
     it('both horse effects can combine', () => {
-      const state = createState([p1, p2, p3, Player.create('p4', 3, createTestHero())])
+      const state = createState([p1, p2, p3, new Player({ id: 'p4', seatIndex: 3, heroes: [createTestHero()], hp: 4, maxHp: 4 })])
 
       // 4 players: distances are larger
       // p1(0) → p3(2): min(2, 2) = 2
@@ -428,8 +428,8 @@ describe('Equipment Card Effects', () => {
       const state = createState([
         p1,
         p2,
-        Player.create('p4', 2, createTestHero()),
-        Player.create('p5', 3, createTestHero()),
+        new Player({ id: 'p4', seatIndex: 2, heroes: [createTestHero()], hp: 4, maxHp: 4 }),
+        new Player({ id: 'p5', seatIndex: 3, heroes: [createTestHero()], hp: 4, maxHp: 4 }),
       ])
 
       // 4 players: p1(0), p2(1), p4(2), p5(3)

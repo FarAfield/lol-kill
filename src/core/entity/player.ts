@@ -1,10 +1,3 @@
-// ============================================================
-// 联盟杀 · Player 实体
-//
-// 统一 IPlayer —— 不拆分 IPlayerState。
-// 所有玩家数据由引擎维护，通过 IStoreService 同步到 UI 层。
-// ============================================================
-
 import { GamePhase, RoleType, EquipSlot } from '@core/contracts/enums'
 import type { PlayerId, Position } from '@core/contracts/types'
 import type { IPlayer } from '@core/contracts/player.interface'
@@ -14,31 +7,25 @@ import type { ICard } from '@core/contracts/card.interface'
 // ── 玩家实体 ──
 
 export class Player implements IPlayer {
-  // ── 基础身份 ──
-  readonly id: PlayerId
-  readonly seatIndex: Position
+  readonly id: string
+  seatIndex: number
   role?: RoleType
   roleRevealed: boolean
   alive: boolean
-
-  // ── 英雄 / 体力 / 能量 ──
+  // 基础属性
   hp: number
   maxHp: number
   power: number
   maxPower: number
   heroes: IHero[]
-
-  // ── 卡牌区 ──
   handCards: ICard[]
   equipCards: ICard[]
   judgeCards: ICard[]
-
   // ── 回合追踪 ──
   usedAttackThisTurn: boolean
   attackLimit: number
   shouldSkipPhases: GamePhase[]
   skippedPhases: GamePhase[]
-
   // ── 通用标记 ──
   marks: Map<string, number>
 
@@ -67,10 +54,10 @@ export class Player implements IPlayer {
     this.role = data.role
     this.roleRevealed = data.roleRevealed ?? false
     this.alive = data.alive ?? true
-    this.hp = data.hp ?? (data.heroes?.[0]?.maxHp ?? 4)
-    this.maxHp = data.maxHp ?? (data.heroes?.[0]?.maxHp ?? 4)
-    this.power = data.power ?? (data.heroes?.[0]?.maxPower ?? 0)
-    this.maxPower = data.maxPower ?? (data.heroes?.[0]?.maxPower ?? 0)
+    this.hp = data.hp ?? data.heroes?.[0]?.maxHp ?? 0
+    this.maxHp = data.maxHp ?? data.heroes?.[0]?.maxHp ?? 0
+    this.power = data.power ?? data.heroes?.[0]?.maxPower ?? 0
+    this.maxPower = data.maxPower ?? data.heroes?.[0]?.maxPower ?? 0
     this.heroes = data.heroes ?? []
     this.handCards = data.handCards ?? []
     this.equipCards = data.equipCards ?? []
@@ -82,41 +69,22 @@ export class Player implements IPlayer {
     this.marks = data.marks ?? new Map()
   }
 
-  // ── 工厂方法 ──
-
-  /**
-   * 创建一个新的 Player 实例。
-   *
-   * @param id        玩家唯一 ID
-   * @param seatIndex 座位号
-   * @param hero      英雄
-   * @param overrides 可选覆盖项
-   */
-  static create(
-    id: PlayerId,
-    seatIndex: Position,
-    hero?: IHero,
-    overrides?: Partial<Omit<IPlayer, 'id' | 'seatIndex' | 'heroes'>>,
-  ): Player {
-    return new Player({
-      id,
-      seatIndex,
-      heroes: hero ? [hero] : [],
-      hp: hero?.maxHp ?? 4,
-      maxHp: hero?.maxHp ?? 4,
-      power: hero?.maxPower ?? 0,
-      maxPower: hero?.maxPower ?? 0,
-      ...overrides,
-    })
+  static batchCreate(num: number): Player[] {
+    return Array.from(
+      { length: num },
+      (_, i) =>
+        new Player({
+          id: `player_${i}` as PlayerId,
+          seatIndex: i as Position,
+        }),
+    )
   }
 
   // ── 体力操作 ──
 
   /**
    * 扣减体力。
-   *
    * HP 不会降到 0 以下（死亡由 DeathSystem 统一处理）。
-   *
    * @param amount 扣减量
    * @returns 实际扣减值
    */
@@ -128,9 +96,7 @@ export class Player implements IPlayer {
 
   /**
    * 回复体力。
-   *
    * HP 不会超过 maxHp。
-   *
    * @param amount 回复量
    * @returns 实际回复值
    */
@@ -142,7 +108,6 @@ export class Player implements IPlayer {
 
   /**
    * 设置体力上限。
-   *
    * @param delta 变化量（正数为增加，负数为减少）
    */
   modifyMaxHp(delta: number): void {
@@ -153,8 +118,6 @@ export class Player implements IPlayer {
     }
   }
 
-  // ── 能量操作 ──
-
   /**
    * 消耗能量。
    */
@@ -163,7 +126,6 @@ export class Player implements IPlayer {
     this.power = Math.max(0, this.power - amount)
     return previous - this.power
   }
-
   /**
    * 获得能量。
    */
@@ -171,13 +133,52 @@ export class Player implements IPlayer {
     this.power = Math.min(this.maxPower, this.power + amount)
   }
 
-  // ── 查询 ──
+  /**
+   * 设置能量上限。
+   *
+   * @param delta 变化量（正数为增加，负数为减少）
+   */
+  modifyMaxPower(delta: number): void {
+    this.maxPower = Math.max(0, this.maxPower + delta)
+    // 当前能量不能超过新的上限
+    if (this.power > this.maxPower) {
+      this.power = this.maxPower
+    }
+  }
 
   /**
    * 当前手牌数量。
    */
   get handSize(): number {
     return this.handCards.length
+  }
+
+  // ── 手牌操作 ──
+
+  /**
+   * 获得手牌（加入手牌区）。
+   *
+   * @param cards 加入手牌的卡牌列表
+   */
+  addHandCards(cards: ICard[]): void {
+    this.handCards.push(...cards)
+  }
+
+  /**
+   * 失去手牌（从手牌区移除指定卡牌）。
+   *
+   * @param cardIds 要移除的卡牌 ID 列表
+   * @returns 实际移除的卡牌列表
+   */
+  removeHandCards(instanceIds: string[]): ICard[] {
+    const removed: ICard[] = []
+    for (const instanceId of instanceIds) {
+      const idx = this.handCards.findIndex((c) => c.instanceId === instanceId)
+      if (idx !== -1) {
+        removed.push(...this.handCards.splice(idx, 1))
+      }
+    }
+    return removed
   }
 
   /**
@@ -213,6 +214,24 @@ export class Player implements IPlayer {
     return this.heroes[0]
   }
 
+  /**
+   * 英雄选择后的回调方法。
+   *
+   * 设置玩家英雄列表，并同步体力/能量上限与当前值。
+   *
+   * @param heroes 选择的英雄列表
+   */
+  chooseHeroes(heroes: IHero[]): void {
+    this.heroes = heroes
+    const first = heroes[0]
+    if (first) {
+      this.maxHp = first.maxHp
+      this.hp = this.maxHp
+      this.maxPower = first.maxPower
+      this.power = this.maxPower
+    }
+  }
+
   // ── 装备区操作 ──
 
   /**
@@ -246,7 +265,7 @@ export class Player implements IPlayer {
    *
    * @returns 被卸下的装备，如果槽位为空则返回 undefined
    */
-  unequipSlot(slot: EquipSlot): ICard | undefined {
+  unEquipSlot(slot: EquipSlot): ICard | undefined {
     const equip = this.getEquipInSlot(slot)
     if (equip) {
       this.equipCards = this.equipCards.filter((c) => c.id !== equip.id)

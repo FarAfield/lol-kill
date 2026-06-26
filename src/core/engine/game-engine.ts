@@ -18,6 +18,7 @@
 import { GamePhase, RoleType, ZoneType } from '@core/contracts/enums'
 import { STANDARD_PHASE_ORDER, DEFAULT_DRAW_COUNT, INITIAL_HAND_SIZE, LORD_HP_BONUS } from '@source/base/constants'
 import type { IGameState, IGameConfig, IGameResult } from '@core/contracts/game.interface'
+import type { PlayerId, Position } from '@core/contracts/types'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard, CardDefinition } from '@core/contracts/card.interface'
 import type { IHero } from '@core/contracts/hero.interface'
@@ -471,7 +472,10 @@ export class GameEngine {
   private createPlayers(config: IGameConfig): void {
     const players: IPlayer[] = []
     for (let i = 0; i < config.playerCount; i++) {
-      const player = Player.create(`player_${i}`, i)
+      const player = new Player({
+        id: `player_${i}` as PlayerId,
+        seatIndex: i as Position,
+      })
       players.push(player)
     }
     this.state.players = players

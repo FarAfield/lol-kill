@@ -69,7 +69,7 @@ describe('CardSystem', () => {
     state = new GameState()
     system = new CardSystem(state)
 
-    player = Player.create('p1', 0, testHero)
+    player = new Player({ id: 'p1', seatIndex: 0, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
     state.players = [player]
   })
 
@@ -112,7 +112,7 @@ describe('CardSystem', () => {
     })
 
     it('should update visibility for Equip zone (all players)', () => {
-      const p2 = Player.create('p2', 1)
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       state.players = [player, p2]
 
       const card = Card.create(basicCardDef)
@@ -147,7 +147,7 @@ describe('CardSystem', () => {
     })
 
     it('should throw if card belongs to another player', () => {
-      const p2 = Player.create('p2', 1)
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       const card = Card.create(basicCardDef)
       card.zone = ZoneType.Hand
       card.owner = p2
@@ -186,7 +186,7 @@ describe('CardSystem', () => {
     })
 
     it('should throw if card is not owned by player', () => {
-      const p2 = Player.create('p2', 1)
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       const card = Card.create(basicCardDef)
       card.zone = ZoneType.Hand
       card.owner = p2
@@ -285,7 +285,7 @@ describe('CardSystem', () => {
 
   describe('transferCard', () => {
     it('should transfer card from one player to another', () => {
-      const p2 = Player.create('p2', 1)
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       const card = Card.create(basicCardDef)
       card.zone = ZoneType.Hand
       card.owner = player
@@ -300,7 +300,7 @@ describe('CardSystem', () => {
     })
 
     it('should transfer multiple cards', () => {
-      const p2 = Player.create('p2', 1)
+      const p2 = new Player({ id: 'p2', seatIndex: 1 })
       const card1 = Card.create(basicCardDef)
       const card2 = Card.create(basicCardDef)
       card1.zone = ZoneType.Hand

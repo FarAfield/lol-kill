@@ -76,7 +76,7 @@ describe('PhaseManager', () => {
 
     // Create players
     for (let i = 0; i < 3; i++) {
-      const player = Player.create(`player_${i}`, i)
+      const player = new Player({ id: `player_${i}`, seatIndex: i })
       state.players.push(player)
     }
     state.currentPlayerIndex = 0

@@ -14,7 +14,7 @@ import type { CardDefinition } from '@core/contracts/card.interface'
 function createPlayers(count: number): Player[] {
   const players: Player[] = []
   for (let i = 0; i < count; i++) {
-    players.push(Player.create(`p${i}`, i))
+    players.push(new Player({ id: `p${i}`, seatIndex: i }))
   }
   return players
 }

@@ -80,7 +80,7 @@ describe('EffectContext (SkillContext)', () => {
     deps = createDeps(state)
 
     const hero = createTestHero()
-    player = Player.create('player_0', 0, hero)
+    player = new Player({ id: 'player_0', seatIndex: 0, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
     state.players = [player]
 
     event = new GameEvent({
@@ -195,7 +195,7 @@ describe('EffectContext (SkillContext)', () => {
       card.owner = player
       player.handCards.push(card)
 
-      const target = Player.create('target', 1, createTestHero())
+      const target = new Player({ id: 'target', seatIndex: 1, heroes: [createTestHero()], hp: 4, maxHp: 4 })
       state.players.push(target)
 
       const ctx = new EffectContext(event, player, [], deps)

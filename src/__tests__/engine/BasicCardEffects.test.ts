@@ -96,9 +96,9 @@ describe('Basic Card Effects', () => {
     registry.registerAll([shaEffect, shanEffect, taoEffect, jiuEffect])
 
     const hero = createTestHero()
-    p1 = Player.create('p1', 0, hero)
-    p2 = Player.create('p2', 1, hero)
-    p3 = Player.create('p3', 2, hero)
+    p1 = new Player({ id: 'p1', seatIndex: 0, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
+    p2 = new Player({ id: 'p2', seatIndex: 1, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
+    p3 = new Player({ id: 'p3', seatIndex: 2, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
 
     state = new GameState({
       players: [p1, p2, p3],

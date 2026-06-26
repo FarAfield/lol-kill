@@ -21,7 +21,7 @@ import type { IPlayer } from '@core/contracts/player.interface'
 // ── 工厂 ──
 
 function createQuickPlayer(id: string, seat: number): IPlayer {
-  return Player.create(id, seat)
+  return new Player({ id, seatIndex: seat })
 }
 
 function createTestCardDef(): CardDefinition {

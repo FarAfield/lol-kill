@@ -26,7 +26,7 @@ function createTestDef(overrides?: Partial<CardDefinition>): CardDefinition {
 }
 
 function createTestPlayer(id: string = 'p1', seat: number = 0): Player {
-  return Player.create(id, seat)
+  return new Player({ id, seatIndex: seat })
 }
 
 // ── 测试套件 ──

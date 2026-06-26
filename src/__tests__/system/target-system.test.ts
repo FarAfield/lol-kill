@@ -22,7 +22,7 @@ const testHero = new Hero({
 
 // ── 创建8人局玩家 ──
 function create8Players(): Player[] {
-  return Array.from({ length: 8 }, (_, i) => Player.create(`p${i}`, i, testHero))
+  return Array.from({ length: 8 }, (_, i) => new Player({ id: `p${i}`, seatIndex: i, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 }))
 }
 
 // ── 卡牌工厂 ──

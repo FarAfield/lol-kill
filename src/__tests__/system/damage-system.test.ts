@@ -42,8 +42,8 @@ describe('DamageSystem', () => {
   beforeEach(() => {
     Card.resetCounter()
     damageSystem = new DamageSystem()
-    source = Player.create('p1', 0, testHero)
-    target = Player.create('p2', 1, testHero)
+    source = new Player({ id: 'p1', seatIndex: 0, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
+    target = new Player({ id: 'p2', seatIndex: 1, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
   })
 
   describe('createDamage', () => {
@@ -112,7 +112,7 @@ describe('DamageSystem', () => {
 
   describe('executePipeline — transfer damage', () => {
     it('should transfer damage to another target', async () => {
-      const newTarget = Player.create('p3', 2, testHero)
+      const newTarget = new Player({ id: 'p3', seatIndex: 2, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 })
       expect(newTarget.hp).toBe(4)
 
       damageSystem.registerHook(DamageStage.Before, (d) => {

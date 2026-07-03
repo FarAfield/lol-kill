@@ -10,7 +10,6 @@ import type { LogEntry } from '@core/contracts/types'
 import type { IGameState, IGameConfig, IGameResult } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
-import type { IHero } from '@core/contracts/hero.interface'
 
 // ── 默认配置 ──
 

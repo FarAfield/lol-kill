@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { SkillRegistry } from '@core/engine/skill-registry'
 import { EffectRegistry } from '@core/engine/effect-registry'
 import { EventTrigger } from '@core/event/event-trigger'
+import { EventCompiler } from '@core/event/event-compiler'
 import { Player } from '@core/entity/player'
 import { Hero } from '@core/entity/hero'
 import {
@@ -58,7 +59,8 @@ describe('SkillRegistry', () => {
   beforeEach(() => {
     effectRegistry = new EffectRegistry()
     eventTrigger = new EventTrigger()
-    skillRegistry = new SkillRegistry(effectRegistry, eventTrigger)
+    const eventCompiler = new EventCompiler()
+    skillRegistry = new SkillRegistry(effectRegistry, eventTrigger, eventCompiler)
   })
 
   // ── 效果注册 ──

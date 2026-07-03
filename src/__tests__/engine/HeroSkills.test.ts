@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { EffectRegistry } from '@core/engine/effect-registry'
 import { SkillRegistry } from '@core/engine/skill-registry'
 import { EffectContext } from '@core/engine/effect-context'
-import type { EffectContextDeps } from '@core/engine/effect-context'
+import type { EffectContextDeps } from '@core/contracts/effect-context-deps'
 import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
 import { EventTrigger } from '@core/event/event-trigger'
@@ -143,7 +143,6 @@ describe('曹操 · 奸雄', () => {
     })
 
     const ctx = new EffectContext(damageEvent, caoCao, [damageCard], deps, damageEvent)
-    damageEvent.data['_effectContext'] = ctx
 
     // 执行奸雄
     await jianxiongEffect.content(ctx)
@@ -165,7 +164,6 @@ describe('曹操 · 奸雄', () => {
     })
 
     const ctx = new EffectContext(selfDamageEvent, caoCao, [damageCard], deps, selfDamageEvent)
-    selfDamageEvent.data['_effectContext'] = ctx
 
     const result = jianxiongEffect.filter!(ctx)
     expect(result).toBe(false)
@@ -182,7 +180,6 @@ describe('曹操 · 奸雄', () => {
     })
 
     const ctx = new EffectContext(preventedEvent, caoCao, [], deps, preventedEvent)
-    preventedEvent.data['_effectContext'] = ctx
 
     const result = jianxiongEffect.filter!(ctx)
     expect(result).toBe(false)
@@ -217,7 +214,6 @@ describe('曹操 · 护驾', () => {
     })
 
     const ctx = new EffectContext(cardUseEvent, caoCao, [shaCard], deps)
-    cardUseEvent.data['_effectContext'] = ctx
 
     await hujiaEffect.content(ctx)
 
@@ -244,7 +240,6 @@ describe('曹操 · 护驾', () => {
     })
 
     const ctx = new EffectContext(event, caoCao, [taoCard], deps)
-    event.data['_effectContext'] = ctx
 
     const result = hujiaEffect.filter!(ctx)
     expect(result).toBe(false)
@@ -296,7 +291,6 @@ describe('司马懿 · 反馈', () => {
     })
 
     const ctx = new EffectContext(damageEvent, simaYi, [], deps, damageEvent)
-    damageEvent.data['_effectContext'] = ctx
 
     await fankuiEffect.content(ctx)
 
@@ -315,7 +309,6 @@ describe('司马懿 · 反馈', () => {
     })
 
     const ctx = new EffectContext(preventedEvent, simaYi, [], deps, preventedEvent)
-    preventedEvent.data['_effectContext'] = ctx
 
     const result = fankuiEffect.filter!(ctx)
     expect(result).toBe(false)
@@ -335,7 +328,6 @@ describe('司马懿 · 反馈', () => {
     })
 
     const ctx = new EffectContext(damageEvent, simaYi, [], deps, damageEvent)
-    damageEvent.data['_effectContext'] = ctx
 
     const result = fankuiEffect.filter!(ctx)
     expect(result).toBe(false)
@@ -391,7 +383,6 @@ describe('夏侯惇 · 刚烈', () => {
     })
 
     const ctx = new EffectContext(damageEvent, xiahouDun, [], deps, damageEvent)
-    damageEvent.data['_effectContext'] = ctx
 
     await ganglieEffect.content(ctx)
 
@@ -411,7 +402,6 @@ describe('夏侯惇 · 刚烈', () => {
     })
 
     const ctx = new EffectContext(selfDamageEvent, xiahouDun, [], deps, selfDamageEvent)
-    selfDamageEvent.data['_effectContext'] = ctx
 
     expect(ganglieEffect.filter!(ctx)).toBe(false)
   })
@@ -469,7 +459,6 @@ describe('张辽 · 突袭', () => {
     })
 
     const ctx = new EffectContext(drawEvent, zhangLiao, [], deps)
-    drawEvent.data['_effectContext'] = ctx
 
     await tuxiEffect.content(ctx)
 
@@ -493,7 +482,6 @@ describe('张辽 · 突袭', () => {
     })
 
     const ctx = new EffectContext(drawEvent, zhangLiao, [], deps)
-    drawEvent.data['_effectContext'] = ctx
 
     expect(tuxiEffect.filter!(ctx)).toBe(false)
   })
@@ -529,7 +517,6 @@ describe('刘备 · 仁德', () => {
     })
 
     const ctx = new EffectContext(phaseEvent, liuBei, [], deps)
-    phaseEvent.data['_effectContext'] = ctx
 
     await rendeEffect.content(ctx)
 
@@ -647,7 +634,6 @@ describe('张飞 · 咆哮', () => {
     })
 
     const ctx = new EffectContext(turnStartEvent, zhangFei, [], deps)
-    turnStartEvent.data['_effectContext'] = ctx
 
     await paoxiaoEffect.content(ctx)
 
@@ -777,7 +763,6 @@ describe('孙权 · 制衡', () => {
     })
 
     const ctx = new EffectContext(phaseEvent, sunQuan, [], deps)
-    phaseEvent.data['_effectContext'] = ctx
 
     // 初始化牌堆用于摸牌
     const drawCardDef = createCardDef({ name: '摸的牌', tags: ['basic'] })
@@ -823,7 +808,6 @@ describe('吕蒙 · 克己', () => {
     })
 
     const ctx = new EffectContext(discardEvent, lvMeng, [], deps)
-    discardEvent.data['_effectContext'] = ctx
 
     await kejiEffect.content(ctx)
 
@@ -852,7 +836,6 @@ describe('吕蒙 · 克己', () => {
     })
 
     const ctx = new EffectContext(discardEvent, lvMeng, [], deps)
-    discardEvent.data['_effectContext'] = ctx
 
     expect(kejiEffect.filter!(ctx)).toBe(false)
   })

@@ -23,6 +23,7 @@ import { GameEvent } from '@core/event/game-event'
 import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
 import { DeckManager } from '@core/system/deck-manager'
+import { CardSystem } from '@core/system/card-system'
 import type { TurnManager } from './turn-manager'
 import type { IUIDecisionService } from '@core/contracts/services.interface'
 
@@ -45,6 +46,7 @@ export interface PhaseManagerOptions {
 export class PhaseManager {
   private decisionService?: IUIDecisionService
   private drawCount: number
+  private cardSystem: CardSystem
 
   constructor(
     private state: IGameState,
@@ -52,10 +54,12 @@ export class PhaseManager {
     private eventChain: EventChain,
     private deckManager: DeckManager,
     private turnManager: TurnManager,
+    cardSystem: CardSystem,
     options?: PhaseManagerOptions,
   ) {
     this.decisionService = options?.decisionService
     this.drawCount = options?.drawCount ?? DEFAULT_DRAW_COUNT
+    this.cardSystem = cardSystem
   }
 
   // ── 完整回合执行 ──
@@ -293,7 +297,7 @@ export class PhaseManager {
         try {
           const options = playableCards.map((card) => ({
             card,
-            validTargets: [], // 由 TargetSystem 填充
+            validTargets: this.getValidTargetsForCard(player, card),
           }))
 
           const result = await this.decisionService.askForCardPlay(
@@ -307,9 +311,9 @@ export class PhaseManager {
             break
           }
 
-          // 玩家选择使用一张牌
-          // 实际出牌逻辑由 GameEngine / CardSystem 处理
-          // 此处仅标记为已尝试（完整实现由 GameEngine 处理）
+          // 执行完整出牌流程：移入处理区 → 事件分发 → 结算完成
+          this.cardSystem.useCard(result.card, player, result.targets)
+
           const cardUseEvent = new GameEvent({
             name: `使用: ${result.card.name}`,
             type: TriggerTiming.CardUse,
@@ -323,6 +327,13 @@ export class PhaseManager {
           })
 
           await this.eventDispatcher.dispatch(cardUseEvent, this.eventChain)
+
+          this.cardSystem.finishProcessing(result.card)
+
+          // 标记攻击（杀、万箭等）
+          if (result.card.tags.has('sha')) {
+            player.usedAttackThisTurn = true
+          }
         } catch {
           // 决策服务不可用时，自动结束出牌阶段
           phaseEnded = true
@@ -445,8 +456,39 @@ export class PhaseManager {
   private autoDiscard(player: IPlayer, count: number): void {
     const toDiscard = player.handCards.splice(0, count)
     for (const card of toDiscard) {
-      this.deckManager.discardOne(card)
+      this.cardSystem.discardCard(card, player)
     }
+  }
+
+  /**
+   * 获取某张卡牌的合法目标列表。
+   */
+  private getValidTargetsForCard(player: IPlayer, card: ICard): IPlayer[] {
+    const aliveOthers = this.state.alivePlayers.filter((p) => p.id !== player.id)
+
+    // 杀：其他存活角色（简化处理，不计算距离）
+    if (card.tags.has('sha')) {
+      return aliveOthers
+    }
+
+    // 桃：仅受伤时可对自己使用
+    if (card.tags.has('peach') || card.tags.has('tao')) {
+      if (player.hp < player.maxHp) return [player]
+      return []
+    }
+
+    // 装备牌：仅对自己使用
+    if (card.type === 'equip' || card.tags.has('equip')) {
+      return [player]
+    }
+
+    // 非延时锦囊：其他存活角色
+    if (card.tags.has('trick')) {
+      return aliveOthers
+    }
+
+    // 默认：其他存活角色
+    return aliveOthers
   }
 
   /**

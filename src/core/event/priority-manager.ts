@@ -1,111 +1,90 @@
 // ============================================================
-// 联盟杀 · PriorityManager — 同时机技能优先级排序
-//
-// 当多个技能在同一时机触发时，需要按优先级确定结算顺序。
-// 排序规则:
-//   1. 锁定技 (locked) 优先于非锁定技
-//   2. 优先级数值高的优先
-//   3. 同名技能去重（同一 skillId 只保留优先级最高的一条）
-//
-// 三国杀规则参考:
-//   - 锁定技总是最先触发（如马超的「马术」）
-//   - 同等条件下按技能声明顺序或玩家座位顺序结算
+// 联盟杀 · PriorityManager — 同时机 handler 排序管理器
 // ============================================================
 
-import type { EventHookRegistration } from '@core/contracts/event.interface'
+import type { CompiledHandler } from '@core/contracts/compiled-handler'
 
 /**
- * 对同时机的技能钩子按优先级排序
+ * 对同时机的 handler 按优先级排序
  *
- * @param hooks - 待排序的钩子注册信息列表
+ * @param handlers - 待排序的 handler 列表
  * @param deduplicate - 是否去重同名技能（默认 true）
- * @returns 排序后的钩子列表
+ * @returns 排序后的 handler 列表
  */
-export function sortHooks(
-  hooks: EventHookRegistration[],
+export function sortHandlers(
+  handlers: CompiledHandler[],
   deduplicate = true,
-): EventHookRegistration[] {
-  const sorted = [...hooks].sort((a, b) => {
+): CompiledHandler[] {
+  const sorted = [...handlers].sort((a, b) => {
     // 1. 锁定技优先
     if (a.isLocked && !b.isLocked) return -1
     if (!a.isLocked && b.isLocked) return 1
-
     // 2. 优先级高的优先
     if (a.priority !== b.priority) {
       return b.priority - a.priority
     }
-
     // 3. 优先级相同时保持原顺序（稳定排序）
     return 0
   })
-
   if (!deduplicate) return sorted
-
-  // 去重：同名技能只保留优先级最高的一条（已在排序中靠前）
+  // 去重：同名技能只保留优先级最高的一条
   const seen = new Set<string>()
-  const result: EventHookRegistration[] = []
-
-  for (const hook of sorted) {
-    if (seen.has(hook.skillId)) continue
-    seen.add(hook.skillId)
-    result.push(hook)
+  const result: CompiledHandler[] = []
+  for (const handler of sorted) {
+    if (seen.has(handler.skillId)) continue
+    seen.add(handler.skillId)
+    result.push(handler)
   }
-
   return result
 }
 
 /**
- * PriorityManager — 同时机技能排序管理器
- *
- * 在 EventDispatcher 推进事件到某阶段时，
- * EventTrigger 返回所有匹配的钩子后，由 PriorityManager 确定执行顺序。
+ * PriorityManager — 同时机 handler 排序管理器
  */
 export class PriorityManager {
   /**
-   * 对钩子列表排序并去重
-   *
-   * 排序优先级: 锁定技 > priority 数值高 > 原顺序
+   * 对 handler 列表排序并去重
    */
-  prioritize(hooks: EventHookRegistration[]): EventHookRegistration[] {
-    return sortHooks(hooks, true)
+  prioritize(handlers: CompiledHandler[]): CompiledHandler[] {
+    return sortHandlers(handlers, true)
   }
 
   /**
    * 仅排序不去重（用于需要多次触发的场景）
    */
-  prioritizeNoDedup(hooks: EventHookRegistration[]): EventHookRegistration[] {
-    return sortHooks(hooks, false)
+  prioritizeNoDedupe(handlers: CompiledHandler[]): CompiledHandler[] {
+    return sortHandlers(handlers, false)
   }
 
   /**
-   * 按玩家座位顺序对钩子进行二次排序
+   * 按玩家座位顺序对 handler 进行二次排序
    *
    * 当优先级完全相同时，按玩家座位号排序。
    * 用于「多名玩家同时触发」的场景（如南蛮入侵响应顺序）。
+   * 注意：需要从外部传入 playerSeatMap 进行 playerId → seatIndex 的映射。
    */
-  sortBySeatOrder(hooks: EventHookRegistration[]): EventHookRegistration[] {
-    return [...hooks].sort((a, b) => {
-      // 锁定技 > 优先级 > 座位号
+  sortBySeatOrder(handlers: CompiledHandler[], playerSeatMap: Map<string, number>): CompiledHandler[] {
+    return [...handlers].sort((a, b) => {
       if (a.isLocked && !b.isLocked) return -1
       if (!a.isLocked && b.isLocked) return 1
       if (a.priority !== b.priority) return b.priority - a.priority
-      return a.player.seatIndex - b.player.seatIndex
+      const seatA = playerSeatMap.get(a.playerId) ?? 0
+      const seatB = playerSeatMap.get(b.playerId) ?? 0
+      return seatA - seatB
     })
   }
 
   /**
-   * 分组：将钩子按玩家分组
-   *
-   * 用于依次询问每个玩家是否发动技能的场景。
+   * 分组：将 handler 按玩家分组
    */
-  groupByPlayer(hooks: EventHookRegistration[]): Map<string, EventHookRegistration[]> {
-    const groups = new Map<string, EventHookRegistration[]>()
-    for (const hook of hooks) {
-      const existing = groups.get(hook.player.id)
+  groupByPlayer(handlers: CompiledHandler[]): Map<string, CompiledHandler[]> {
+    const groups = new Map<string, CompiledHandler[]>()
+    for (const handler of handlers) {
+      const existing = groups.get(handler.playerId)
       if (existing) {
-        existing.push(hook)
+        existing.push(handler)
       } else {
-        groups.set(hook.player.id, [hook])
+        groups.set(handler.playerId, [handler])
       }
     }
     return groups

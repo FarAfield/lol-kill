@@ -15,7 +15,6 @@ export type { EventDispatcherOptions } from './event-dispatcher'
 
 // ── EventTrigger (触发匹配) ──
 export { EventTrigger } from './event-trigger'
-export type { EffectRegistrationOptions } from './event-trigger'
 
 // ── EventPauseManager (暂停/恢复) ──
 export { EventPauseManager } from './event-pause-manager'
@@ -26,8 +25,7 @@ export { ResponseWindow, ResponseWindowFactory, ResponseType } from './response-
 export type { ResponseWindowOptions, ResponseResult } from './response-window'
 
 // ── PriorityManager (优先级排序) ──
-export { PriorityManager, sortHooks } from './priority-manager'
+export { PriorityManager, sortHandlers } from './priority-manager'
 
 // ── EventCompiler (事件编译) ──
 export { EventCompiler } from './event-compiler'
-export type { CardUseResult } from './event-compiler'

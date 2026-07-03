@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { EffectRegistry } from '@core/engine/effect-registry'
 import { SkillRegistry } from '@core/engine/skill-registry'
 import { EffectContext } from '@core/engine/effect-context'
-import type { EffectContextDeps } from '@core/engine/effect-context'
+import type { EffectContextDeps } from '@core/contracts/effect-context-deps'
 import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
 import { EventTrigger } from '@core/event/event-trigger'
@@ -107,8 +107,7 @@ describe('张飞 · 咆哮 + 诸葛连弩 — 技能与装备交互', () => {
       turn: 0,
     })
 
-    const ctx = new EffectContext(turnStartEvent, zhangFei, [], deps)
-    turnStartEvent.data['_effectContext'] = ctx
+    const ctx = new EffectContext(turnStartEvent, zhangFei, [])
 
     await paoxiaoEffect.content(ctx)
     expect(zhangFei.attackLimit).toBe(Infinity)
@@ -246,7 +245,6 @@ describe('曹操 · 奸雄 + 司马懿 · 反馈 — 同时受伤触发', () => 
     })
 
     const ctxCao = new EffectContext(damageEventCao, caoCao, [damageCardCao], deps, damageEventCao)
-    damageEventCao.data['_effectContext'] = ctxCao
 
     // 奸雄filter应通过
     expect(jianxiongEffect.filter!(ctxCao)).toBe(true)
@@ -262,7 +260,6 @@ describe('曹操 · 奸雄 + 司马懿 · 反馈 — 同时受伤触发', () => 
     })
 
     const ctxSima = new EffectContext(damageEventSima, simaYi, [], deps, damageEventSima)
-    damageEventSima.data['_effectContext'] = ctxSima
 
     // 反馈filter应通过
     expect(fankuiEffect.filter!(ctxSima)).toBe(true)
@@ -325,7 +322,6 @@ describe('曹操 · 护驾 — 魏势力协助', () => {
     })
 
     const ctx = new EffectContext(cardUseEvent, caoCao, [shaCard], deps)
-    cardUseEvent.data['_effectContext'] = ctx
 
     await hujiaEffect.content(ctx)
 

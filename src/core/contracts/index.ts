@@ -70,6 +70,12 @@ export type {
   IGameResult,
 } from './game.interface'
 
+// ── 编译效果 ├──
+export type { CompiledHandler } from './compiled-handler'
+
+// ── 效果上下文依赖 ──
+export type { EffectContextDeps } from './effect-context-deps'
+
 // ── 服务接口 ──
 export type {
   IStoreService,

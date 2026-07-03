@@ -1,24 +1,9 @@
-// ============================================================
-// 联盟杀 · GameEvent — 事件实体
-//
-// 实现 IGameEvent 接口，代表游戏中的一个可结算事件。
-// 每个事件在事件流水线中经历多个阶段（EventStatus），
-// 从 Waiting 进入，到 Completed 结束。
-//
-// 流水线状态流转:
-//   WAITING → SKIP_CHECK → (CANCELLED) → BEFORE → BEGIN
-//     → PREPARE → CONTENT → PREVENT → (PREVENTED) → END → AFTER → COMPLETED
-// ============================================================
-
-import type {
-  IGameEvent,
-  EventValues,
-} from '@core/contracts/event.interface'
+import type { IGameEvent, EventValues } from '@core/contracts/event.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
 import { EventStatus } from '@core/contracts/enums'
 import type { TriggerTiming, TriggerStage, GamePhase } from '@core/contracts/enums'
-import type { EventId } from '@core/contracts/types'
+import { IdGenerator } from '@core/utils'
 
 /**
  * 事件创建选项
@@ -64,14 +49,8 @@ function createDefaultValues(): EventValues {
   }
 }
 
-/**
- * 生成唯一事件 ID
- */
-let eventIdCounter = 0
-function generateEventId(): EventId {
-  eventIdCounter += 1
-  return `event_${eventIdCounter}_${Date.now()}`
-}
+/** 全局共享 ID 生成器（所有 GameEvent 实例共用，保证 ID 递增不重复） */
+const _idGenerator = new IdGenerator()
 
 /**
  * 有效的状态转移表
@@ -95,7 +74,7 @@ const VALID_TRANSITIONS: Partial<Record<EventStatus, EventStatus[]>> = {
 }
 
 export class GameEvent implements IGameEvent {
-  id: EventId
+  id: string
   name: string
   type: TriggerTiming
 
@@ -125,7 +104,7 @@ export class GameEvent implements IGameEvent {
   timestamp: number
 
   constructor(options: GameEventOptions) {
-    this.id = generateEventId()
+    this.id = _idGenerator.next('event')
     this.name = options.name
     this.type = options.type
 
@@ -167,20 +146,17 @@ export class GameEvent implements IGameEvent {
    * @throws 如果转移非法
    */
   transitionTo(target: EventStatus): void {
-    // 如果是强制事件且目标为 cancelled/prevented，跳过
+    // 如果是强制事件且目标为 cancelled/prevented，跳过（强制事件无法流转至此状态）
     if (this.forced && (target === 'cancelled' || target === 'prevented')) {
       return
     }
-
     const allowed = VALID_TRANSITIONS[this.status]
     if (!allowed || !(allowed as EventStatus[]).includes(target)) {
       throw new Error(
         `[GameEvent] 非法状态转移: ${this.status} → ${target} (event: ${this.name}, id: ${this.id})`,
       )
     }
-
     this.status = target
-
     // 设置取消/阻止标记
     if (target === 'cancelled') {
       this.canceled = true
@@ -211,11 +187,7 @@ export class GameEvent implements IGameEvent {
    * 事件是否已结束（已完成、已取消、已阻止）
    */
   get isFinished(): boolean {
-    return (
-      this.status === 'completed' ||
-      this.status === 'cancelled' ||
-      this.status === 'prevented'
-    )
+    return this.status === 'completed' || this.status === 'cancelled' || this.status === 'prevented'
   }
 
   /**
@@ -244,6 +216,11 @@ export class GameEvent implements IGameEvent {
    * 调试用的简要描述
    */
   toString(): string {
-    return `GameEvent(${this.id}: ${this.name}, type=${this.type}, status=${this.status}, depth=${this.depth})`
+    return `GameEvent(【${this.id}】: ${this.name}, type=${this.type}, status=${this.status}, depth=${this.depth})`
+  }
+
+  /** 重置 ID 生成器（重放 / 测试前调用） */
+  static resetIdGenerator(): void {
+    _idGenerator.reset()
   }
 }

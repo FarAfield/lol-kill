@@ -19,6 +19,7 @@ import type { IPlayer } from '@core/contracts/player.interface'
 import type { IHero } from '@core/contracts/hero.interface'
 import { EffectRegistry } from './effect-registry'
 import { EventTrigger } from '@core/event/event-trigger'
+import { EventCompiler } from '@core/event/event-compiler'
 
 /**
  * 玩家效果注册记录
@@ -48,18 +49,22 @@ export class SkillRegistry {
   /** 事件触发器 */
   readonly eventTrigger: EventTrigger
 
+  /** 事件编译器 */
+  readonly eventCompiler: EventCompiler
+
   /** 玩家效果记录（playerId → 已注册效果 ID 列表） */
   private playerEffects: Map<string, PlayerEffectRecord> = new Map()
 
   /**
-   * 已注册到 EventTrigger 的效果 ID 集合（用于快速检查是否已注册）。
+   * 已注册的效果 ID 集合（用于快速检查是否已注册）。
    * key = `${playerId}:${effectId}`
    */
-  private registeredHooks: Set<string> = new Set()
+  private registeredEffectIds: Set<string> = new Set()
 
-  constructor(effectRegistry: EffectRegistry, eventTrigger: EventTrigger) {
+  constructor(effectRegistry: EffectRegistry, eventTrigger: EventTrigger, eventCompiler: EventCompiler) {
     this.effectRegistry = effectRegistry
     this.eventTrigger = eventTrigger
+    this.eventCompiler = eventCompiler
   }
 
   // ── 英雄技能加载 ──
@@ -123,29 +128,19 @@ export class SkillRegistry {
     let count = 0
 
     for (const effect of effects) {
-      const hookKey = `${player.id}:${effect.id}`
+      const key = `${player.id}:${effect.id}`
 
       // 防止重复注册
-      if (this.registeredHooks.has(hookKey)) continue
+      if (this.registeredEffectIds.has(key)) continue
 
-      // 临时启用觉醒技以便注册钩子（钩子内部会检查 enabled 状态）
-      const wasEnabled = effect.enabled
-      if (effect.type === 'awaken' && !effect.enabled) {
-        // 觉醒技初始 disabled，但仍注册钩子（filter 检查会阻止执行）
-        // 钩子的 checkFrequency 和 enabled 检查已在 EventTrigger.createHook 中
-      }
+      // 觉醒技初始 enabled = false，编译到 CompiledHandler 后
+      // handler.execute 会在运行时检查 effect.enabled
+      const handlers = this.eventCompiler.compile(effect, player)
 
-      this.eventTrigger.registerEffect({
-        effect,
-        player,
-      })
-
-      this.registeredHooks.add(hookKey)
-      count++
-
-      // 恢复觉醒技状态
-      if (!wasEnabled) {
-        effect.enabled = false
+      if (handlers.length > 0) {
+        this.eventTrigger.registerCompiledBatch(handlers)
+        this.registeredEffectIds.add(key)
+        count++
       }
     }
 
@@ -184,7 +179,7 @@ export class SkillRegistry {
     const record = this.playerEffects.get(player.id)
     if (record) {
       for (const effectId of record.effectIds) {
-        this.registeredHooks.delete(`${player.id}:${effectId}`)
+        this.registeredEffectIds.delete(`${player.id}:${effectId}`)
       }
       this.playerEffects.delete(player.id)
     }
@@ -201,10 +196,10 @@ export class SkillRegistry {
 
     // 从 EventTrigger 移除匹配的钩子
     this.eventTrigger.unregisterBy(
-      (reg) => reg.skillId === effectId && reg.player.id === player.id,
+      (handler) => handler.skillId === effectId && handler.playerId === player.id,
     )
 
-    this.registeredHooks.delete(hookKey)
+    this.registeredEffectIds.delete(hookKey)
 
     // 从记录中移除
     const record = this.playerEffects.get(player.id)
@@ -231,7 +226,7 @@ export class SkillRegistry {
   enableEffect(player: IPlayer, effectId: string): boolean {
     const hookKey = `${player.id}:${effectId}`
 
-    if (!this.registeredHooks.has(hookKey)) {
+    if (!this.registeredEffectIds.has(hookKey)) {
       return false
     }
 
@@ -252,7 +247,7 @@ export class SkillRegistry {
   disableEffect(player: IPlayer, effectId: string): boolean {
     const hookKey = `${player.id}:${effectId}`
 
-    if (!this.registeredHooks.has(hookKey)) {
+    if (!this.registeredEffectIds.has(hookKey)) {
       return false
     }
 
@@ -285,14 +280,14 @@ export class SkillRegistry {
    * 检查玩家的某效果是否已注册。
    */
   hasEffect(playerId: string, effectId: string): boolean {
-    return this.registeredHooks.has(`${playerId}:${effectId}`)
+    return this.registeredEffectIds.has(`${playerId}:${effectId}`)
   }
 
   /**
    * 获取已注册钩子的总数。
    */
   get registeredCount(): number {
-    return this.registeredHooks.size
+    return this.registeredEffectIds.size
   }
 
   // ── 重置 ──
@@ -302,7 +297,7 @@ export class SkillRegistry {
    */
   clear(): void {
     this.eventTrigger.clear()
-    this.registeredHooks.clear()
+    this.registeredEffectIds.clear()
     this.playerEffects.clear()
   }
 }

@@ -11,6 +11,7 @@ import { Card } from '@core/entity/card'
 import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
 import { DeckManager } from '@core/system/deck-manager'
+import { CardSystem } from '@core/system/card-system'
 import {
   GamePhase,
   CardType,
@@ -24,8 +25,11 @@ import type { IUIDecisionService, CardPlayOption, CardPlayResult } from '@core/c
 
 // ── 测试辅助 ──
 
+let testCardIdCounter = 0
 function createTestCardDef(overrides?: Partial<CardDefinition>): CardDefinition {
+  const id = overrides?.id ?? `test_card_${testCardIdCounter++}`
   return {
+    id,
     name: 'sha',
     type: CardType.Basic,
     suit: CardSuit.Spade,
@@ -81,12 +85,15 @@ describe('PhaseManager', () => {
     }
     state.currentPlayerIndex = 0
 
+    const cardSystem = new CardSystem(state)
+
     phaseManager = new PhaseManager(
       state,
       eventDispatcher,
       eventChain,
       deckManager,
       turnManager,
+      cardSystem,
     )
   })
 
@@ -200,6 +207,7 @@ describe('PhaseManager', () => {
       for (let i = 0; i < 4; i++) {
         const card = Card.create(createTestCardDef({ name: `card_${i}` }))
         card.zone = ZoneType.Hand
+        card.owner = player
         player.handCards.push(card)
       }
 
@@ -258,6 +266,7 @@ describe('PhaseManager', () => {
     it('should execute a full turn for current player', async () => {
       turnManager.startRound()
       const player = turnManager.nextTurn()!
+      player.hp = 4 // set HP so discard phase doesn't remove drawn cards
       expect(player).toBeDefined()
 
       const result = await phaseManager.executeTurn()
@@ -383,12 +392,14 @@ describe('PhaseManager', () => {
   describe('play phase with decision service', () => {
     it('should ask player for card play when decision service is available', async () => {
       const decisionService = createMockDecisionService()
+      const cs = new CardSystem(state)
       const pm = new PhaseManager(
         state,
         eventDispatcher,
         eventChain,
         deckManager,
         turnManager,
+        cs,
         { decisionService },
       )
 
@@ -427,12 +438,14 @@ describe('PhaseManager', () => {
             Promise.resolve(validCards.slice(0, count)),
         ),
       })
+      const cs = new CardSystem(state)
       const pm = new PhaseManager(
         state,
         eventDispatcher,
         eventChain,
         deckManager,
         turnManager,
+        cs,
         { decisionService },
       )
 
@@ -443,6 +456,7 @@ describe('PhaseManager', () => {
       for (let i = 0; i < 3; i++) {
         const card = Card.create(createTestCardDef({ name: `card_${i}` }))
         card.zone = ZoneType.Hand
+        card.owner = player
         player.handCards.push(card)
       }
 

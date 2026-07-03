@@ -43,6 +43,7 @@ import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
 import { GameEvent } from '@core/event/game-event'
 import { TriggerTiming } from '@core/contracts/enums'
+import type { EffectContextDeps } from '@core/contracts/effect-context-deps'
 
 // ── System ──
 import { DeckManager } from '@core/system/deck-manager'
@@ -113,17 +114,19 @@ export class GameEngine {
     this.state = new GameState()
     this.stateMachine = new GameStateMachine(GamePhase.NotStarted)
 
-    // ── 初始化事件系统 ──
-    this.eventChain = new EventChain()
-    this.eventDispatcher = new EventDispatcher()
-
-    // ── 初始化子系统 ──
+    // ── 初始化子系统（先于事件系统创建，EventDispatcher 需要 deps） ──
     this.deckManager = new DeckManager(this.state, options?.randomService)
     this.cardSystem = new CardSystem(this.state)
     this.damageSystem = new DamageSystem()
     this.distanceSystem = new DistanceSystem()
     this.targetSystem = new TargetSystem()
     this.deathSystem = new DeathSystem(this.state)
+
+    // ── 初始化事件系统 ──
+    this.eventChain = new EventChain()
+    this.eventDispatcher = new EventDispatcher({
+      deps: this.buildEffectDeps(),
+    })
 
     // ── 初始化回合/阶段管理 ──
     this.turnManager = new TurnManager(this.state)
@@ -133,6 +136,7 @@ export class GameEngine {
       this.eventChain,
       this.deckManager,
       this.turnManager,
+      this.cardSystem,
       {
         decisionService: options?.decisionService,
         drawCount: options?.drawCount ?? DEFAULT_DRAW_COUNT,
@@ -146,6 +150,23 @@ export class GameEngine {
     this.decisionService = options?.decisionService
     this.enableAudit = options?.enableAudit ?? false
     this.expectedCardTotal = options?.expectedCardTotal ?? -1
+  }
+
+  /**
+   * 构建 EffectContextDeps，供 EventDispatcher 在执行 CompiledHandler 时
+   * 创建 EffectContext 实例。
+   */
+  private buildEffectDeps(): EffectContextDeps {
+    return {
+      state: this.state,
+      eventChain: this.eventChain,
+      eventDispatcher: this.eventDispatcher,
+      deckManager: this.deckManager,
+      cardSystem: this.cardSystem,
+      damageSystem: this.damageSystem,
+      deathSystem: this.deathSystem,
+      decisionService: this.decisionService,
+    }
   }
 
   // ── 初始化 ──
@@ -426,9 +447,10 @@ export class GameEngine {
       this.eventChain,
       this.deckManager,
       this.turnManager,
+      this.cardSystem,
       {
         decisionService: this.decisionService,
-        drawCount: this.decisionService ? DEFAULT_DRAW_COUNT : DEFAULT_DRAW_COUNT,
+        drawCount: DEFAULT_DRAW_COUNT,
       },
     )
   }

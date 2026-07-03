@@ -3,9 +3,7 @@
 //
 // 提供效果执行时的受限读写接口，作为引擎与效果逻辑之间的安全边界。
 // 所有写操作最终都通过事件系统执行——效果不能直接修改 Player/Card 属性。
-//
-// EffectContext 由 EventCompiler 在卡牌使用时创建，并挂载到
-// event.data['_effectContext'] 上供效果钩子读取。
+// EffectContext 由 EventDispatcher 在执行 CompiledHandler 时创建，不再通过 event.data 暗线传递。
 // ============================================================
 
 import {
@@ -14,31 +12,13 @@ import {
   DamageType,
   GamePhase,
 } from '@core/contracts/enums'
-import type { IEffectContext } from '@core/contracts/effect.interface'
+import type { IEffectContext, ResponseRequest, EffectResponse } from '@core/contracts/effect.interface'
 import type { IGameEvent } from '@core/contracts/event.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
-import type { IGameState } from '@core/contracts/game.interface'
 import { GameEvent } from '@core/event/game-event'
-import type { EventChain } from '@core/event/event-chain'
-import type { EventDispatcher } from '@core/event/event-dispatcher'
-import type { DeckManager } from '@core/system/deck-manager'
-import type { CardSystem } from '@core/system/card-system'
 import { DamageSystem } from '@core/system/damage-system'
-import type { DeathSystem } from '@core/system/death-system'
-
-/**
- * EffectContext 依赖项
- */
-export interface EffectContextDeps {
-  state: IGameState
-  eventChain: EventChain
-  eventDispatcher: EventDispatcher
-  deckManager: DeckManager
-  cardSystem: CardSystem
-  damageSystem: DamageSystem
-  deathSystem: DeathSystem
-}
+import type { EffectContextDeps } from '@core/contracts/effect-context-deps'
 
 /**
  * EffectContext — 效果执行上下文
@@ -125,15 +105,6 @@ export class EffectContext implements IEffectContext {
       },
     })
 
-    // 将 EffectContext 挂载到子事件上
-    damageEvent.data['_effectContext'] = new EffectContext(
-      damageEvent,
-      this.player,
-      this.triggerCards,
-      this.deps,
-      damageEvent,
-    )
-
     // 创建伤害实例并执行流水线
     const damageInstance = this.deps.damageSystem.createDamage(
       this.player,
@@ -149,25 +120,128 @@ export class EffectContext implements IEffectContext {
     // 执行伤害流水线
     await this.deps.damageSystem.executePipeline(damageInstance)
 
-    // 分发 Damage 事件
     await this.deps.eventDispatcher.dispatch(damageEvent, this.deps.eventChain)
 
     // 检查目标是否濒死
     if (this.deps.deathSystem.checkDying(target)) {
-      // 触发 PlayerDying 事件
-      const dyingEvent = new GameEvent({
+      await this.emit({
         name: `濒死: ${target.hero?.name ?? target.id}`,
         type: TriggerTiming.PlayerDying,
-        source: this.player,
-        player: this.player,
         targets: [target],
-        phase: this.game.currentPhase,
-        round: this.game.currentRound,
-        turn: this.player.seatIndex,
         data: { dyingPlayer: target },
       })
-      await this.deps.eventDispatcher.dispatch(dyingEvent, this.deps.eventChain)
     }
+  }
+
+  /**
+   * 触发子事件 — 通用的事件发射方法。
+   *
+   * 这是 effect 触发任意子事件的通用入口。
+   * 不需要为每种事件类型都新增专用方法——用 emit() 即可。
+   *
+   * 用法示例（触发 PlayerDying）:
+   * ```ts
+   * await ctx.emit({
+   *   type: TriggerTiming.PlayerDying,
+   *   targets: [target],
+   *   data: { dyingPlayer: target },
+   * })
+   * ```
+   *
+   * 自动完成三件事：
+   * 1. 创建 GameEvent（继承当前 phase/round/turn）
+   * 2. 挂载 EffectContext（让子事件的效果钩子也能工作）
+   * 3. dispatch 到 EventChain（自动推入 → 结算 → 弹出）
+   */
+  async emit(eventDef: {
+    type: TriggerTiming
+    name?: string
+    source?: IPlayer
+    targets?: IPlayer[]
+    cards?: ICard[]
+    data?: Record<string, unknown>
+    forced?: boolean
+    silent?: boolean
+  }): Promise<void> {
+    const event = new GameEvent({
+      name: eventDef.name ?? `${eventDef.type}`,
+      type: eventDef.type,
+      source: eventDef.source ?? this.player,
+      player: this.player,
+      targets: eventDef.targets ?? [],
+      cards: eventDef.cards ?? this.triggerCards,
+      phase: this.game.currentPhase,
+      round: this.game.currentRound,
+      turn: this.player.seatIndex,
+      forced: eventDef.forced ?? false,
+      silent: eventDef.silent ?? false,
+      data: eventDef.data ?? {},
+    })
+
+    await this.deps.eventDispatcher.dispatch(event, this.deps.eventChain)
+  }
+
+  /**
+   * 请求玩家响应 — 暂停流水线，等待玩家决策。
+   *
+   * 内部使用 EventPauseManager 阻塞事件链推进，
+   * 同时通过 decisionService 向外部（UI/AI）发起询问。
+   *
+   * 根据 options 中提供的字段自动路由：
+   *   validCards   → 询问玩家选择卡牌（出闪/出桃）→ askForResponse
+   *   validTargets → 询问玩家选择目标           → askForTarget
+   *   都不提供     → 纯确认/取消询问
+   *
+   * 使用 finally 确保无论决策成功/失败都恢复流水线，
+   * 防止回调永远不触发导致事件栈死锁。
+   */
+  async waitForResponse(prompt: string, options?: ResponseRequest): Promise<EffectResponse> {
+    if (!this.deps.decisionService) {
+      return { confirmed: false }
+    }
+
+    const pausePromise = this.deps.eventDispatcher.pauseManager.pause(
+      prompt,
+      options?.timeout,
+    )
+
+    const decisionPromise = (async () => {
+      try {
+        if (options?.validTargets && options.validTargets.length > 0) {
+          const targets = await this.deps.decisionService!.askForTarget(
+            this.player,
+            options.validTargets,
+            prompt,
+          )
+          return { confirmed: targets.length > 0, targets }
+        }
+
+        if (options?.validCards && options.validCards.length > 0) {
+          const card = await this.deps.decisionService!.askForResponse(
+            this.player,
+            prompt,
+            options.validCards,
+            options.timeout,
+          )
+          return { confirmed: card !== null, card: card ?? undefined }
+        }
+
+        // 纯确认询问（无卡牌/目标）：传空数组走 askForResponse
+        const card = await this.deps.decisionService!.askForResponse(
+          this.player,
+          prompt,
+          [],
+          options?.timeout,
+        )
+        return { confirmed: card !== null }
+      } finally {
+        this.deps.eventDispatcher.pauseManager.resume()
+      }
+    })()
+
+    // 暂停阻塞 → 等待 decisionService 调用 resume() → 解除阻塞
+    await pausePromise
+    return await decisionPromise
   }
 
   /**
@@ -216,13 +290,6 @@ export class EffectContext implements IEffectContext {
       round: this.game.currentRound,
       turn: this.player.seatIndex,
     })
-
-    cardUseEvent.data['_effectContext'] = new EffectContext(
-      cardUseEvent,
-      this.player,
-      [card],
-      this.deps,
-    )
 
     await this.deps.eventDispatcher.dispatch(
       cardUseEvent,

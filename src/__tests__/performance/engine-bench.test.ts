@@ -76,19 +76,23 @@ describe('Performance Benchmarks', () => {
     it('should get matching hooks for 10 heroes under 50ms', () => {
       const eventTrigger = new EventTrigger()
 
-      // Register 10 heroes × 3 skills each = 30 hooks
+      // Register 10 heroes × 3 skills each = 30 handlers
       for (let h = 0; h < 10; h++) {
         const player = createQuickPlayer(`hero_${h}`, h)
         for (let s = 0; s < 3; s++) {
-          eventTrigger.register({
-            hook: async () => {},
-            skillId: `skill_h${h}_s${s}`,
-            player,
-            priority: h * 10 + s,
-            isLocked: h % 3 === 0, // some locked
+          eventTrigger.registerCompiled({
             timing: TriggerTiming.Damage,
             stage: 'Content',
             scope: 'global',
+            skillId: `skill_h${h}_s${s}`,
+            playerId: player.id,
+            priority: h * 10 + s,
+            isLocked: h % 3 === 0,
+            frequency: 'unlimited' as const,
+            enabled: true,
+            usedThisTurn: false,
+            usedThisRound: false,
+            execute: async () => {},
           })
         }
       }
@@ -101,7 +105,7 @@ describe('Performance Benchmarks', () => {
       const start = performance.now()
 
       for (let i = 0; i < 10; i++) {
-        eventTrigger.getMatchingHooks(event, 'Content')
+        eventTrigger.getMatchingHandlers(event, 'Content')
       }
 
       const elapsed = performance.now() - start
@@ -113,19 +117,23 @@ describe('Performance Benchmarks', () => {
       const dispatcher = new EventDispatcher()
       const chain = new EventChain()
 
-      // Register 30 hooks (10 heroes × 3 skills)
+      // Register 30 handlers (10 heroes × 3 skills)
       for (let h = 0; h < 10; h++) {
         const player = createQuickPlayer(`hero_${h}`, h)
         for (let s = 0; s < 3; s++) {
-          dispatcher.eventTrigger.register({
-            hook: async () => {},
-            skillId: `skill_h${h}_s${s}`,
-            player,
-            priority: h * 10 + s,
-            isLocked: h % 3 === 0,
+          dispatcher.eventTrigger.registerCompiled({
             timing: TriggerTiming.CardUse,
             stage: 'Content',
             scope: 'global',
+            skillId: `skill_h${h}_s${s}`,
+            playerId: player.id,
+            priority: h * 10 + s,
+            isLocked: h % 3 === 0,
+            frequency: 'unlimited' as const,
+            enabled: true,
+            usedThisTurn: false,
+            usedThisRound: false,
+            execute: async () => {},
           })
         }
       }

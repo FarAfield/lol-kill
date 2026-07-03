@@ -23,6 +23,12 @@ const constantRoutes = [
     component: () => import('@/views/game/index.vue'),
     meta: { title: '游戏桌面' },
   },
+  {
+    path: '/game-text',
+    name: 'game-text',
+    component: () => import('@/views/game-text/index.vue'),
+    meta: { title: '文字调试版' },
+  },
   // {
   //   path: "/hero",
   //   name: "hero",

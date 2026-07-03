@@ -1,24 +1,3 @@
-// ============================================================
-// 联盟杀 · EventPauseManager — 事件栈暂停/恢复管理
-//
-// 当事件结算过程中需要等待玩家输入（出牌选择、目标选择、
-// 响应询问等）时，事件栈必须暂停等待。
-//
-// 设计:
-//   - 基于 Promise 的暂停机制
-//   - 支持嵌套暂停（多个暂停点堆叠）
-//   - 支持超时自动恢复
-//   - 支持取消暂停
-//
-// 使用场景:
-//   1. 玩家出牌阶段 — 等待选择要出的牌和目标
-//   2. 响应窗口 — 等待玩家决定是否出闪/桃/无懈可击
-//   3. 技能发动选择 — 等待玩家决定是否发动技能
-// ============================================================
-
-/**
- * 暂停状态
- */
 export interface PauseState {
   /** 暂停原因（调试用） */
   reason: string
@@ -32,20 +11,11 @@ export interface PauseState {
   timeoutTimer?: ReturnType<typeof setTimeout>
 }
 
-/**
- * EventPauseManager — 事件暂停管理器
- *
- * 提供暂停/恢复事件执行的机制。
- * 当暂停时，EventDispatcher 的流水线推进被阻塞，
- * 直到调用 resume() 或超时。
- */
 export class EventPauseManager {
   /** 暂停状态栈（支持嵌套暂停） */
   private pauseStack: PauseState[] = []
-
   /** 全局超时时间（毫秒），0 表示不启用 */
   private defaultTimeout: number
-
   /** 是否允许嵌套暂停 */
   private allowNested: boolean
 
@@ -66,9 +36,7 @@ export class EventPauseManager {
     if (!this.allowNested && this.pauseStack.length > 0) {
       this.resume()
     }
-
     const effectiveTimeout = timeout ?? this.defaultTimeout
-
     return new Promise<void>((resolve, reject) => {
       const state: PauseState = {
         reason,
@@ -76,7 +44,6 @@ export class EventPauseManager {
         resolve,
         reject,
       }
-
       // 设置超时
       if (effectiveTimeout > 0) {
         state.timeoutTimer = setTimeout(() => {
@@ -84,14 +51,12 @@ export class EventPauseManager {
           resolve()
         }, effectiveTimeout)
       }
-
       this.pauseStack.push(state)
     })
   }
 
   /**
    * 恢复事件执行
-   *
    * 恢复最近的一个暂停点（栈顶）。
    * 如果栈为空则什么都不做。
    */
@@ -114,7 +79,6 @@ export class EventPauseManager {
 
   /**
    * 取消当前暂停
-   *
    * @param reason - 取消原因
    */
   cancel(reason?: string): void {

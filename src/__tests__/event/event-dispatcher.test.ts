@@ -87,37 +87,49 @@ describe('EventDispatcher', () => {
       const contentHook = vi.fn()
       const afterHook = vi.fn()
 
-      dispatcher.eventTrigger.register({
-        hook: beforeHook,
+      dispatcher.eventTrigger.registerCompiled({
+        execute: beforeHook,
         skillId: 'before_skill',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Before',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
-      dispatcher.eventTrigger.register({
-        hook: contentHook,
+      dispatcher.eventTrigger.registerCompiled({
+        execute: contentHook,
         skillId: 'content_skill',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
-      dispatcher.eventTrigger.register({
-        hook: afterHook,
+      dispatcher.eventTrigger.registerCompiled({
+        execute: afterHook,
         skillId: 'after_skill',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'After',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       const event = new GameEvent({
@@ -135,37 +147,49 @@ describe('EventDispatcher', () => {
     it('should execute hooks in priority order', async () => {
       const executionOrder: string[] = []
 
-      dispatcher.eventTrigger.register({
-        hook: async () => { executionOrder.push('low') },
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async () => { executionOrder.push('low') },
         skillId: 'low_priority',
-        player: {} as any,
+        playerId: 'any',
         priority: 1,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
-      dispatcher.eventTrigger.register({
-        hook: async () => { executionOrder.push('mid') },
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async () => { executionOrder.push('mid') },
         skillId: 'mid_priority',
-        player: {} as any,
+        playerId: 'any',
         priority: 5,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
-      dispatcher.eventTrigger.register({
-        hook: async () => { executionOrder.push('high') },
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async () => { executionOrder.push('high') },
         skillId: 'high_priority',
-        player: {} as any,
+        playerId: 'any',
         priority: 10,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       const event = new GameEvent({
@@ -179,15 +203,19 @@ describe('EventDispatcher', () => {
 
     it('should not execute hooks when stage has no matching hooks', async () => {
       const hook = vi.fn()
-      dispatcher.eventTrigger.register({
+      dispatcher.eventTrigger.registerCompiled({
         hook,
         skillId: 'damage_only',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.Damage, // different timing
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       const event = new GameEvent({
@@ -221,15 +249,19 @@ describe('EventDispatcher', () => {
 
     it('should not enter Content stage when cancelled', async () => {
       const contentHook = vi.fn()
-      dispatcher.eventTrigger.register({
-        hook: contentHook,
+      dispatcher.eventTrigger.registerCompiled({
+        execute:contentHook,
         skillId: 'content_skill',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       const event = new GameEvent({
@@ -252,17 +284,21 @@ describe('EventDispatcher', () => {
       })
 
       // Hook at Prevent stage that prevents the event
-      dispatcher.eventTrigger.register({
-        hook: async (evt) => {
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async (evt) => {
           evt.prevented = true
         },
         skillId: 'preventer',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Prevent',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       await dispatcher.dispatch(event, chain)
@@ -278,17 +314,21 @@ describe('EventDispatcher', () => {
         type: TriggerTiming.CardUse,
       })
 
-      dispatcher.eventTrigger.register({
-        hook: async (evt) => {
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async (evt) => {
           evt.prevented = true
         },
         skillId: 'preventer',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Prevent',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       await dispatcher.dispatch(event, chain)
@@ -336,8 +376,8 @@ describe('EventDispatcher', () => {
       })
 
       // Hook that pushes a child event during Content
-      dispatcher.eventTrigger.register({
-        hook: async (_evt) => {
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async (_evt) => {
           executionOrder.push('A_Content')
 
           // Create and push a child event to chain
@@ -347,12 +387,12 @@ describe('EventDispatcher', () => {
           })
 
           // Register a hook for the child
-          dispatcher.eventTrigger.register({
-            hook: async () => {
+          dispatcher.eventTrigger.registerCompiled({
+            execute:async () => {
               executionOrder.push('B_Content')
             },
             skillId: 'child_hook',
-            player: {} as any,
+            playerId: 'any',
             priority: 0,
             isLocked: false,
             timing: TriggerTiming.Damage,
@@ -363,12 +403,16 @@ describe('EventDispatcher', () => {
           chain.push(eventB)
         },
         skillId: 'parent_hook',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       await dispatcher.dispatch(eventA, chain)
@@ -386,8 +430,8 @@ describe('EventDispatcher', () => {
         type: TriggerTiming.CardUse,
       })
 
-      dispatcher.eventTrigger.register({
-        hook: async (_evt) => {
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async (_evt) => {
           const eventB = new GameEvent({
             name: 'Child Event',
             type: TriggerTiming.Damage,
@@ -395,12 +439,16 @@ describe('EventDispatcher', () => {
           chain.push(eventB)
         },
         skillId: 'parent_hook',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       await dispatcher.dispatch(eventA, chain)
@@ -416,19 +464,19 @@ describe('EventDispatcher', () => {
 
       const eventA = new GameEvent({ name: 'A', type: TriggerTiming.CardUse })
 
-      dispatcher.eventTrigger.register({
-        hook: async (_evt) => {
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async (_evt) => {
           order.push('A')
           const eventB = new GameEvent({ name: 'B', type: TriggerTiming.Damage })
 
-          dispatcher.eventTrigger.register({
-            hook: async (_e) => {
+          dispatcher.eventTrigger.registerCompiled({
+            execute:async (_e) => {
               order.push('B')
               const eventC = new GameEvent({ name: 'C', type: TriggerTiming.Damaged })
               chain.push(eventC)
             },
             skillId: 'hook_b',
-            player: {} as any,
+            playerId: 'any',
             priority: 0,
             isLocked: false,
             timing: TriggerTiming.Damage,
@@ -439,12 +487,16 @@ describe('EventDispatcher', () => {
           chain.push(eventB)
         },
         skillId: 'hook_a',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       await dispatcher.dispatch(eventA, chain)
@@ -530,17 +582,21 @@ describe('EventDispatcher', () => {
 
   describe('error handling', () => {
     it('should throw by default when hook throws', async () => {
-      dispatcher.eventTrigger.register({
-        hook: async () => {
+      dispatcher.eventTrigger.registerCompiled({
+        execute:async () => {
           throw new Error('Hook error')
         },
         skillId: 'failing_hook',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       const event = new GameEvent({
@@ -558,17 +614,21 @@ describe('EventDispatcher', () => {
         onError,
       })
 
-      dispatcherLenient.eventTrigger.register({
-        hook: async () => {
+      dispatcherLenient.eventTrigger.registerCompiled({
+        execute:async () => {
           throw new Error('Hook error')
         },
         skillId: 'failing_hook',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       const event = new GameEvent({
@@ -583,20 +643,24 @@ describe('EventDispatcher', () => {
     })
   })
 
-  describe('onHookExecute callback', () => {
-    it('should call onHookExecute for each hook', async () => {
-      const onHookExecute = vi.fn()
-      const dispatcherWithCallback = new EventDispatcher({ onHookExecute })
+  describe('onHandlerExecute callback', () => {
+    it('should call onHandlerExecute for each hook', async () => {
+      const onHandlerExecute = vi.fn()
+      const dispatcherWithCallback = new EventDispatcher({ onHandlerExecute })
 
-      dispatcherWithCallback.eventTrigger.register({
-        hook: async () => {},
+      dispatcherWithCallback.eventTrigger.registerCompiled({
+        execute:async () => {},
         skillId: 'test_skill',
-        player: {} as any,
+        playerId: 'any',
         priority: 0,
         isLocked: false,
         timing: TriggerTiming.CardUse,
         stage: 'Content',
         scope: 'global',
+        frequency: 'unlimited' as const,
+        enabled: true,
+        usedThisTurn: false,
+        usedThisRound: false,
       })
 
       const event = new GameEvent({
@@ -605,7 +669,7 @@ describe('EventDispatcher', () => {
       })
 
       await dispatcherWithCallback.dispatch(event, chain)
-      expect(onHookExecute).toHaveBeenCalledTimes(1)
+      expect(onHandlerExecute).toHaveBeenCalledTimes(1)
     })
   })
 })

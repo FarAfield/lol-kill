@@ -71,6 +71,37 @@ export interface ITriggerCondition {
 }
 
 /**
+ * 响应请求参数
+ *
+ * 传递给 waitForResponse 的选项，定义玩家可以响应什么。
+ * 三个字段按优先级匹配：validEffects > validTargets > validCards。
+ * 不传任何 valid 字段时视为纯确认/取消询问。
+ */
+export interface ResponseRequest {
+  /** 可选的响应卡牌（如闪、桃） */
+  validCards?: ICard[]
+  /** 可选的目标列表 */
+  validTargets?: IPlayer[]
+  /** 超时时间（毫秒），0 表示不超时 */
+  timeout?: number
+}
+
+/**
+ * 响应结果
+ *
+ * waitForResponse 的返回值。
+ * confirmed === false 表示玩家放弃响应（未出闪、未出桃等）。
+ */
+export interface EffectResponse {
+  /** 是否确认响应 */
+  confirmed: boolean
+  /** 选择的卡牌（如有） */
+  card?: ICard
+  /** 选择的目标（如有） */
+  targets?: IPlayer[]
+}
+
+/**
  * 效果执行上下文（受限读写接口）
  *
  * 引擎提供给 Effect 逻辑的安全边界。
@@ -94,6 +125,58 @@ export interface IEffectContext {
   damageTarget(target: IPlayer, amount: number): Promise<void>
   recoverHp(target: IPlayer, amount: number): Promise<void>
   transferCards(cards: ICard[], target: IPlayer): Promise<void>
+  /**
+   * 请求玩家响应 — 暂停当前事件流水线，等待玩家决策。
+   *
+   * 在效果 content() 中调用此方法，会冻结事件链的推进，
+   * 直到玩家回应或超时。常用于：
+   * - Prevent 阶段询问是否出闪
+   * - 濒死求桃
+   * - 技能发动确认
+   * - 选择目标
+   *
+   * @param prompt  提示文本（如 "是否出闪？"）
+   * @param options 响应选项（可用卡牌、目标、超时）
+   * @returns 响应结果
+   *
+   * @example
+   * ```ts
+   * const resp = await ctx.waitForResponse('是否出闪？', {
+   *   validCards: handCards.filter(c => c.name === '闪'),
+   * })
+   * if (resp.confirmed) {
+   *   ctx.event.prevented = true  // 出闪成功，阻止伤害
+   * }
+   * ```
+   */
+  waitForResponse(prompt: string, options?: ResponseRequest): Promise<EffectResponse>
+  /**
+   * 触发子事件 — 在当前事件链中插入一个任意类型的事件。
+   *
+   * 子事件会被 dispatch 到 EventChain，以 LIFO 顺序在当前事件之后结算。
+   * 自动继承当前事件的 phase/round/turn 信息。
+   *
+   * @param eventDef 事件定义
+   */
+  emit(eventDef: {
+    /** 触发时机类型 */
+    type: TriggerTiming
+    /** 事件名称（可选，默认用 type 生成） */
+    name?: string
+    /** 事件来源 */
+    source?: IPlayer
+    /** 事件目标列表 */
+    targets?: IPlayer[]
+    /** 关联卡牌 */
+    cards?: ICard[]
+    /** 自定义数据 */
+    data?: Record<string, unknown>
+    /** 是否强制（不可取消/阻止） */
+    forced?: boolean
+    /** 是否静默 */
+    silent?: boolean
+  }): Promise<void>
+
   useCard(card: ICard, targets: IPlayer[]): Promise<void>
   judge(player: IPlayer): Promise<ICard>
   obtainCards(target: IPlayer, cards: ICard[]): Promise<void>

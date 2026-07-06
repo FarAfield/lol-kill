@@ -163,10 +163,13 @@ export function useSkill(
         description: effect?.description ?? '',
         type: effect?.type ?? SkillType.Passive,
         usable: usable.has(id),
-        usedThisTurn: effect?.usedThisTurn ?? false,
-        usedThisRound: effect?.usedThisRound ?? false,
+        // usedThisTurn/usedThisRound 在 CompiledHandler 上维护，
+        // UI 层暂从 handler 获取，这里用 false 兜底
+        usedThisTurn: false,
+        usedThisRound: false,
         priority: effect?.priority ?? 0,
-        enabled: effect?.enabled ?? true,
+        // 可用性由 isAvailable(ctx) 运行时判断，不再有简单的 boolean 字段
+        enabled: true,
         typeLabel: SKILL_TYPE_LABELS[effect?.type ?? SkillType.Passive],
         typeColor: SKILL_TYPE_COLORS[effect?.type ?? SkillType.Passive],
       }

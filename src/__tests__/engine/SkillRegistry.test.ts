@@ -45,9 +45,6 @@ function createTestEffect(id: string, overrides?: Partial<IEffect>): IEffect {
     },
     filter: overrides?.filter,
     content: overrides?.content ?? (async () => {}),
-    enabled: overrides?.enabled ?? true,
-    usedThisTurn: false,
-    usedThisRound: false,
   }
 }
 
@@ -236,38 +233,33 @@ describe('SkillRegistry', () => {
   // ── 觉醒技启停 ──
 
   describe('enableEffect / disableEffect', () => {
-    it('应启用觉醒技', () => {
+    it('应返回 true（兼容旧调用）', () => {
       const player = new Player({ id: 'p1', seatIndex: 0 })
       const awakenEffect = createTestEffect('awaken_skill', {
         type: SkillType.Awaken,
-        enabled: false,
       })
       effectRegistry.register(awakenEffect)
       skillRegistry.registerPlayerEffects(player, [awakenEffect])
 
       const result = skillRegistry.enableEffect(player, 'awaken_skill')
-
       expect(result).toBe(true)
-      expect(awakenEffect.enabled).toBe(true)
     })
 
-    it('启用未注册的效果应失败', () => {
+    it('启用未注册的效果应返回 false', () => {
       const player = new Player({ id: 'p1', seatIndex: 0 })
       const result = skillRegistry.enableEffect(player, 'not_registered')
 
       expect(result).toBe(false)
     })
 
-    it('应禁用效果', () => {
+    it('应返回 true（兼容旧调用）', () => {
       const player = new Player({ id: 'p1', seatIndex: 0 })
-      const effect = createTestEffect('e1', { enabled: true })
+      const effect = createTestEffect('e1')
       effectRegistry.register(effect)
       skillRegistry.registerPlayerEffects(player, [effect])
 
       const result = skillRegistry.disableEffect(player, 'e1')
-
       expect(result).toBe(true)
-      expect(effect.enabled).toBe(false)
     })
   })
 

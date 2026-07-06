@@ -31,9 +31,7 @@ function createEffect(id: string, overrides?: Partial<IEffect>): IEffect {
     },
     content: overrides?.content ?? (async () => {}),
     filter: overrides?.filter,
-    enabled: overrides?.enabled ?? true,
-    usedThisTurn: overrides?.usedThisTurn ?? false,
-    usedThisRound: overrides?.usedThisRound ?? false,
+    isAvailable: overrides?.isAvailable,
   }
 }
 
@@ -80,7 +78,6 @@ describe('EventCompiler.compile(effect, player)', () => {
       type: SkillType.Locked,
       priority: 100,
       frequency: Frequency.OncePerTurn,
-      enabled: false,
     })
 
     const handlers = compiler.compile(effect, player)
@@ -88,7 +85,8 @@ describe('EventCompiler.compile(effect, player)', () => {
     expect(handlers[0]?.isLocked).toBe(true)
     expect(handlers[0]?.priority).toBe(100)
     expect(handlers[0]?.frequency).toBe(Frequency.OncePerTurn)
-    expect(handlers[0]?.enabled).toBe(false)
+    expect(handlers[0]?.usedThisTurn).toBe(false)
+    expect(handlers[0]?.usedThisRound).toBe(false)
   })
 
   it('handler.execute 应调用 effect.content', async () => {
@@ -104,10 +102,10 @@ describe('EventCompiler.compile(effect, player)', () => {
     expect(executed).toBe(true)
   })
 
-  it('handler.execute 应跳过 disabled 的效果', async () => {
+  it('handler.execute 应跳过 isAvailable 返回 false 的效果', async () => {
     let executed = false
     const effect = createEffect('e5', {
-      enabled: false,
+      isAvailable: () => false,
       content: async () => { executed = true },
     })
 
@@ -145,31 +143,32 @@ describe('EventCompiler.compile(effect, player)', () => {
     expect(executed).toBe(false)
   })
 
-  it('handler.execute 应更新 frequency 标记', async () => {
+  it('handler.execute 应更新 handler 的 frequency 标记', async () => {
     const effect = createEffect('e8', {
       frequency: Frequency.OncePerTurn,
     })
 
-    expect(effect.usedThisTurn).toBe(false)
     const handlers = compiler.compile(effect, player)
+    expect(handlers[0]?.usedThisTurn).toBe(false)
     const mockCtx = { event: {} as any, player, game: {} as any, triggerCards: [] } as any
 
     await handlers[0]!.execute(mockCtx)
-    expect(effect.usedThisTurn).toBe(true)
+    expect(handlers[0]?.usedThisTurn).toBe(true)
   })
 
-  it('once 频率的效果执行后应禁用', async () => {
+  it('once 频率的效果执行后应标记为已使用', async () => {
     const effect = createEffect('e9', {
       frequency: Frequency.Once,
     })
 
-    expect(effect.enabled).toBe(true)
     const handlers = compiler.compile(effect, player)
     const mockCtx = { event: {} as any, player, game: {} as any, triggerCards: [] } as any
 
+    expect(handlers[0]?.usedThisRound).toBe(false)
+    expect(handlers[0]?.usedThisTurn).toBe(false)
+
     await handlers[0]!.execute(mockCtx)
-    expect(effect.usedThisRound).toBe(true)
-    expect(effect.usedThisTurn).toBe(true)
-    expect(effect.enabled).toBe(false)
+    expect(handlers[0]?.usedThisRound).toBe(true)
+    expect(handlers[0]?.usedThisTurn).toBe(true)
   })
 })

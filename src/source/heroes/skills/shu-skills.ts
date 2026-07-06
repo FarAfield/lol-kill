@@ -56,9 +56,6 @@ export const rendeEffect: IEffect = {
     ctx.player.setMark('rendePhaseActive', 1)
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -110,9 +107,6 @@ export const wushengEffect: IEffect = {
     // 此 content 仅作占位
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -143,9 +137,6 @@ export const paoxiaoEffect: IEffect = {
     ctx.player.setMark('paoxiaoActive', 1)
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -200,9 +191,6 @@ export const longdanEffect: IEffect = {
     // viewAs 技能，核心逻辑由 CardSystem 在使用牌时调用 viewAs
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ── 汇总导出 ──

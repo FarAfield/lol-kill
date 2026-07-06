@@ -15,6 +15,7 @@ import { EffectContext } from '@core/engine/effect-context'
 import type { EffectContextDeps } from '@core/contracts/effect-context-deps'
 import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
+import { EventPauseManager } from '@core/event/event-pause-manager'
 import { EventTrigger } from '@core/event/event-trigger'
 import { GameEvent } from '@core/event/game-event'
 import { DeckManager } from '@core/system/deck-manager'
@@ -77,6 +78,7 @@ function createDeps(state: GameState): EffectContextDeps {
     state,
     eventChain: new EventChain(),
     eventDispatcher: new EventDispatcher(),
+    pauseManager: new EventPauseManager(),
     deckManager: new DeckManager(state),
     cardSystem: new CardSystem(state),
     damageSystem: new DamageSystem(),

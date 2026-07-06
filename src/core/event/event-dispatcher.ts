@@ -1,27 +1,5 @@
-// ============================================================
-// 联盟杀 · EventDispatcher — AOP 流水线事件调度器
-//
-// 事件系统的核心调度引擎。将事件按流水线阶段推进，
-// 在每个阶段查询并执行匹配的 CompiledHandler。
-//
-// 完整流水线:
-//   WAITING → SKIP_CHECK → (CANCELLED) → BEFORE → BEGIN
-//     → PREPARE → CONTENT → PREVENT → (PREVENTED) → END → AFTER → COMPLETED
-//
-// 嵌套事件处理 (LIFO):
-//   事件A 的 CONTENT 阶段触发事件B → B推入EventChain栈顶
-//   → B完整结算 → B出栈 → EventChain栈顶恢复为A → A继续PREVENT阶段
-//
-// 设计要点:
-//   - Handler 通过 EventTrigger 匹配
-//   - 同时机 handler 通过 PriorityManager 排序
-//   - 需要玩家决策时通过 EventPauseManager 暂停
-//   - EffectContext 由 Dispatcher 在执行 handler 时创建，不依赖暗线传递
-// ============================================================
-
-import type { IGameEvent, IEventContext } from '@core/contracts/event.interface'
+import type { IGameEvent } from '@core/contracts/event.interface'
 import type { CompiledHandler } from '@core/contracts/compiled-handler'
-import type { IPlayer } from '@core/contracts/player.interface'
 import type { IEffectContext } from '@core/contracts/effect.interface'
 import type { EffectContextDeps } from '@core/contracts/effect-context-deps'
 import { EffectContext } from '@core/engine/effect-context'
@@ -29,8 +7,6 @@ import { EventStatus, type TriggerStage } from '@core/contracts/enums'
 import { EventChain } from './event-chain'
 import { EventTrigger } from './event-trigger'
 import { PriorityManager } from './priority-manager'
-import { EventPauseManager } from './event-pause-manager'
-
 /**
  * EventDispatcher 配置选项
  */
@@ -97,15 +73,12 @@ function getEventDepth(event: IGameEvent): number {
 export class EventDispatcher {
   readonly eventTrigger: EventTrigger
   readonly priorityManager: PriorityManager
-  readonly pauseManager: EventPauseManager
-
-  private options: Required<EventDispatcherOptions>
+  private options: Required<Omit<EventDispatcherOptions, 'deps'>> & Pick<EventDispatcherOptions, 'deps'>
   private deps?: EffectContextDeps
 
   constructor(options?: EventDispatcherOptions) {
     this.eventTrigger = new EventTrigger()
     this.priorityManager = new PriorityManager()
-    this.pauseManager = new EventPauseManager()
 
     this.options = {
       maxDepth: options?.maxDepth ?? 20,
@@ -248,9 +221,6 @@ export class EventDispatcher {
     const sorted = this.priorityManager.prioritize(handlers)
 
     for (const handler of sorted) {
-      // handler 不可用（已禁用或次数用完），跳过
-      if (!handler.enabled) continue
-
       this.options.onHandlerExecute(handler, event)
 
       // 创建 EffectContext（如果 deps 可用）
@@ -284,12 +254,7 @@ export class EventDispatcher {
     const player = this.deps.state.players.find((p) => p.id === handler.playerId)
     if (!player) return undefined
 
-    return new EffectContext(
-      event,
-      player,
-      event.cards ?? [],
-      this.deps,
-    )
+    return new EffectContext(event, player, event.cards ?? [], this.deps)
   }
 
   /**

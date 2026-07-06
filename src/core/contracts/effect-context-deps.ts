@@ -13,6 +13,7 @@ import type { CardSystem } from '@core/system/card-system'
 import type { DamageSystem } from '@core/system/damage-system'
 import type { DeathSystem } from '@core/system/death-system'
 import type { IUIDecisionService } from './services.interface'
+import type { EventPauseManager } from '@core/event/event-pause-manager'
 
 /**
  * EffectContext 依赖项
@@ -26,6 +27,8 @@ export interface EffectContextDeps {
   eventChain: EventChain
   /** Dispatch 函数（EffectContext.emit 等内部调用），结构类型避免循环依赖 */
   eventDispatcher: { dispatch(event: IGameEvent, chain: EventChain): Promise<void> }
+  /** 暂停管理器——等待玩家决策时挂起事件链 */
+  pauseManager: EventPauseManager
   deckManager: DeckManager
   cardSystem: CardSystem
   damageSystem: DamageSystem

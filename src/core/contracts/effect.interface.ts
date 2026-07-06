@@ -231,9 +231,12 @@ export interface ICardSelector {
  * - 触发：trigger（source / global / target 三种监听范围 × 七个流水线阶段）
  * - 筛选：filter, selectTarget, selectCard
  * - 执行：content
+ * - 可用性：isAvailable
  * - 视作：viewAs, viewAsFilter
  * - AI：aiValue, aiCard, aiTarget
- * - 运行时：enabled, usedThisTurn, usedThisRound
+ *
+ * 注意：IEffect 是纯定义接口，不包含任何运行时可变状态。
+ * usedThisTurn / usedThisRound 等频率状态放在 CompiledHandler 上。
  */
 export interface IEffect {
   /** 效果唯一标识 */
@@ -309,11 +312,22 @@ export interface IEffect {
   /** AI 选择目标 */
   aiTarget?: (targets: IPlayer[], context: IEffectContext) => IPlayer[]
 
-  // ── 运行时状态（引擎维护，source 数据中为默认值） ──
-  /** 是否启用（觉醒技初始为 false，觉醒后置为 true） */
-  enabled: boolean
-  /** 本回合是否已使用 */
-  usedThisTurn: boolean
-  /** 本轮是否已使用 */
-  usedThisRound: boolean
+  // ── 可用性检查（运行时） ──
+  /**
+   * 检查技能当前是否可用（运行时判断）。
+   *
+   * 在每次触发时被调用，返回 false 则跳过本次执行。
+   * 用于实现：
+   * - 觉醒技：检查觉醒条件是否满足
+   * - 沉默/禁魔：检查玩家 mark
+   * - 状态限制：体力、手牌数等条件
+   *
+   * 与 filter 的区别：
+   * - isAvailable 是"这个技能现在能用吗？"（全局可用性）
+   * - filter 是"这次触发要发动吗？"（具体条件筛选）
+   *
+   * @param context 效果执行上下文
+   * @returns true 表示技能当前可用
+   */
+  isAvailable?: (context: IEffectContext) => boolean
 }

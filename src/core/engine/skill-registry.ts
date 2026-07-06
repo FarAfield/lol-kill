@@ -211,50 +211,27 @@ export class SkillRegistry {
     }
   }
 
-  // ── 效果启停控制（觉醒技等） ──
+// ── 效果启停控制（觉醒技等） ──
 
   /**
    * 启用效果（用于觉醒技触发后）。
    *
-   * 觉醒技在注册时 enabled = false，钩子虽然已注册但不会执行。
-   * 调用此方法将 enabled 置为 true，后续触发时钩子正常执行。
+   * 在新设计下，觉醒技的启用通过 player marks + isAvailable 动态判断，
+   * 无需再手动设置 enabled。此方法保留空实现以兼容原有调用，
+   * 新代码应直接修改玩家状态（如 setMark）来影响 isAvailable 的判断。
    *
-   * @param player    效果持有者
-   * @param effectId  效果 ID
-   * @returns 是否成功启用
+   * @deprecated 使用 player.setMark() + isAvailable 替代
    */
-  enableEffect(player: IPlayer, effectId: string): boolean {
-    const hookKey = `${player.id}:${effectId}`
-
-    if (!this.registeredEffectIds.has(hookKey)) {
-      return false
-    }
-
-    const effect = this.effectRegistry.get(effectId)
-    if (!effect) return false
-
-    effect.enabled = true
+  enableEffect(_player: IPlayer, _effectId: string): boolean {
     return true
   }
 
   /**
    * 禁用效果。
    *
-   * @param player    效果持有者
-   * @param effectId  效果 ID
-   * @returns 是否成功禁用
+   * @deprecated 使用 player.setMark() + isAvailable 替代
    */
-  disableEffect(player: IPlayer, effectId: string): boolean {
-    const hookKey = `${player.id}:${effectId}`
-
-    if (!this.registeredEffectIds.has(hookKey)) {
-      return false
-    }
-
-    const effect = this.effectRegistry.get(effectId)
-    if (!effect) return false
-
-    effect.enabled = false
+  disableEffect(_player: IPlayer, _effectId: string): boolean {
     return true
   }
 

@@ -76,9 +76,6 @@ export const jianxiongEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -121,9 +118,6 @@ export const hujiaEffect: IEffect = {
     // 标记清除由事件结束时 EventDispatcher 处理
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -183,9 +177,6 @@ export const fankuiEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -240,9 +231,6 @@ export const guicaiEffect: IEffect = {
     judgeCard.owner = ctx.player
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -316,9 +304,6 @@ export const ganglieEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -386,9 +371,6 @@ export const tuxiEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ── 汇总导出 ──

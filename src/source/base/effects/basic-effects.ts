@@ -61,9 +61,6 @@ export const shaEffect: IEffect = {
     ctx.player.markAttackUsed()
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -97,9 +94,6 @@ export const shanEffect: IEffect = {
     ctx.player.setMark('shanUsed', 1)
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -137,9 +131,6 @@ export const taoEffect: IEffect = {
     await ctx.recoverHp(target, 1)
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -180,9 +171,6 @@ export const jiuEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────

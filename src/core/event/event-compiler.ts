@@ -1,32 +1,18 @@
-// ============================================================
-// 联盟杀 · EventCompiler — 事件编译器
-//
-// 将声明式 IEffect 定义为引擎可高效匹配的 CompiledHandler。
-// 编译在注册时完成，运行时只做匹配 + 执行。
-//
-// 典型用法（SkillRegistry 注册英雄技能时）：
-//   const handlers = eventCompiler.compile(effect, player)
-//   eventTrigger.registerCompiledBatch(handlers)
-//
-// 每个 IEffect.trigger 中的 TriggerEntry 展开为一个 CompiledHandler。
-// handler.execute 不依赖外部注入，所有服务通过参数 ctx 获取。
-// ============================================================
-
-import type { IEffect, IEffectContext } from '@core/contracts/effect.interface'
+import type { IEffect, IEffectContext, TriggerEntry } from '@core/contracts/effect.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { CompiledHandler } from '@core/contracts/compiled-handler'
 
 /**
  * 检查效果的 frequency 限制
  */
-function checkFrequency(effect: IEffect): boolean {
+function checkFrequency(handler: CompiledHandler, effect: IEffect): boolean {
   switch (effect.frequency) {
     case 'once':
-      return !effect.usedThisRound && !effect.usedThisTurn
+      return !handler.usedThisRound && !handler.usedThisTurn
     case 'oncePerTurn':
-      return !effect.usedThisTurn
+      return !handler.usedThisTurn
     case 'oncePerRound':
-      return !effect.usedThisRound
+      return !handler.usedThisRound
     case 'unlimited':
     default:
       return true
@@ -34,20 +20,19 @@ function checkFrequency(effect: IEffect): boolean {
 }
 
 /**
- * 标记效果已使用（更新 frequency 状态）
+ * 标记效果已使用（更新 handler 的 frequency 状态）
  */
-function markUsed(effect: IEffect): void {
+function markUsed(handler: CompiledHandler, effect: IEffect): void {
   switch (effect.frequency) {
     case 'once':
-      effect.usedThisRound = true
-      effect.usedThisTurn = true
-      effect.enabled = false
+      handler.usedThisTurn = true
+      handler.usedThisRound = true
       break
     case 'oncePerTurn':
-      effect.usedThisTurn = true
+      handler.usedThisTurn = true
       break
     case 'oncePerRound':
-      effect.usedThisRound = true
+      handler.usedThisRound = true
       break
     case 'unlimited':
     default:
@@ -105,12 +90,12 @@ export class EventCompiler {
   private compileEntry(
     effect: IEffect,
     player: IPlayer,
-    entry: IEffect['trigger']['source'][number],
+    entry: TriggerEntry,
     scope: CompiledHandler['scope'],
   ): CompiledHandler {
     const { timing, stage } = entry
 
-    return {
+    const handler: CompiledHandler = {
       timing,
       stage,
       scope,
@@ -119,16 +104,15 @@ export class EventCompiler {
       priority: effect.priority,
       isLocked: effect.type === 'locked',
       frequency: effect.frequency,
-      enabled: effect.enabled,
-      usedThisTurn: effect.usedThisTurn,
-      usedThisRound: effect.usedThisRound,
+      usedThisTurn: false,
+      usedThisRound: false,
 
       execute: async (ctx: IEffectContext) => {
-        // 1. enabled 检查
-        if (!effect.enabled) return
+        // 1. 可用性检查（isAvailable）
+        if (effect.isAvailable && !effect.isAvailable(ctx)) return
 
         // 2. frequency 检查
-        if (!checkFrequency(effect)) return
+        if (!checkFrequency(handler, effect)) return
 
         // 3. filter 检查
         if (effect.filter && !effect.filter(ctx)) return
@@ -139,8 +123,10 @@ export class EventCompiler {
         }
 
         // 5. 更新 frequency 标记
-        markUsed(effect)
+        markUsed(handler, effect)
       },
     }
+
+    return handler
   }
 }

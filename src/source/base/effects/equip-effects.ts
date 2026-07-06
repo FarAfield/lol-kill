@@ -51,9 +51,6 @@ export const zhuGeLianNuEffect: IEffect = {
     ctx.player.attackLimit = Infinity
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -93,9 +90,6 @@ export const qingGangJianEffect: IEffect = {
     ctx.event.data['_ignoreArmor'] = true
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -145,9 +139,6 @@ export const ciXiongShuangGuJianEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -177,9 +168,6 @@ export const zhangBaSheMaoEffect: IEffect = {
     // 效果核心逻辑由 viewAs 和外部选择器处理
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -232,9 +220,6 @@ export const guanShiFuEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -282,9 +267,6 @@ export const baGuaZhenEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -331,9 +313,6 @@ export const renWangDunEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -362,9 +341,6 @@ export const defensiveHorseEffect: IEffect = {
     // 此 content 为占位
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -391,9 +367,6 @@ export const offensiveHorseEffect: IEffect = {
     // 此 content 为占位
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────

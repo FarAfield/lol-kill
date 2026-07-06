@@ -61,9 +61,6 @@ export const guoHeChaiQiaoEffect: IEffect = {
     await ctx.discardCards([cardToDiscard])
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -108,9 +105,6 @@ export const shunShouQianYangEffect: IEffect = {
     await ctx.transferCards([cardToTake], ctx.player)
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -139,9 +133,6 @@ export const wuZhongShengYouEffect: IEffect = {
     await ctx.drawCards(2)
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -191,9 +182,6 @@ export const nanManRuQinEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -241,9 +229,6 @@ export const wanJianQiFaEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -298,9 +283,6 @@ export const jueDouEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -339,9 +321,6 @@ export const wuXieKeJiEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -379,9 +358,6 @@ export const wuGuFengDengEffect: IEffect = {
     ctx.event.data['_wuGuFengDeng_remaining'] = [...revealedCards]
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -413,9 +389,6 @@ export const taoYuanJieYiEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────
@@ -467,9 +440,6 @@ export const jieDaoShaRenEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ────────────────────────────────────────

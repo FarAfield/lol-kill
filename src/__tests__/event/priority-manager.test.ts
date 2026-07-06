@@ -17,7 +17,6 @@ function createMockHandler(overrides: Partial<CompiledHandler> = {}): CompiledHa
     priority: overrides.priority ?? 0,
     isLocked: overrides.isLocked ?? false,
     frequency: overrides.frequency ?? Frequency.Unlimited,
-    enabled: overrides.enabled ?? true,
     usedThisTurn: overrides.usedThisTurn ?? false,
     usedThisRound: overrides.usedThisRound ?? false,
     execute: overrides.execute ?? (async () => {}),

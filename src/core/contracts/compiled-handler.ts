@@ -34,11 +34,9 @@ export interface CompiledHandler {
   isLocked: boolean
   /** 频率限制 */
   frequency: Frequency
-  /** 是否启用 */
-  enabled: boolean
-  /** 本回合是否已使用 */
+  /** 本回合是否已使用（由频率系统维护） */
   usedThisTurn: boolean
-  /** 本轮是否已使用 */
+  /** 本轮是否已使用（由频率系统维护） */
   usedThisRound: boolean
   /** 执行入口 —— 由 EventDispatcher 在调度时调用，传入引擎提供的上下文 */
   execute: (context: IEffectContext) => Promise<void>

@@ -75,9 +75,6 @@ export const zhihengEffect: IEffect = {
     const drawn = await ctx.drawCards(1)
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ═══════════════════════════════════════════
@@ -117,9 +114,6 @@ export const kejiEffect: IEffect = {
     }
   },
 
-  enabled: true,
-  usedThisTurn: false,
-  usedThisRound: false,
 }
 
 // ── 汇总导出 ──

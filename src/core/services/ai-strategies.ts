@@ -368,7 +368,7 @@ export class BeginnerAIStrategy extends BaseAIStrategy {
     _state: IGameState,
   ): IEffect | null {
     // 随机选择一个可用效果
-    const activeEffects = availableEffects.filter((e) => e.type === SkillType.Active && e.enabled)
+    const activeEffects = availableEffects.filter((e) => e.type === SkillType.Active)
     return this.pickRandom(activeEffects)
   }
 
@@ -495,7 +495,7 @@ export class NormalAIStrategy extends BaseAIStrategy {
     availableEffects: IEffect[],
     _state: IGameState,
   ): IEffect | null {
-    const active = availableEffects.filter((e) => e.type === SkillType.Active && e.enabled)
+    const active = availableEffects.filter((e) => e.type === SkillType.Active)
     if (active.length === 0) return null
 
     // 按优先级排序，选择最高优先级的效果
@@ -548,7 +548,7 @@ export class NormalAIStrategy extends BaseAIStrategy {
     _state: IGameState,
   ): IEffect | null {
     // 有可用的响应效果就用
-    const usable = availableEffects.filter((e) => e.enabled)
+    const usable = availableEffects.filter(() => true)
     if (usable.length === 0) return null
     const sorted = [...usable].sort((a, b) => b.priority - a.priority)
     return sorted[0] ?? null
@@ -674,7 +674,7 @@ export class HardAIStrategy extends BaseAIStrategy {
     state: IGameState,
   ): IEffect | null {
     const active = availableEffects.filter(
-      (e) => e.type === SkillType.Active && e.enabled,
+      (e) => e.type === SkillType.Active,
     )
     if (active.length === 0) return null
 
@@ -804,7 +804,7 @@ export class HardAIStrategy extends BaseAIStrategy {
     availableEffects: IEffect[],
     state: IGameState,
   ): IEffect | null {
-    const usable = availableEffects.filter((e) => e.enabled)
+    const usable = availableEffects.filter(() => true)
     if (usable.length === 0) return null
 
     // 评估每个效果的价值

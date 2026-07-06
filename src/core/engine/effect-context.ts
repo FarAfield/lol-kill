@@ -200,7 +200,7 @@ export class EffectContext implements IEffectContext {
       return { confirmed: false }
     }
 
-    const pausePromise = this.deps.eventDispatcher.pauseManager.pause(
+    const pausePromise = this.deps.pauseManager.pause(
       prompt,
       options?.timeout,
     )
@@ -235,7 +235,7 @@ export class EffectContext implements IEffectContext {
         )
         return { confirmed: card !== null }
       } finally {
-        this.deps.eventDispatcher.pauseManager.resume()
+        this.deps.pauseManager.resume()
       }
     })()
 

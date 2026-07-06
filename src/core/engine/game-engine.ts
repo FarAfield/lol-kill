@@ -42,6 +42,7 @@ import { PhaseManager } from './phase-manager'
 import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
 import { GameEvent } from '@core/event/game-event'
+import { EventPauseManager } from '@core/event/event-pause-manager'
 import { TriggerTiming } from '@core/contracts/enums'
 import type { EffectContextDeps } from '@core/contracts/effect-context-deps'
 
@@ -88,6 +89,7 @@ export class GameEngine {
   // ── 事件系统 ──
   eventChain: EventChain
   eventDispatcher: EventDispatcher
+  pauseManager: EventPauseManager
 
   // ── 回合/阶段管理 ──
   turnManager: TurnManager
@@ -124,6 +126,7 @@ export class GameEngine {
 
     // ── 初始化事件系统 ──
     this.eventChain = new EventChain()
+    this.pauseManager = new EventPauseManager()
     this.eventDispatcher = new EventDispatcher({
       deps: this.buildEffectDeps(),
     })
@@ -161,6 +164,7 @@ export class GameEngine {
       state: this.state,
       eventChain: this.eventChain,
       eventDispatcher: this.eventDispatcher,
+      pauseManager: this.pauseManager,
       deckManager: this.deckManager,
       cardSystem: this.cardSystem,
       damageSystem: this.damageSystem,

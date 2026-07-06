@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { EventCompiler } from '@core/event/event-compiler'
 import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
+import { EventPauseManager } from '@core/event/event-pause-manager'
 import { EffectRegistry } from '@core/engine/effect-registry'
 import type { EffectContextDeps } from '@core/engine/effect-context'
 import { DeckManager } from '@core/system/deck-manager'
@@ -66,6 +67,7 @@ function createDeps(state: GameState): EffectContextDeps {
     state,
     eventChain: new EventChain(),
     eventDispatcher: new EventDispatcher(),
+    pauseManager: new EventPauseManager(),
     deckManager: new DeckManager(state),
     cardSystem: new CardSystem(state),
     damageSystem: new DamageSystem(),

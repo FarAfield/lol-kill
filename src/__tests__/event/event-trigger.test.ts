@@ -44,7 +44,6 @@ function createMockHandler(overrides: Partial<CompiledHandler> = {}): CompiledHa
     priority: overrides.priority ?? 0,
     isLocked: overrides.isLocked ?? false,
     frequency: overrides.frequency ?? Frequency.Unlimited,
-    enabled: overrides.enabled ?? true,
     usedThisTurn: overrides.usedThisTurn ?? false,
     usedThisRound: overrides.usedThisRound ?? false,
     execute: overrides.execute ?? (async () => {}),
@@ -385,9 +384,6 @@ describe('EventTrigger', () => {
           source: [{ timing: TriggerTiming.CardUse, stage: 'Before' }],
         },
         content: async () => {},
-        enabled: true,
-        usedThisTurn: false,
-        usedThisRound: false,
       }
 
       const handlers = compiler.compile(effect, player)
@@ -417,9 +413,6 @@ describe('EventTrigger', () => {
           global: [{ timing: TriggerTiming.Damage, stage: 'After' }],
         },
         content: async () => {},
-        enabled: true,
-        usedThisTurn: false,
-        usedThisRound: false,
       }
 
       const handlers = compiler.compile(effect, player)
@@ -447,9 +440,6 @@ describe('EventTrigger', () => {
           target: [{ timing: TriggerTiming.CardTarget, stage: 'Before' }],
         },
         content: async () => {},
-        enabled: true,
-        usedThisTurn: false,
-        usedThisRound: false,
       }
 
       const handlers = compiler.compile(effect, player)
@@ -481,9 +471,6 @@ describe('EventTrigger', () => {
           target: [{ timing: TriggerTiming.CardTarget, stage: 'Before' }],
         },
         content: async () => {},
-        enabled: true,
-        usedThisTurn: false,
-        usedThisRound: false,
       }
 
       const handlers = compiler.compile(effect, player)
@@ -503,9 +490,6 @@ describe('EventTrigger', () => {
           source: [{ timing: TriggerTiming.CardUse, stage: 'Before' }],
         },
         content: async () => {},
-        enabled: true,
-        usedThisTurn: false,
-        usedThisRound: false,
       }
 
       const handlers = compiler.compile(effect, player)

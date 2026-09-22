@@ -355,7 +355,7 @@ export class Player implements IPlayer {
   /**
    * 将玩家序列化为纯对象（用于 Store 同步 / 日志）。
    */
-  toJSON(): Omit<IPlayer, 'marks'> & { marks: Record<string, number> } {
+  toJSON(): Omit<IPlayer, 'marks' | 'hero' | 'isWounded' | 'isDying' | 'recoverHp' | 'modifyMaxHp' | 'getMark' | 'setMark' | 'clearMark' | 'resetTurnState' | 'markAttackUsed' | 'getEquipInSlot'> & { marks: Record<string, number> } {
     const marksObj: Record<string, number> = {}
     this.marks.forEach((v, k) => {
       marksObj[k] = v

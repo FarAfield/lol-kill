@@ -36,11 +36,15 @@ export class Hero implements IHero {
     title: string
     kingdom: Kingdom
     maxHp: number
-    maxPower: number
+    maxPower?: number
     effectIds: string[]
-    skins: Array<{ skinName: string; skinImage: string }>
+    skins?: Array<{ skinName: string; skinImage: string }>
   }): Hero {
-    return new Hero(data)
+    return new Hero({
+      ...data,
+      maxPower: data.maxPower ?? 0,
+      skins: data.skins ?? [],
+    })
   }
 
   hasEffect(effectId: string): boolean {

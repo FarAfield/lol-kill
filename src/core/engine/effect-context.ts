@@ -11,9 +11,11 @@ import {
   ZoneType,
   DamageType,
   GamePhase,
+  LogLevel,
 } from '@core/contracts/enums'
 import type { IEffectContext, ResponseRequest, EffectResponse } from '@core/contracts/effect.interface'
 import type { IGameEvent } from '@core/contracts/event.interface'
+import type { IGameState } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
 import { GameEvent } from '@core/event/game-event'
@@ -114,8 +116,8 @@ export class EffectContext implements IEffectContext {
       card,
     )
 
-    // 将伤害实例挂载到事件数据中
-    damageEvent.data['_damageInstance'] = damageInstance
+    // 将伤害实例挂载到事件上（类型安全的一级字段，替代 data['_damageInstance'] 暗线）
+    damageEvent.damageInstance = damageInstance
 
     // 执行伤害流水线
     await this.deps.damageSystem.executePipeline(damageInstance)
@@ -245,6 +247,85 @@ export class EffectContext implements IEffectContext {
   }
 
   /**
+   * 询问指定玩家一个确认性问题（是否出杀/是否出闪等）。
+   *
+   * 通过 pauseManager 暂停事件链，向指定玩家发出询问，
+   * 等待 decisionService 返回后恢复。
+   */
+  async askPlayer(player: IPlayer, prompt: string, timeout?: number): Promise<boolean> {
+    if (!this.deps.decisionService) return false
+
+    const pausePromise = this.deps.pauseManager.pause(prompt, timeout)
+    const decisionPromise = (async () => {
+      try {
+        const card = await this.deps.decisionService!.askForResponse(
+          player,
+          prompt,
+          [],
+          timeout,
+        )
+        return card !== null
+      } finally {
+        this.deps.pauseManager.resume()
+      }
+    })()
+
+    await pausePromise
+    return await decisionPromise
+  }
+
+  /**
+   * 询问指定玩家选择一张卡牌。
+   *
+   * 向指定玩家展示可选卡牌列表，由玩家选择一张。
+   * 放弃选择或超时返回 null。
+   */
+  async askPlayerForCard(
+    player: IPlayer,
+    prompt: string,
+    validCards: ICard[],
+    timeout?: number,
+  ): Promise<ICard | null> {
+    if (!this.deps.decisionService || validCards.length === 0) return null
+
+    const pausePromise = this.deps.pauseManager.pause(prompt, timeout)
+    const decisionPromise = (async () => {
+      try {
+        return await this.deps.decisionService!.askForResponse(
+          player,
+          prompt,
+          validCards,
+          timeout,
+        ) ?? null
+      } finally {
+        this.deps.pauseManager.resume()
+      }
+    })()
+
+    await pausePromise
+    return await decisionPromise
+  }
+
+  // ── 事件元数据 ──
+
+  /**
+   * 附加事件元数据供外部（UI/AI/日志）使用。
+   *
+   * 替代 event.data['_xxx'] 暗线模式。
+   * key 使用 camelCase 命名，不再以下划线开头。
+   */
+  setEventMeta(key: string, value: unknown): void {
+    this.event.data[key] = value
+  }
+
+  /**
+   * 获取事件元数据。
+   */
+  getEventMeta<T>(key: string): T | undefined {
+    return this.event.data[key] as T | undefined
+  }
+
+  /**
    * 回复体力 — 目标回复指定点数的体力。
    */
   async recoverHp(target: IPlayer, amount: number): Promise<void> {
@@ -255,7 +336,7 @@ export class EffectContext implements IEffectContext {
       round: this.game.currentRound,
       phase: this.game.currentPhase,
       message: `${target.hero?.name ?? target.id} 回复了 ${actualRecovered} 点体力`,
-      level: 1, // Info
+      level: LogLevel.Info,
       sourcePlayerId: this.player.id,
       targetPlayerIds: [target.id],
     })

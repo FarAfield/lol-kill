@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { DamageSystem, DamageStage } from '@core/system/damage-system'
-import type { DamageInstance } from '@core/system/damage-system'
+import type { DamageInstance } from '@core/contracts/damage.interface'
 import { Player } from '@core/entity/player'
 import { Card } from '@core/entity/card'
 import { Hero } from '@core/entity/hero'

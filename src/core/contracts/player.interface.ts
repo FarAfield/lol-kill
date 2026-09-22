@@ -1,5 +1,5 @@
 import type { PlayerId, Position } from './types'
-import type { RoleType, GamePhase } from './enums'
+import type { RoleType, GamePhase, EquipSlot } from './enums'
 import type { IHero } from './hero.interface'
 import type { ICard } from './card.interface'
 
@@ -29,6 +29,8 @@ export interface IPlayer {
   alive: boolean
 
   // ── 英雄 / 体力 / 能量 ──
+  /** 当前英雄（标准模式下为 heroes[0]） */
+  readonly hero: IHero | undefined
   /** 当前体力 */
   hp: number
   /** 体力上限 */
@@ -68,4 +70,26 @@ export interface IPlayer {
    * - 'rage': 怒气层数
    */
   marks: Map<string, number>
+
+  // ── 方法 ──
+  /** 回复体力 */
+  recoverHp(amount: number): number
+  /** 修改体力上限 */
+  modifyMaxHp(delta: number): void
+  /** 获取标记值 */
+  getMark(key: string): number
+  /** 设置标记值 */
+  setMark(key: string, value: number): void
+  /** 清除指定标记 */
+  clearMark(key: string): void
+  /** 重置回合内状态 */
+  resetTurnState(): void
+  /** 标记已使用一次攻击 */
+  markAttackUsed(): void
+  /** 获取指定装备槽位中的卡牌 */
+  getEquipInSlot(slot: EquipSlot): ICard | undefined
+  /** 是否受伤（hp < maxHp） */
+  readonly isWounded: boolean
+  /** 是否处于濒死状态 */
+  readonly isDying: boolean
 }

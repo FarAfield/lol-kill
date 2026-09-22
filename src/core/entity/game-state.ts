@@ -304,7 +304,7 @@ export class GameState implements IGameState {
       started: this.started,
       finished: this.finished,
       processingCards: [...this.processingCards],
-    }
+    } as IGameState
   }
 
   /**

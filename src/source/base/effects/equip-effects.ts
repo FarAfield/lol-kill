@@ -85,9 +85,6 @@ export const qingGangJianEffect: IEffect = {
     if (target) {
       target.setMark('ignoreArmor', 1)
     }
-
-    // 将标记信息附加到事件中
-    ctx.event.data['_ignoreArmor'] = true
   },
 
 }
@@ -124,14 +121,23 @@ export const ciXiongShuangGuJianEffect: IEffect = {
     if (!target || !target.alive) return
 
     // 目标选择：弃一张牌或让使用者摸一张牌
-    // 由外部决策决定
-    const targetChoseDiscard =
-      ctx.event.data['_cixiong_discard'] as boolean | undefined
+    const willDiscard = await ctx.askPlayer(
+      target,
+      '是否弃一张牌？（否则使用者摸一张牌）',
+    )
 
-    if (targetChoseDiscard) {
-      const cardToDiscard = ctx.event.data['_cixiong_card'] as ICard | undefined
+    if (willDiscard) {
+      // 目标选择弃牌——让目标选择要弃置的牌
+      const cardToDiscard = await ctx.askPlayerForCard(
+        target,
+        '请选择要弃置的牌',
+        [...target.handCards, ...target.equipCards],
+      )
       if (cardToDiscard) {
         await ctx.discardCards([cardToDiscard])
+      } else {
+        // 目标放弃选择→使用者摸一张牌
+        await ctx.drawCards(1)
       }
     } else {
       // 目标不弃牌 → 使用者摸一张牌
@@ -194,28 +200,20 @@ export const guanShiFuEffect: IEffect = {
     if (!hasAxe) return false
 
     // 检查伤害是否被阻止（杀被闪抵消）
-    const damageInstance = ctx.event.data['_damageInstance'] as
-      | { prevented: boolean }
-      | undefined
-    return damageInstance?.prevented === true
+    return ctx.event.damageInstance?.prevented === true
   },
 
   content: async (ctx) => {
-    // 由外部决策决定是否弃2张牌强制命中
-    const willForce = ctx.event.data['_guanshifu_force'] as boolean | undefined
+    // 询问使用者是否弃2张牌强制命中
+    const willForce = await ctx.waitForResponse('是否弃2张牌强制命中？')
 
-    if (willForce) {
-      // 弃2张牌
-      const cardsToDiscard = (ctx.event.data['_guanshifu_cards'] as ICard[] | undefined) ?? []
-      if (cardsToDiscard.length >= 2) {
-        await ctx.discardCards(cardsToDiscard.slice(0, 2))
-        // 强制命中：设置伤害不被阻止
-        const damageInstance = ctx.event.data['_damageInstance'] as
-          | { prevented: boolean; currentAmount: number }
-          | undefined
-        if (damageInstance) {
-          damageInstance.prevented = false
-        }
+    if (willForce.confirmed && ctx.player.handCards.length >= 2) {
+      // 弃前2张手牌（TODO: 支持 multi-card selection 后改为让玩家精确选择）
+      const cardsToDiscard = ctx.player.handCards.slice(0, 2)
+      await ctx.discardCards(cardsToDiscard)
+      // 强制命中：设置伤害不被阻止
+      if (ctx.event.damageInstance) {
+        ctx.event.damageInstance.prevented = false
       }
     }
   },
@@ -258,11 +256,8 @@ export const baGuaZhenEffect: IEffect = {
     if (judgeCard.suit === CardSuit.Heart || judgeCard.suit === CardSuit.Diamond) {
       ctx.player.setMark('baguaSuccess', 1)
       // 标记伤害被阻止
-      const damageInstance = ctx.event.data['_damageInstance'] as
-        | { prevented: boolean }
-        | undefined
-      if (damageInstance) {
-        damageInstance.prevented = true
+      if (ctx.event.damageInstance) {
+        ctx.event.damageInstance.prevented = true
       }
     }
   },
@@ -302,14 +297,8 @@ export const renWangDunEffect: IEffect = {
     // 黑色杀无效：标记伤害应被阻止
     ctx.player.setMark('renWangDunBlock', 1)
 
-    // 设置事件数据中的阻止标记
-    ctx.event.data['_renwangdun_blocked'] = true
-
-    const damageInstance = ctx.event.data['_damageInstance'] as
-      | { prevented: boolean }
-      | undefined
-    if (damageInstance) {
-      damageInstance.prevented = true
+    if (ctx.event.damageInstance) {
+      ctx.event.damageInstance.prevented = true
     }
   },
 

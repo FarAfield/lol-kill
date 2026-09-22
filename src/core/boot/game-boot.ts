@@ -92,7 +92,7 @@ class DefaultLoggerService implements ILoggerService {
 
   log(message: string, level: LogLevel): void {
     this.logs.push({ message, level, timestamp: Date.now() })
-    const prefix = `[GameBoot][${LogLevel[level]}]`
+    const prefix = `[GameBoot][${level}]`
     switch (level) {
       case LogLevel.Error:
         console.error(prefix, message)
@@ -108,16 +108,26 @@ class DefaultLoggerService implements ILoggerService {
     }
   }
 
-  debug(message: string): void { this.log(message, LogLevel.Debug) }
-  info(message: string): void { this.log(message, LogLevel.Info) }
-  warn(message: string): void { this.log(message, LogLevel.Warn) }
-  error(message: string): void { this.log(message, LogLevel.Error) }
+  debug(message: string): void {
+    this.log(message, LogLevel.Debug)
+  }
+  info(message: string): void {
+    this.log(message, LogLevel.Info)
+  }
+  warn(message: string): void {
+    this.log(message, LogLevel.Warn)
+  }
+  error(message: string): void {
+    this.log(message, LogLevel.Error)
+  }
 
   getLogs(): ReadonlyArray<{ message: string; level: LogLevel; timestamp: number }> {
     return this.logs
   }
 
-  clear(): void { this.logs = [] }
+  clear(): void {
+    this.logs = []
+  }
 }
 
 // ── GameBoot 配置选项 ──
@@ -210,10 +220,7 @@ export class GameBoot {
    * @param options 启动选项
    */
   static createStandard5P(options?: GameBootOptions): GameBoot {
-    return new GameBoot(
-      { ...standard5pConfig },
-      options,
-    )
+    return new GameBoot({ ...standard5pConfig }, options)
   }
 
   /**
@@ -224,10 +231,7 @@ export class GameBoot {
    * @param options 启动选项
    */
   static createStandard8P(options?: GameBootOptions): GameBoot {
-    return new GameBoot(
-      { ...standard8pConfig },
-      options,
-    )
+    return new GameBoot({ ...standard8pConfig }, options)
   }
 
   /**
@@ -279,9 +283,9 @@ export class GameBoot {
 
     this.loggerService.info(
       `GameBoot.boot() — 引擎初始化完成 ` +
-      `(玩家: ${this.engine.state.players.length}, ` +
-      `牌堆: ${this.engine.state.deck.length} 张, ` +
-      `轮次: ${this.engine.state.currentRound})`,
+        `(玩家: ${this.engine.state.players.length}, ` +
+        `牌堆: ${this.engine.state.deck.length} 张, ` +
+        `轮次: ${this.engine.state.currentRound})`,
     )
 
     return {
@@ -308,7 +312,7 @@ export class GameBoot {
     await this.engine.start()
 
     this.loggerService.info(
-      `GameBoot.start() — 游戏已启动，当前阶段: ${GamePhase[this.engine.state.currentPhase]}`,
+      `GameBoot.start() — 游戏已启动，当前阶段: ${this.engine.state.currentPhase}`,
     )
   }
 
@@ -341,7 +345,7 @@ export class GameBoot {
 
     this.loggerService.info(
       `GameBoot.runGameLoop() — 游戏结束: ${result.reason} ` +
-      `(胜者: ${result.winner ?? '无'}, 轮次: ${result.totalRounds})`,
+        `(胜者: ${result.winner ?? '无'}, 轮次: ${result.totalRounds})`,
     )
 
     return result
@@ -446,24 +450,24 @@ export class GameBoot {
     if (heroCount > 0 && heroCount < neededHeroes) {
       this.loggerService.warn(
         `[GameBoot] 英雄池数量 (${heroCount}) 不足以为每位玩家提供 ` +
-        `${config.heroSelectCount} 名候选 (需要 ${neededHeroes})。将重用英雄。`,
+          `${config.heroSelectCount} 名候选 (需要 ${neededHeroes})。将重用英雄。`,
       )
     }
 
     // 卡牌数量检查
-    const totalCardsInDeck = config.cards.reduce((sum, def) => sum + 1, 0)
+    const totalCardsInDeck = config.cards.reduce((sum) => sum + 1, 0)
     const minCards = config.playerCount * (config.initialHandSize + 5) // 初始手牌 + 缓冲
     if (config.cards.length > 0 && totalCardsInDeck < minCards) {
       this.loggerService.warn(
         `[GameBoot] 卡牌种类较少 (${config.cards.length} 种)，` +
-        `建议至少 ${minCards} 张卡牌以确保游戏可进行`,
+          `建议至少 ${minCards} 张卡牌以确保游戏可进行`,
       )
     }
 
     this.loggerService.debug(
       `[GameBoot] 配置验证通过: ${config.playerCount} 人, ` +
-      `${config.roles.length} 身份, ${config.heroes.length} 英雄, ` +
-      `${config.cards.length} 种卡牌`,
+        `${config.roles.length} 身份, ${config.heroes.length} 英雄, ` +
+        `${config.cards.length} 种卡牌`,
     )
   }
 }

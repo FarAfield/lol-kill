@@ -4,16 +4,15 @@
       <h1>🎴 联盟杀</h1>
       <p class="subtitle">英雄联盟主题 · 三国杀规则</p>
       <div class="actions">
-        <n-button type="primary" size="large" @click="goGame">
-          进入游戏（图形版）
-        </n-button>
+        <n-button type="primary" size="large" @click="goGame"> 进入游戏（图形版） </n-button>
         <n-button type="warning" size="large" @click="goGameText">
           进入游戏（文字调试版）
         </n-button>
+        <n-button type="warning" size="large" @click="goGameMiniText">
+          进入游戏（最小化调试版）
+        </n-button>
       </div>
-      <p class="desc">
-        文字调试版: 所有玩家默认由AI控制，实时日志输出
-      </p>
+      <p class="desc">文字调试版: 所有玩家默认由AI控制，实时日志输出</p>
     </div>
   </div>
 </template>
@@ -29,6 +28,10 @@ function goGame(): void {
 
 function goGameText(): void {
   router.push('/game-text')
+}
+
+function goGameMiniText() {
+  router.push('/game-test-mini')
 }
 </script>
 

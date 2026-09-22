@@ -53,12 +53,13 @@ export const guoHeChaiQiaoEffect: IEffect = {
 
     if (availableCards.length === 0) return
 
-    // 由调用方（通过 selectCard）选择要弃置的牌
-    // 若未提供选择器，默认弃置第一张
-    const cardToDiscard = ctx.event.data['_selectedCard'] as ICard | undefined
-      ?? availableCards[0]!
-
-    await ctx.discardCards([cardToDiscard])
+    // 由调用方（通过 waitForResponse）选择要弃置的牌
+    const resp = await ctx.waitForResponse('请选择要弃置的牌', {
+      validCards: availableCards,
+    })
+    if (resp.confirmed && resp.card) {
+      await ctx.discardCards([resp.card])
+    }
   },
 
 }
@@ -97,12 +98,13 @@ export const shunShouQianYangEffect: IEffect = {
 
     if (availableCards.length === 0) return
 
-    // 由调用方选择要获得的牌，默认第一张
-    const cardToTake = ctx.event.data['_selectedCard'] as ICard | undefined
-      ?? availableCards[0]!
-
-    // 将牌从目标转移给使用者
-    await ctx.transferCards([cardToTake], ctx.player)
+    // 由调用方（通过 waitForResponse）选择要获得的牌
+    const resp = await ctx.waitForResponse('请选择要获得的牌', {
+      validCards: availableCards,
+    })
+    if (resp.confirmed && resp.card) {
+      await ctx.transferCards([resp.card], ctx.player)
+    }
   },
 
 }
@@ -171,9 +173,8 @@ export const nanManRuQinEffect: IEffect = {
       if (!player.alive) continue
       if (player.id === source.id) continue
 
-      // 检查玩家是否有杀可以响应
-      // 由外部（决策服务）决定是否出杀
-      const responded = ctx.event.data[`_nanman_${player.id}`] as boolean | undefined
+      // 询问玩家是否出杀
+      const responded = await ctx.askPlayer(player, '请出杀（南蛮入侵）')
 
       if (!responded) {
         // 未出杀 → 受到1点伤害
@@ -219,8 +220,8 @@ export const wanJianQiFaEffect: IEffect = {
       if (!player.alive) continue
       if (player.id === source.id) continue
 
-      // 由外部决定是否出闪
-      const responded = ctx.event.data[`_wanjian_${player.id}`] as boolean | undefined
+      // 询问玩家是否出闪
+      const responded = await ctx.askPlayer(player, '请出闪（万箭齐发）')
 
       if (!responded) {
         // 未出闪 → 受到1点伤害
@@ -266,8 +267,8 @@ export const jueDouEffect: IEffect = {
     let round = 0
 
     while (round < maxRounds) {
-      // 当前防守方需要出杀
-      const responded = ctx.event.data[`_juedou_${currentDefender.id}_${round}`] as boolean | undefined
+      // 询问当前防守方是否出杀
+      const responded = await ctx.askPlayer(currentDefender, '请出杀（决斗）')
 
       if (!responded) {
         // 当前防守方无法出杀 → 受到1点伤害（由对方造成）
@@ -314,11 +315,11 @@ export const wuXieKeJiEffect: IEffect = {
     // 事件系统会在 Before 阶段检查 canceled 标记
     ctx.event.canceled = true
 
-    // 将抵消信息记录到事件数据中
-    ctx.event.data['_canceledBy'] = {
-      player: ctx.player.id,
-      card: ctx.triggerCards.find((c) => c.tags.has('wuXieKeJi'))?.id,
-    }
+    // 将抵消信息记录到事件元数据中
+    ctx.setEventMeta('canceledBy', {
+      playerId: ctx.player.id,
+      cardId: ctx.triggerCards.find((c) => c.tags.has('wuXieKeJi'))?.id,
+    })
   },
 
 }
@@ -353,9 +354,9 @@ export const wuGuFengDengEffect: IEffect = {
     if (revealedCards.length === 0) return
 
     // 从当前回合玩家开始，轮流选一张 → 由外部循环调用完成
-    // 此处将亮出的牌存到事件数据中供后续处理
-    ctx.event.data['_wuGuFengDeng_cards'] = revealedCards.map((c) => c.id)
-    ctx.event.data['_wuGuFengDeng_remaining'] = [...revealedCards]
+    // 此处将亮出的牌存到事件元数据中供后续处理
+    ctx.setEventMeta('wuGuFengDengCards', revealedCards.map((c) => c.id))
+    ctx.setEventMeta('wuGuFengDengRemaining', [...revealedCards])
   },
 
 }
@@ -428,8 +429,8 @@ export const jieDaoShaRenEffect: IEffect = {
       return
     }
 
-    // 由外部决策决定 target 是否出杀
-    const willAttack = ctx.event.data[`_jiedao_${target.id}`] as boolean | undefined
+    // 询问目标是否出杀
+    const willAttack = await ctx.askPlayer(target, '是否出杀？')
 
     if (willAttack && secondaryTarget && secondaryTarget.alive) {
       // 目标对 secondaryTarget 出杀 → 视为 target 使用了一张杀

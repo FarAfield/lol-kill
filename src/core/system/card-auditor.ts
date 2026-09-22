@@ -104,8 +104,8 @@ export class CardAuditor {
     counts['judge(全部)'] = playerJudgeCards
 
     const totalCards =
-      counts.deck + counts.discard + counts.processing +
-      counts['hand(全部)'] + counts['equip(全部)'] + counts['judge(全部)']
+      counts.deck! + counts.discard! + counts.processing! +
+      counts['hand(全部)']! + counts['equip(全部)']! + counts['judge(全部)']!
 
     // ── 总数检查 ──
     if (expectedTotal !== undefined && expectedTotal >= 0) {

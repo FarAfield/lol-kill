@@ -25,6 +25,8 @@ export interface IStoreService {
   syncPlayerState(player: IPlayer): void
   /** 获取缓存的游戏状态快照 */
   getGameState(): Readonly<IGameState>
+  /** 注册状态变更回调 */
+  onChange(callback: (state: IGameState) => void): void
   /** 重置存储 */
   reset(): void
 }

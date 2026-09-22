@@ -174,9 +174,8 @@ const discardSelectedIds = ref<string[]>([])
 
 // ── Controller getter（用于 hooks） ──
 function getController(): GameController | null {
-  return controller.value
+  return (controller.value ?? null) as GameController | null
 }
-
 // ── Hooks ──
 const cardPlay = useCardPlay(getController, () => gameStore)
 const response = useResponse(getController)

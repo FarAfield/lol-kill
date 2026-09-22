@@ -177,6 +177,59 @@ export interface IEffectContext {
     silent?: boolean
   }): Promise<void>
 
+  /**
+   * 询问指定玩家一个确认性问题（是否出杀/是否出闪等）。
+   *
+   * 与 waitForResponse 不同，此方法向指定玩家发出询问，而非效果持有者。
+   * 内部使用 decisionService.askForResponse，通过 pauseManager 暂停事件链等待响应。
+   *
+   * @param player  被询问的玩家
+   * @param prompt  提示文本
+   * @param timeout 超时时间（毫秒），0 表示不超时
+   * @returns true 表示玩家确认响应
+   */
+  askPlayer(player: IPlayer, prompt: string, timeout?: number): Promise<boolean>
+
+  /**
+   * 询问指定玩家选择一张卡牌。
+   *
+   * 向指定玩家展示可选卡牌列表，由玩家选择一张。
+   * 放弃选择或超时返回 null。
+   *
+   * @param player     被询问的玩家
+   * @param prompt     提示文本
+   * @param validCards 可选卡牌列表
+   * @param timeout    超时时间（毫秒），0 表示不超时
+   * @returns 玩家选择的卡牌，放弃/超时返回 null
+   */
+  askPlayerForCard(
+    player: IPlayer,
+    prompt: string,
+    validCards: ICard[],
+    timeout?: number,
+  ): Promise<ICard | null>
+
+  /**
+   * 附加事件元数据供外部（UI/AI/日志）使用。
+   *
+   * 替代 event.data['_xxx'] 暗线模式——效果通过此方法向外部输出信息，
+   * 外部层通过对应的 getEventMeta 或直接读取事件元数据获取。
+   *
+   * 元数据 key 使用 camelCase 命名，不再以下划线开头。
+   *
+   * @param key   元数据键名（camelCase）
+   * @param value 元数据值
+   */
+  setEventMeta(key: string, value: unknown): void
+
+  /**
+   * 获取事件元数据。
+   *
+   * @param key 元数据键名
+   * @returns 元数据值，不存在时返回 undefined
+   */
+  getEventMeta<T>(key: string): T | undefined
+
   useCard(card: ICard, targets: IPlayer[]): Promise<void>
   judge(player: IPlayer): Promise<ICard>
   obtainCards(target: IPlayer, cards: ICard[]): Promise<void>

@@ -40,6 +40,20 @@ export interface IGameState {
   started: boolean
   finished: boolean
   processingCards: ICard[]
+
+  /** 存活玩家列表 */
+  readonly alivePlayers: IPlayer[]
+  /** 存活玩家数量 */
+  readonly aliveCount: number
+
+  /** 添加一条游戏日志 */
+  addLog(entry: LogEntry): void
+  /** 获取只读快照 */
+  snapshot(): Readonly<IGameState>
+  /** 标记游戏已开始 */
+  markStarted(): void
+  /** 标记游戏已结束 */
+  markFinished(): void
 }
 
 /**

@@ -221,3 +221,5 @@ export class Card implements ICard {
     }
   }
 }
+
+export type { CardDefinition } from '@core/contracts/card.interface'

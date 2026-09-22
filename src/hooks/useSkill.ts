@@ -210,7 +210,7 @@ export function useSkill(
     // 尝试从 hero 数据中查找
     for (const hero of player.heroes) {
       // IHero 可能有内部效果数据引用
-      const heroAny = hero as Record<string, unknown>
+      const heroAny = hero as unknown as Record<string, unknown>
       if (Array.isArray(heroAny._effects)) {
         const found = (heroAny._effects as IEffect[]).find(
           (e: IEffect) => e.id === effectId,

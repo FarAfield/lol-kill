@@ -6,6 +6,7 @@ import type { TriggerTiming, EventStatus, GamePhase, TriggerStage } from './enum
 import type { EventId } from './types'
 import type { IPlayer } from './player.interface'
 import type { ICard } from './card.interface'
+import type { DamageInstance } from './damage.interface'
 
 /**
  * 事件值对象
@@ -80,6 +81,8 @@ export interface IGameEvent {
   // ── 扩展数据 ──
   /** 自定义扩展数据 */
   data: Record<string, unknown>
+  /** 伤害实例（仅 Damage 类型事件有此字段） */
+  damageInstance?: DamageInstance
   /** 事件创建时间戳 */
   timestamp: number
 }

@@ -11,12 +11,12 @@ const constantRoutes = [
     component: () => import('@/views/home/index.vue'),
     meta: { title: '主页' },
   },
-  // {
-  //   path: "/test",
-  //   name: "test",
-  //   component: () => import("@/views/test/index.vue"),
-  //   meta: { title: "测试" },
-  // },
+  {
+    path: '/game-test-mini',
+    name: 'game-test-mini',
+    component: () => import('@/views/game-test-mini/index.vue'),
+    meta: { title: '最小化测试' },
+  },
   {
     path: '/game',
     name: 'game',

@@ -76,6 +76,10 @@ export type { CompiledHandler } from './compiled-handler'
 // ── 效果上下文依赖 ──
 export type { EffectContextDeps } from './effect-context-deps'
 
+// ── 伤害接口 ──
+export type { DamageInstance } from './damage.interface'
+export { DamageStage } from './damage.interface'
+
 // ── 服务接口 ──
 export type {
   IStoreService,

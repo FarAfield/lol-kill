@@ -48,7 +48,7 @@ interface PositionedPlayer extends UIPlayerInfo {
   y: number
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   players: UIPlayerInfo[]
   currentPhase: string
   currentPlayerIndex: number
@@ -58,7 +58,11 @@ const props = defineProps<{
   selectedTargetIds?: string[]
   /** 悬停的目标 ID */
   hoveredTargetId?: string | null
-}>()
+}>(), {
+  validTargetIds: () => new Set<string>(),
+  selectedTargetIds: () => [],
+  hoveredTargetId: null,
+})
 
 const emit = defineEmits<{
   (e: 'select-target', playerId: string): void

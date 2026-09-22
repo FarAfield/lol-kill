@@ -7,7 +7,8 @@
 // ============================================================
 
 import { describe, it, expect } from 'vitest'
-import { DamageSystem, DamageStage, type DamageInstance } from '@core/system/damage-system'
+import { DamageSystem, DamageStage } from '@core/system/damage-system'
+import type { DamageInstance } from '@core/contracts/damage.interface'
 import { EventTrigger } from '@core/event/event-trigger'
 import { EventDispatcher } from '@core/event/event-dispatcher'
 import { EventChain } from '@core/event/event-chain'

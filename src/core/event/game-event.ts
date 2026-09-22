@@ -1,6 +1,7 @@
 import type { IGameEvent, EventValues } from '@core/contracts/event.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
+import type { DamageInstance } from '@core/contracts/damage.interface'
 import { EventStatus } from '@core/contracts/enums'
 import type { TriggerTiming, TriggerStage, GamePhase } from '@core/contracts/enums'
 import { IdGenerator } from '@core/utils'
@@ -101,6 +102,7 @@ export class GameEvent implements IGameEvent {
   turn?: number
 
   data: Record<string, unknown>
+  damageInstance?: DamageInstance
   timestamp: number
 
   constructor(options: GameEventOptions) {
@@ -132,6 +134,7 @@ export class GameEvent implements IGameEvent {
     this.turn = options.turn
 
     this.data = options.data ?? {}
+    this.damageInstance = undefined
     this.timestamp = Date.now()
   }
 

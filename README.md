@@ -46,7 +46,7 @@ npm run build
 ## 测试
 
 ```sh
-# 全部单元测试 (Vitest, 904 个测试)
+# 全部单元测试 (Vitest)
 npm run test:unit
 
 # E2E 测试 (Playwright)
@@ -66,11 +66,11 @@ npm run lint
 ```
 core/               # 纯 TS 引擎 — 零视图依赖
 ├── contracts/      # 接口定义 (IEvent, IEffect, ICard, IPlayer...)
-├── engine/         # GameEngine, StateMachine, PhaseManager, ReplayEngine
+├── engine/         # GameEngine, StateMachine, PhaseManager, SkillRegistry
 ├── event/          # EventChain(LIFO), EventDispatcher(AOP), EventTrigger
 ├── system/         # CardSystem, DamageSystem, DeathSystem, DeckManager...
 ├── entity/         # Player, Card, Hero, GameState
-├── services/       # DI 容器, StoreService, LogSerializer
+├── services/       # StoreService, AIController
 └── boot/           # GameBoot 启动引导
 
 source/             # 静态游戏资源（声明式数据）
@@ -121,19 +121,11 @@ views/              # Vue 页面
 
 ## 开发状态
 
-| Phase | 内容 | 状态 |
-|-------|------|------|
-| 1 | 核心接口与类型定义 | ✅ |
-| 2 | 事件系统 (LIFO 栈) | ✅ |
-| 3 | 状态机 | ✅ |
-| 4 | 实体与数据模型 | ✅ |
-| 8 | 技能系统 | ✅ |
-| 11 | AI 系统 | ✅ |
-| 15 | 完整游戏模式 | ✅ |
-| 16 | 测试覆盖与优化 | ✅ |
-| 17 | 网络对战 | 🔜 远期 |
+引擎骨架（分层、事件系统、数据驱动）已成型，但存在装配断裂：Effect 系统尚未接入引擎，
+当前对局中卡牌效果与武将技能均不生效。引擎正处于重构中。
 
-详见 [PLAN.md](./PLAN.md) 和 [CLAUDE.md](./CLAUDE.md)。
+- 架构与编码规范：[docs/code-standards.md](./docs/code-standards.md)
+- 重构计划与进度：[docs/refactor-plan.md](./docs/refactor-plan.md)
 
 ---
 

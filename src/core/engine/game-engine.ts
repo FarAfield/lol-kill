@@ -53,7 +53,6 @@ import { DamageSystem } from '@core/system/damage-system'
 import { DistanceSystem } from '@core/system/distance-system'
 import { TargetSystem } from '@core/system/target-system'
 import { DeathSystem } from '@core/system/death-system'
-import { CardAuditor } from '@core/system/card-auditor'
 
 /**
  * GameEngine 配置选项
@@ -69,10 +68,6 @@ export interface GameEngineOptions {
   decisionService?: IUIDecisionService
   /** 摸牌阶段摸牌数（默认 2） */
   drawCount?: number
-  /** 启用卡牌数量审计（开发/测试用，默认关闭） */
-  enableAudit?: boolean
-  /** 预期卡牌总数（审计用），不设置则从 config.cards 推导 */
-  expectedCardTotal?: number
 }
 
 /**
@@ -108,8 +103,6 @@ export class GameEngine {
   private loggerService?: ILoggerService
   private storeService?: IStoreService
   private decisionService?: IUIDecisionService
-  private enableAudit: boolean
-  private expectedCardTotal: number
 
   constructor(options?: GameEngineOptions) {
     // ── 初始化状态 ──
@@ -151,8 +144,6 @@ export class GameEngine {
     this.loggerService = options?.loggerService
     this.storeService = options?.storeService
     this.decisionService = options?.decisionService
-    this.enableAudit = options?.enableAudit ?? false
-    this.expectedCardTotal = options?.expectedCardTotal ?? -1
   }
 
   /**
@@ -621,41 +612,10 @@ export class GameEngine {
 
   /**
    * 同步状态到 Store（如果已注入）。
-   * 如果启用了审计，在同步前验证卡牌完整性。
    */
   private syncState(): void {
-    if (this.enableAudit) {
-      this.auditCards()
-    }
     if (this.storeService) {
       this.storeService.syncGameState(this.state.toJSON())
-    }
-  }
-
-  /**
-   * 执行卡牌数量审计（仅在 enableAudit 开启时调用）。
-   *
-   * 检测重复卡牌 ID、总数偏差、区域不一致等异常。
-   * 发现问题时通过 loggerService 输出警告/错误。
-   */
-  private auditCards(): void {
-    const expectedTotal = this.expectedCardTotal >= 0
-      ? this.expectedCardTotal
-      : this.state.config.cards.length
-    const result = CardAuditor.verify(this.state, expectedTotal)
-
-    for (const warning of result.warnings) {
-      this.log('warn', `[CardAuditor] ${warning}`)
-    }
-    for (const error of result.errors) {
-      this.log('error', `[CardAuditor] ${error}`)
-    }
-
-    if (!result.valid) {
-      this.log(
-        'error',
-        `[CardAuditor] 卡牌审计未通过: ${result.errors.length} 个错误, ${result.warnings.length} 个警告`,
-      )
     }
   }
 

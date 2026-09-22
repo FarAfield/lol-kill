@@ -20,10 +20,6 @@ export { EventTrigger } from './event-trigger'
 export { EventPauseManager } from './event-pause-manager'
 export type { PauseState } from './event-pause-manager'
 
-// ── ResponseWindow (玩家决策) ──
-export { ResponseWindow, ResponseWindowFactory, ResponseType } from './response-window'
-export type { ResponseWindowOptions, ResponseResult } from './response-window'
-
 // ── PriorityManager (优先级排序) ──
 export { PriorityManager, sortHandlers } from './priority-manager'
 

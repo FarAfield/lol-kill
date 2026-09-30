@@ -117,7 +117,6 @@ import { AIController } from '@core/services/ai-controller'
 import { AIDifficulty } from '@core/contracts/ai.interface'
 import { GamePhase, LogLevel, RoleType } from '@core/contracts/enums'
 import { standard5pConfig } from '@source/modes/standard-5p'
-import type { IGameResult } from '@core/contracts/game.interface'
 
 // ── Router / Store ──
 const router = useRouter()
@@ -218,7 +217,6 @@ async function startGame(): Promise<void> {
         if (prev > 0) {
           logStore.addLog({
             id: `log_round_${Date.now()}_${state.currentRound}`,
-            timestamp: Date.now(),
             round: state.currentRound,
             phase: state.currentPhase,
             message: `--- 第 ${state.currentRound} 轮 ---`,
@@ -232,7 +230,6 @@ async function startGame(): Promise<void> {
         lastPhase = state.currentPhase
         logStore.addLog({
           id: `log_phase_${Date.now()}`,
-          timestamp: Date.now(),
           round: state.currentRound,
           phase: state.currentPhase,
           message: `[${phaseName(state.currentPhase)}]`,
@@ -248,7 +245,6 @@ async function startGame(): Promise<void> {
           const heroName = player.heroes[0]?.name ?? `玩家${player.seatIndex + 1}`
           logStore.addLog({
             id: `log_turn_${Date.now()}`,
-            timestamp: Date.now(),
             round: state.currentRound,
             phase: state.currentPhase,
             message: `▶ 回合开始 — ${heroName} (❤️${player.hp}/${player.maxHp})`,
@@ -266,7 +262,6 @@ async function startGame(): Promise<void> {
           if (!inLog) {
             logStore.addLog({
               id: `log_death_${Date.now()}_${dp.id}`,
-              timestamp: Date.now(),
               round: state.currentRound,
               phase: state.currentPhase,
               message: `💀 ${dp.heroes[0]?.name ?? dp.id} 已阵亡`,
@@ -290,7 +285,6 @@ async function startGame(): Promise<void> {
     // ── 7. Log init info ──
     logStore.addLog({
       id: `log_init_${Date.now()}`,
-      timestamp: Date.now(),
       round: 0,
       phase: GamePhase.Prepare,
       message: `🎮 游戏初始化完成 — ${standard5pConfig.mode}，${initState.players.length} 名玩家，全部由 AI 控制`,
@@ -300,7 +294,6 @@ async function startGame(): Promise<void> {
       const hero = p.heroes[0]
       logStore.addLog({
         id: `log_hero_${p.id}_${Date.now()}`,
-        timestamp: Date.now(),
         round: 0,
         phase: GamePhase.Prepare,
         message: `  #${p.seatIndex + 1} ${hero?.name ?? '?'} (${p.roleRevealed ? roleLabel(p.role) : '身份隐藏'}) ❤️${p.hp}/${p.maxHp} 🃏${p.handCards.length}张`,
@@ -317,7 +310,6 @@ async function startGame(): Promise<void> {
     // ── 8. Run game loop ──
     logStore.addLog({
       id: `log_run_${Date.now()}`,
-      timestamp: Date.now(),
       round: 1,
       phase: GamePhase.RoundStart,
       message: '🎮 游戏开始',
@@ -335,7 +327,6 @@ async function startGame(): Promise<void> {
 
     logStore.addLog({
       id: `log_end_${Date.now()}`,
-      timestamp: Date.now(),
       round: result.totalRounds,
       phase: GamePhase.GameOver,
       message: `🏆 游戏结束 — ${result.reason}（共 ${result.totalRounds} 轮）`,
@@ -351,7 +342,6 @@ async function startGame(): Promise<void> {
     console.error('[TextGame] 游戏运行失败:', err)
     logStore.addLog({
       id: `log_error_${Date.now()}`,
-      timestamp: Date.now(),
       round: 0,
       phase: GamePhase.GameOver,
       message: `❌ 游戏运行失败: ${err instanceof Error ? err.message : String(err)}`,

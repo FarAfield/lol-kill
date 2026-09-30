@@ -4,121 +4,90 @@
 // 包含：
 //   孙权 — 制衡 (主动)
 //   吕蒙 — 克己 (锁定)
+//
+// 克己在迁移时被重新对准了时机：它原本挂在 `phaseDiscardBefore` 上，
+// 而 `PhaseManager.executeTurn` 是在**分发阶段事件之前**就检查
+// `shouldSkipPhases` 的——等事件发出来，跳过与否早已决定完了。
+// 也就是说原实现一次也没生效过。正确时机是「出牌阶段结束时」。
 // ============================================================
 
-import {
-  SkillType,
-  TriggerTiming,
-  Frequency,
-  GamePhase,
-} from '@core/contracts/enums'
-import type { IEffect } from '@core/contracts/effect.interface'
-import type { ICard } from '@core/contracts/card.interface'
+import { GamePhase, ZoneType } from '@core/contracts/enums'
+import type { ISkill } from '@core/contracts/skill.interface'
 
 // ═══════════════════════════════════════════
 // 孙权 · 制衡
-// 出牌阶段，你可以弃置任意张牌，
-// 然后摸等量的牌（每回合限一次）。
+// 出牌阶段，你可以弃置任意张牌，然后摸等量的牌（每回合限一次）。
 // ═══════════════════════════════════════════
 
-export const zhihengEffect: IEffect = {
+export const zhiheng: ISkill = {
   id: 'zhiheng',
   name: '制衡',
   description: '出牌阶段可弃置任意张牌，然后摸等量的牌（每回合限一次）。',
-  type: SkillType.Active,
+
   priority: 10,
-  frequency: Frequency.OncePerTurn,
+  frequency: 'oncePerTurn',
+  enable: [GamePhase.PhaseUse],
+  trigger: { player: ['phaseUseBegin'] },
 
-  trigger: {
-    player: [{ timing: TriggerTiming.PhaseUse, stage: 'Begin' }],
-  },
-
-  filter: (ctx) => {
-    if (!ctx.player.alive) return false
-    // 需要至少有1张可弃置的牌（手牌或装备）
-    return (
-      ctx.player.handCards.length > 0 ||
-      ctx.player.equipCards.length > 0
-    )
-  },
+  filter: (ctx) =>
+    ctx.player.alive &&
+    (ctx.player.handCards.length > 0 || ctx.player.equipCards.length > 0),
 
   content: async (ctx) => {
-    // 标记制衡可用
-    ctx.player.setMark('zhihengAvailable', 1)
+    ctx.setMark(ctx.player, 'zhihengAvailable', 1)
 
-    // 实际制衡操作由 UI 驱动：
-    // 1. 玩家选择 X 张手牌/装备牌弃置
-    // 2. 摸 X 张牌
-    //
-    // 简化实现：随机弃置一张手牌并摸一张
-    const allCards = [
-      ...ctx.player.handCards,
-      ...ctx.player.equipCards,
-    ]
-    if (allCards.length === 0) return
+    // 无决策服务时按「装备优先于手牌」弃一张、摸一张；
+    // 有 UI 时应由 `askForCardSelection` 的返回数量决定，
+    // 但「弃几张摸几张」这条等式不能变。
+    const chosen =
+      ctx.player.equipCards.find((c) => c.zone === ZoneType.Equip) ??
+      ctx.player.handCards.find((c) => c.zone === ZoneType.Hand)
+    if (!chosen) return
 
-    // 弃置 1 张并摸 1 张（简化，完整实现需 UI 决策）
-    const randomIndex = Math.floor(Math.random() * allCards.length)
-    const chosenCard = allCards[randomIndex]!
-
-    await ctx.discardCards([chosenCard])
-
-    // 从手牌/装备区移除
-    ctx.player.handCards = ctx.player.handCards.filter(
-      (c) => c.id !== chosenCard.id,
-    )
-    ctx.player.equipCards = ctx.player.equipCards.filter(
-      (c) => c.id !== chosenCard.id,
-    )
-
-    // 摸 1 张牌
-    const drawn = await ctx.drawCards(1)
+    await ctx.discardCards([chosen])
+    await ctx.drawCards(1)
   },
 
+  ai: { order: 5 },
 }
 
 // ═══════════════════════════════════════════
 // 吕蒙 · 克己
-// 锁定技，若你于出牌阶段未使用或弃置过【杀】，
-// 你跳过本回合的弃牌阶段。
+// 锁定技，若你于出牌阶段未使用过【杀】，你跳过本回合的弃牌阶段。
 // ═══════════════════════════════════════════
 
-export const kejiEffect: IEffect = {
+/**
+ * 克己 —— 锁定技，出牌阶段结束时决定要不要跳过弃牌阶段
+ *
+ * 挂在 `phaseUseEnd` 而不是 `phaseDiscardBefore`：
+ * `executeTurn` 在分发阶段事件**之前**就检查 `shouldSkipPhases`，
+ * 事件发出时去改它，已经太晚了。
+ *
+ * 「本回合出没出过杀」读 `player.usedAttackThisTurn` —— 它由
+ * `basic-contents` 在结算杀时写入、由 `resetTurnState` 每回合清零，
+ * 是一条真正被维护的信号（旧的 `usedShaThisTurn` 标记无人写入，恒为 0）。
+ */
+export const keji: ISkill = {
   id: 'keji',
   name: '克己',
   description: '锁定技，出牌阶段未使用【杀】，则跳过弃牌阶段。',
-  type: SkillType.Locked,
+
+  locked: true,
   priority: 100,
-  frequency: Frequency.Unlimited,
+  frequency: 'unlimited',
+  trigger: { player: ['phaseUseEnd'] },
 
-  trigger: {
-    player: [{ timing: TriggerTiming.PhaseDiscard, stage: 'Before' }],
-  },
-
-  filter: (ctx) => {
-    // 克己触发条件：出牌阶段未使用过杀且未弃置过杀
-    if (!ctx.player.alive) return false
-
-    // 检查是否在出牌阶段使用过杀
-    const usedSha = ctx.player.getMark('usedShaThisTurn') > 0
-    return !usedSha
-  },
+  filter: (ctx) => ctx.player.alive && !ctx.player.usedAttackThisTurn,
 
   content: async (ctx) => {
-    // 跳过弃牌阶段
-    ctx.player.setMark('kejiActive', 1)
-
-    // 将 PhaseDiscard 加入应跳过的阶段列表
-    if (!ctx.player.shouldSkipPhases.includes(GamePhase.PhaseDiscard)) {
-      ctx.player.shouldSkipPhases.push(GamePhase.PhaseDiscard)
-    }
+    const player = ctx.player
+    if (player.shouldSkipPhases.includes(GamePhase.PhaseDiscard)) return
+    ctx.skipPhases(player, [GamePhase.PhaseDiscard])
   },
 
+  ai: { order: 7 },
 }
 
 // ── 汇总导出 ──
 
-export const wuSkills: IEffect[] = [
-  zhihengEffect,
-  kejiEffect,
-]
+export const wuSkills: ISkill[] = [zhiheng, keji]

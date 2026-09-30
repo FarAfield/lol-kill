@@ -14,7 +14,7 @@
 // ============================================================
 
 import { GamePhase } from '@core/contracts/enums'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
 
 // ── 类型定义 ──
 
@@ -28,7 +28,7 @@ export interface TransitionRule {
   /** 目标状态 */
   to: GamePhase
   /** 转移条件（可选），返回 true 时允许转移 */
-  condition?: (state: IGameState) => boolean
+  condition?: (state: GameStateSnapshot) => boolean
 }
 
 /**
@@ -39,18 +39,18 @@ export interface StateMachineHooks {
    * 非法转移回调 — 当 transition() 被调用但目标状态不在允许列表中时触发。
    * 用于调试和日志记录，不阻止调用者的返回值。
    */
-  onIllegalTransition?: (from: GamePhase, to: GamePhase, state: IGameState) => void
+  onIllegalTransition?: (from: GamePhase, to: GamePhase, state: GameStateSnapshot) => void
 
   /**
    * 转移前钩子 — 在实际修改 currentState 之前调用。
    * 支持异步，钩子完成后才会执行状态修改。
    */
-  onBeforeTransition?: (from: GamePhase, to: GamePhase, state: IGameState) => void | Promise<void>
+  onBeforeTransition?: (from: GamePhase, to: GamePhase, state: GameStateSnapshot) => void | Promise<void>
 
   /**
    * 转移后钩子 — 在 currentState 变更且写入历史记录之后调用。
    */
-  onAfterTransition?: (from: GamePhase, to: GamePhase, state: IGameState) => void | Promise<void>
+  onAfterTransition?: (from: GamePhase, to: GamePhase, state: GameStateSnapshot) => void | Promise<void>
 }
 
 /**
@@ -144,7 +144,7 @@ export class GameStateMachine {
    * @param state 当前游戏状态（用于条件判断和钩子）
    * @returns 是否成功转移
    */
-  async transition(to: GamePhase, state: IGameState): Promise<boolean> {
+  async transition(to: GamePhase, state: GameStateSnapshot): Promise<boolean> {
     if (!this.canTransition(to, state)) {
       this.hooks.onIllegalTransition?.(this.current, to, state)
       return false
@@ -175,7 +175,7 @@ export class GameStateMachine {
    * @param to    目标状态
    * @param state 游戏状态（条件判断用，可选）
    */
-  canTransition(to: GamePhase, state?: IGameState): boolean {
+  canTransition(to: GamePhase, state?: GameStateSnapshot): boolean {
     const specificRules = this.stateTransitions.get(this.current) ?? []
     const allRules = [...specificRules, ...this.wildcardTransitions]
 
@@ -193,7 +193,7 @@ export class GameStateMachine {
    *
    * @param state 游戏状态（条件判断用，可选）
    */
-  getAvailableTransitions(state?: IGameState): GamePhase[] {
+  getAvailableTransitions(state?: GameStateSnapshot): GamePhase[] {
     const specificRules = this.stateTransitions.get(this.current) ?? []
     const allRules = [...specificRules, ...this.wildcardTransitions]
 

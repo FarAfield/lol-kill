@@ -1,7 +1,11 @@
 import { ZoneType, CardType, CardSuit, CardRank, EquipSlot } from '@core/contracts/enums'
 import { IdGenerator } from '@core/utils'
 import type { ICard, CardDefinition } from '@core/contracts/card.interface'
+import type { CardTagValue } from '@core/contracts/card-tag'
 import type { IPlayer } from '@core/contracts/player.interface'
+
+/** 卡牌定义：由 `source/cards/*` 提供，工厂方法 `Card.create()` 消费 */
+export type { CardDefinition }
 
 export class Card implements ICard {
   readonly instanceId: string
@@ -11,7 +15,7 @@ export class Card implements ICard {
   readonly suit: CardSuit
   readonly rank: CardRank
   readonly description: string
-  readonly tags: Set<string>
+  readonly tags: Set<CardTagValue>
   readonly effectIds: string[]
   readonly equipSlot?: EquipSlot
   readonly attackRange?: number
@@ -23,6 +27,8 @@ export class Card implements ICard {
   visibleTo: IPlayer[]
   virtual: boolean
   isFaceDown: boolean
+  /** 虚拟牌消耗的底牌实例 id（虚拟牌专用） */
+  viewedFrom?: string[]
 
   /** 全局共享 ID 生成器（所有 Card 实例共用，保证 ID 递增不重复） */
   private static _idGenerator = new IdGenerator()
@@ -35,7 +41,7 @@ export class Card implements ICard {
     suit: CardSuit
     rank: CardRank
     description: string
-    tags: Set<string>
+    tags: Set<CardTagValue>
     effectIds: string[]
     equipSlot?: EquipSlot
     attackRange?: number
@@ -46,8 +52,11 @@ export class Card implements ICard {
     visibleTo: IPlayer[]
     virtual: boolean
     isFaceDown: boolean
+    viewedFrom?: string[]
+    /** 显式指定实例 id（虚拟牌专用：它的身份是可推导的，见 `createVirtual`） */
+    instanceId?: string
   }) {
-    this.instanceId = Card._idGenerator.next(data.id)
+    this.instanceId = data.instanceId ?? Card._idGenerator.next(data.id)
     this.id = data.id
     this.name = data.name
     this.type = data.type
@@ -65,6 +74,7 @@ export class Card implements ICard {
     this.visibleTo = data.visibleTo
     this.virtual = data.virtual
     this.isFaceDown = data.isFaceDown
+    this.viewedFrom = data.viewedFrom
   }
 
   /**
@@ -94,57 +104,76 @@ export class Card implements ICard {
   }
 
   /**
-   * 创建一个已指定 zone 的 Card 实例。
-   * 用于 source/ 数据中需要指定初始区域的场景（如装备区已有卡牌）。
-   * @param def  卡牌定义
-   * @param zone 初始区域
+   * 由一条 `viewAs` 技能造出一张**虚拟牌**
+   *
+   * 虚拟牌是一张**不属于任何区域**的临时视图：它有新的 `instanceId`
+   * （所以能和别的牌区分开），但没有物理实体——真正被使用与弃置的，
+   * 是 `baseCards` 里那几张真牌。
+   *
+   * 之所以不直接改造底牌：把一张红色牌「暂时变成杀」就得在事后还原，
+   * 而中途任何一次提前返回 / 抛错都会把它永久染成杀。造一个独立视图，
+   * 底牌从头到尾没有被改写过。
+   *
+   * ── 虚拟牌的 `instanceId` 是**推导出来的**，不是发号发出来的 ──
+   * 一条视作由「哪条技能 + 哪几张底牌」唯一决定（`skillId` + 底牌
+   * instanceId），因此它的身份可以现算，且**每次算都一样**。
+   * 交给自增发号器的话，出牌阶段每刷新一次候选列表，同一条视作就
+   * 换一个 id——UI 的选中项、测试里编排好的应答、日志里那一行
+   * 全都对不上号。
+   *
+   * @param base     模板：未被覆盖的字段全部继承它
+   * @param overrides `viewAs` 的返回值（名字 / tags / id …）
+   * @param baseCards 这张视图消耗的底牌（默认只有 `base`）
+   * @param skillId  产生它的技能（参与推导实例 id）
    */
-  static createInZone(def: CardDefinition, zone: ZoneType): Card {
-    const card = Card.create(def)
-    card.zone = zone
-    return card
+  static createVirtual(
+    base: ICard,
+    overrides: Partial<ICard>,
+    baseCards: readonly ICard[] = [base],
+    skillId = 'viewAs',
+  ): Card {
+    const bases = baseCards.length > 0 ? baseCards : [base]
+
+    return new Card({
+      instanceId: `virtual:${skillId}:${bases.map((card) => card.instanceId).join('+')}`,
+      id: overrides.id ?? base.id,
+      name: overrides.name ?? base.name,
+      type: overrides.type ?? base.type,
+      suit: overrides.suit ?? base.suit,
+      rank: overrides.rank ?? base.rank,
+      description: overrides.description ?? base.description,
+      tags: overrides.tags ?? new Set(base.tags),
+      effectIds: overrides.effectIds ?? base.effectIds,
+      equipSlot: overrides.equipSlot ?? base.equipSlot,
+      attackRange: overrides.attackRange ?? base.attackRange,
+      isDelayed: overrides.isDelayed ?? base.isDelayed,
+      canBeCanceled: overrides.canBeCanceled ?? base.canBeCanceled,
+      owner: overrides.owner ?? base.owner,
+      zone: overrides.zone ?? base.zone,
+      visibleTo: overrides.visibleTo ?? base.visibleTo,
+      isFaceDown: overrides.isFaceDown ?? base.isFaceDown,
+      virtual: true,
+      viewedFrom: bases.map((card) => card.instanceId),
+    })
   }
 
-  /**
-   * 将卡牌移动到指定区域。
-   * 同时更新可见性：
-   * - Deck / Discard → 清空 visibleTo
-   * - Hand → 仅 owner 可见
-   * - Equip / Judge → 所有玩家可见
-   * - Processing → 所有玩家可见
-   * @param zone 目标区域
-   */
-  moveTo(zone: ZoneType): void {
-    this.zone = zone
-    switch (zone) {
-      case ZoneType.Deck:
-      case ZoneType.Discard:
-        this.visibleTo = []
-        break
-      case ZoneType.Hand:
-        this.visibleTo = this.owner ? [this.owner] : []
-        break
-      case ZoneType.Equip:
-      case ZoneType.Judge:
-      case ZoneType.Processing:
-        // 可见性由外部玩家列表决定，此处不清空
-        break
-    }
-  }
-  /**
-   * 将卡牌移动到指定区域并更新所属玩家。
-   * @param zone   目标区域
-   * @param player 新的所属玩家
-   */
-  moveToPlayer(zone: ZoneType, player: IPlayer): void {
-    this.owner = player
-    this.moveTo(zone)
-  }
+  // ── 区域 ──
+  //
+  // **这里没有任何改区域的方法**（Phase 19）。
+  //
+  // `createInZone` / `moveTo` / `moveToPlayer` 曾经在这儿，是 `CardSystem`
+  // 的第二套实现——而且两套的规则并不一致：这里的 `moveTo` 在
+  // Equip / Judge / Processing 下不动 `visibleTo`，也完全不碰区域数组，
+  // 于是「改了 zone 却没进数组」这种半身不遂能堂而皇之地发生。
+  // 生产代码里它们一个调用点都没有（只在测试里被用过），
+  // 因此删掉而不是修——留着就是给下一个人留一条绕过系统的近路。
+  //
+  // 改区域一律走 `CardSystem.moveCard` 及其语义化入口。
 
   /**
    * 检查卡牌是否拥有指定标签。
    */
-  hasTag(tag: string): boolean {
+  hasTag(tag: CardTagValue): boolean {
     return this.tags.has(tag)
   }
 
@@ -190,7 +219,13 @@ export class Card implements ICard {
     this.visibleTo = players
   }
 
-  /** 重置 ID 生成器（重放 / 测试前调用） */
+  /**
+   * 重置 ID 生成器 —— 每局开局由 `GameEngine.init()` 调用
+   *
+   * 不归零的话第二局的牌会接着上一局的尾巴编号，于是同一颗种子
+   * 也复现不出同一局：局面完全一样，可每张牌的 instanceId 都不一样，
+   * 回放比对在第一张牌上就会全线飘红。
+   */
   static resetIdGenerator(): void {
     Card._idGenerator.reset()
   }
@@ -218,6 +253,7 @@ export class Card implements ICard {
       visibleTo: this.visibleTo,
       virtual: this.virtual,
       isFaceDown: this.isFaceDown,
+      viewedFrom: this.viewedFrom,
     }
   }
 }

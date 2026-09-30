@@ -13,7 +13,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { GamePhase, RoleType } from '@core/contracts/enums'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
 import type { IHero } from '@core/contracts/hero.interface'
@@ -81,7 +81,7 @@ const PHASE_LABELS: Record<GamePhase, string> = {
  */
 export const useGameStore = defineStore('game', () => {
   // ── 原始引擎状态 ──
-  const gameState = ref<IGameState | null>(null)
+  const gameState = ref<GameStateSnapshot | null>(null)
 
   // ── 派生状态 ──
 
@@ -163,7 +163,7 @@ export const useGameStore = defineStore('game', () => {
   /**
    * 从引擎同步状态（由 StoreService.onChange 触发）。
    */
-  function syncFromEngine(state: IGameState): void {
+  function syncFromEngine(state: GameStateSnapshot): void {
     gameState.value = state
   }
 

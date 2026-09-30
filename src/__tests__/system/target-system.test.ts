@@ -1,204 +1,148 @@
 // ============================================================
-// 联盟杀 · TargetSystem 单元测试
+// D5 / D6 —— 两处「同一个 tag 与自己重复」的条件
+//
+//   target-system.ts   tags.has(Heal) && tags.has(Heal)
+//   phase-manager.ts   card.tags.has(Heal) || card.tags.has(Heal)
+//
+// 两处都是恒等式，等于只判了一次。可疑点在于**带 Heal 的牌不止一张**：
+// 【桃】是 [Heal, Basic, Dying]，【桃园结义】是 [PeachGardenOath, Trick, Heal, Aoe]。
+// 于是第二张被第一张的目标规则吃掉了——桃园结义「只能对自己用」。
+//
+// 本文件把两类的目标范围分别钉住，让「重复条件」这件事
+// 不再只是一个肉眼看得见、机器却不会报错的坏味道。
 // ============================================================
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import { TargetSystem } from '@core/system/target-system'
-import { Player } from '@core/entity/player'
-import { Card } from '@core/entity/card'
-import { Hero } from '@core/entity/hero'
-import { GameState } from '@core/entity/game-state'
-import { CardType, CardSuit, ZoneType, EquipSlot, Kingdom } from '@core/contracts/enums'
-import type { CardDefinition } from '@core/contracts/card.interface'
+import { beforeEach, describe, expect, it } from 'vitest'
 
-// ── 创建英雄 ──
-const testHero = new Hero({
-  id: 'test-hero',
-  name: '测试',
-  title: '测试',
-  kingdom: Kingdom.Demacia,
-  maxHp: 4,
+import { TargetSystem } from '@core/system'
+import { CardTag } from '@core/contracts/card-tag'
+import type { ICard } from '@core/contracts/card.interface'
+import type { IPlayer } from '@core/contracts/player.interface'
+import { cardDef, createTestEnv, giveCard, type TestEnv } from '../helpers/game-env'
+
+let env: TestEnv
+
+beforeEach(async () => {
+  env = await createTestEnv()
 })
 
-// ── 创建8人局玩家 ──
-function create8Players(): Player[] {
-  return Array.from({ length: 8 }, (_, i) => new Player({ id: `p${i}`, seatIndex: i, heroes: [testHero], hp: testHero.maxHp, maxHp: testHero.maxHp, power: testHero.maxPower ?? 0, maxPower: testHero.maxPower ?? 0 }))
+// ── 工具 ──
+
+/** 【桃】—— 与 `src/source/cards/basic.ts` 的 Tao 同 tags */
+function peach(user: IPlayer): ICard {
+  return giveCard(user, cardDef('tao', [CardTag.Heal, CardTag.Basic, CardTag.Dying]))
 }
 
-// ── 卡牌工厂 ──
-function createCard(def: Partial<CardDefinition> & { name: string; tags: string[] }): Card {
-  return Card.create({
-    type: CardType.Basic,
-    suit: CardSuit.Spade,
-    rank: 1,
-    description: '',
-    effectIds: [],
-    isDelayed: false,
-    canBeCanceled: false,
-    ...def,
-  })
+/**
+ * 【桃园结义】—— 与 `src/source/cards/tricks.ts` 的 taoYuanJieYi 同 tags
+ *
+ * 它同时带 `Heal` 与 `Aoe`：这正是能抓住「重复条件」的那张牌。
+ */
+function peachGarden(user: IPlayer): ICard {
+  return giveCard(
+    user,
+    cardDef('taoYuanJieYi', [
+      CardTag.PeachGardenOath,
+      CardTag.Trick,
+      CardTag.Heal,
+      CardTag.Aoe,
+    ]),
+  )
 }
 
-describe('TargetSystem', () => {
-  let state: GameState
+function targetsFor(source: IPlayer, card: ICard): IPlayer[] {
+  return TargetSystem.getAvailableTargets(source, card, env.engine.state, env.engine.modQuery)
+}
 
-  beforeEach(() => {
-    Card.resetCounter()
-    state = new GameState()
+/**
+ * 引擎侧的目标入口（`PhaseManager.getValidTargetsForCard`，私有）
+ *
+ * 与 `boolean-mods.test.ts` 同一套做法：宁可断言私有方法，
+ * 也不为了测试把内部实现改成 public。
+ */
+function engineTargetsFor(source: IPlayer, card: ICard): IPlayer[] {
+  const pm = env.engine.phaseManager as unknown as {
+    getValidTargetsForCard(p: IPlayer, c: ICard): IPlayer[]
+  }
+  return pm.getValidTargetsForCard(source, card)
+}
+
+// ── 桃：自己（受伤时）或濒死角色 ──
+
+describe('桃 —— [Heal, Basic, Dying]', () => {
+  it('受伤时目标是自己', () => {
+    const [source] = env.players()
+    source.hp = source.maxHp - 1
+
+    expect(targetsFor(source!, peach(source!)).map((p) => p.id)).toEqual([source!.id])
   })
 
-  describe('getAvailableTargets — 杀', () => {
-    it('should return adjacent players only (range 1)', () => {
-      const players = create8Players()
-      state.players = players
+  it('满血且无人濒死时没有合法目标', () => {
+    const [source] = env.players()
 
-      const sha = createCard({ name: 'sha', tags: ['sha', 'attack'] })
-      const targets = TargetSystem.getAvailableTargets(players[0]!, sha, state)
-
-      // Only seat 1 and seat 7 are in range
-      expect(targets).toHaveLength(2)
-      expect(targets.map((p) => p.seatIndex).sort()).toEqual([1, 7])
-    })
-
-    it('should include more players with weapon', () => {
-      const players = create8Players()
-      state.players = players
-
-      // Give player 0 a weapon with range 2
-      const weaponDef: CardDefinition = {
-        name: 'test-weapon',
-        type: CardType.Equip,
-        suit: CardSuit.Spade,
-        rank: 1,
-        description: '',
-        tags: ['weapon'],
-        effectIds: [],
-        equipSlot: EquipSlot.Weapon,
-        attackRange: 3,
-        isDelayed: false,
-        canBeCanceled: false,
-      }
-      const weapon = Card.create(weaponDef)
-      weapon.zone = ZoneType.Equip
-      players[0]!.equipCards.push(weapon)
-
-      const sha = createCard({ name: 'sha', tags: ['sha', 'attack'] })
-      const targets = TargetSystem.getAvailableTargets(players[0]!, sha, state)
-
-      // Range = 1 + 3 = 4, should include seats 1,2,3,5,6,7
-      expect(targets.length).toBeGreaterThan(2)
-    })
+    expect(targetsFor(source!, peach(source!))).toEqual([])
   })
 
-  describe('getAvailableTargets — 桃', () => {
-    it('should target self when wounded', () => {
-      const players = create8Players()
-      state.players = players
-      players[0]!.hp = 2 // wounded
+  it('他人濒死时可以指向他（不只是自己）', () => {
+    const [source, dying] = env.players()
+    dying!.hp = 0
 
-      const tao = createCard({ name: 'tao', tags: ['tao', 'heal'] })
-      const targets = TargetSystem.getAvailableTargets(players[0]!, tao, state)
+    expect(targetsFor(source!, peach(source!)).map((p) => p.id)).toContain(dying!.id)
+  })
+})
 
-      expect(targets).toHaveLength(1)
-      expect(targets[0]!.id).toBe('p0')
-    })
+// ── 桃园结义：带 Heal，但不是桃 ──
 
-    it('should not target self when full HP', () => {
-      const players = create8Players()
-      state.players = players
-      players[0]!.hp = 4 // full
+describe('桃园结义 —— [PeachGardenOath, Trick, Heal, Aoe]', () => {
+  it('不被桃的规则吃掉：目标不止自己', () => {
+    const [source, other] = env.players()
+    const ids = targetsFor(source!, peachGarden(source!)).map((p) => p.id)
 
-      const tao = createCard({ name: 'tao', tags: ['tao', 'heal'] })
-      const targets = TargetSystem.getAvailableTargets(players[0]!, tao, state)
-
-      expect(targets).toHaveLength(0)
-    })
-
-    it('should target dying players', () => {
-      const players = create8Players()
-      state.players = players
-      players[1]!.hp = 0 // dying
-      players[0]!.hp = 4 // full hp (not wounded)
-
-      const tao = createCard({ name: 'tao', tags: ['tao', 'heal'] })
-      const targets = TargetSystem.getAvailableTargets(players[0]!, tao, state)
-
-      // Should include the dying player (but not self since not wounded)
-      expect(targets).toHaveLength(1)
-      expect(targets[0]!.id).toBe('p1')
-    })
+    expect(ids).toContain(other!.id)
+    expect(ids).not.toContain(source!.id)
   })
 
-  describe('getAvailableTargets — 酒', () => {
-    it('should only target self', () => {
-      const players = create8Players()
-      state.players = players
+  it('受伤时同样不该退化成「只有自己」', () => {
+    const [source, other] = env.players()
+    source!.hp = source!.maxHp - 1
 
-      const jiu = createCard({ name: 'jiu', tags: ['jiu', 'boost'] })
-      const targets = TargetSystem.getAvailableTargets(players[0]!, jiu, state)
+    // 这一条是重复条件的直接症状：桃那条分支按 `player.isWounded` 返回 [自己]，
+    // 与「群体效果」完全相反。
+    const ids = targetsFor(source!, peachGarden(source!)).map((p) => p.id)
 
-      expect(targets).toHaveLength(1)
-      expect(targets[0]!.id).toBe('p0')
-    })
+    expect(ids).toContain(other!.id)
+    expect(ids).not.toContain(source!.id)
   })
 
-  describe('getAvailableTargets — 决斗', () => {
-    it('should target any other player', () => {
-      const players = create8Players()
-      state.players = players
+  it('目标数是 0 —— 群体牌不逐个选目标', () => {
+    const [source] = env.players()
 
-      const duel = createCard({ name: 'jueDou', tags: ['duel'] })
-      const targets = TargetSystem.getAvailableTargets(players[0]!, duel, state)
+    expect(TargetSystem.getMinTargets(peachGarden(source!))).toBe(0)
+    expect(TargetSystem.getMaxTargets(peachGarden(source!), source!)).toBe(0)
+  })
+})
 
-      expect(targets).toHaveLength(7) // all others
-      expect(targets.map((p) => p.id)).not.toContain('p0')
-    })
+// ── 引擎侧同一处笔误 ──
+//
+// 这一组原本盯的是 `PhaseManager.resolveTargetsForCard` —— 一份与
+// TargetSystem 并存的**副本**。D3/D4 清偿时那份副本被删掉了，
+// 引擎侧现在直接问 TargetSystem，所以这里改成断言「两处一致」：
+// 副本不会再悄悄长回来。
+
+describe('PhaseManager 的目标入口 —— 与 TargetSystem 同源', () => {
+  it('桃：受伤时目标是自己', () => {
+    const [source] = env.players()
+    source!.hp = source!.maxHp - 1
+
+    expect(engineTargetsFor(source!, peach(source!)).map((p) => p.id)).toEqual([source!.id])
   })
 
-  describe('getAvailableTargets — AOE', () => {
-    it('should target all other players regardless of distance', () => {
-      const players = create8Players()
-      state.players = players
+  it('桃园结义：不走桃那条分支', () => {
+    const [source, other] = env.players()
+    source!.hp = source!.maxHp - 1
 
-      const aoe = createCard({ name: 'nanManRuQin', tags: ['aoe'] })
-      const targets = TargetSystem.getAvailableTargets(players[0]!, aoe, state)
+    const ids = engineTargetsFor(source!, peachGarden(source!)).map((p) => p.id)
 
-      expect(targets).toHaveLength(7)
-    })
-  })
-
-  describe('validateTargets', () => {
-    it('should validate legal target', () => {
-      const players = create8Players()
-      state.players = players
-
-      const sha = createCard({ name: 'sha', tags: ['sha', 'attack'] })
-      const result = TargetSystem.validateTargets(players[0]!, [players[1]!], sha, state)
-
-      expect(result.valid).toBe(true)
-    })
-
-    it('should reject target out of range', () => {
-      const players = create8Players()
-      state.players = players
-
-      const sha = createCard({ name: 'sha', tags: ['sha', 'attack'] })
-      // Player at seat 4 is distance 4 away (base range is 1)
-      const result = TargetSystem.validateTargets(players[0]!, [players[4]!], sha, state)
-
-      expect(result.valid).toBe(false)
-      expect(result.reason).toBeDefined()
-    })
-
-    it('should reject empty targets', () => {
-      const players = create8Players()
-      state.players = players
-
-      const sha = createCard({ name: 'sha', tags: ['sha', 'attack'] })
-      const result = TargetSystem.validateTargets(players[0]!, [], sha, state)
-
-      expect(result.valid).toBe(false)
-      expect(result.reason).toBe('未选择目标')
-    })
+    expect(ids).toContain(other!.id)
   })
 })

@@ -14,7 +14,22 @@
 import { ZoneType } from '@core/contracts/enums'
 import type { ICard } from '@core/contracts/card.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
+
+/**
+ * 卡牌系统选项
+ */
+export interface CardSystemOptions {
+  /**
+   * 装备区发生增减时通知（涉及到的玩家，可能两个人：失去者与获得者）
+   *
+   * 装备技「装备时自动获得、卸下时自动失去」全靠这一声通知——
+   * 挂在 `moveCard` 上而不是挂在 `equipCard` / `unequipCard` 上，
+   * 是因为**拆装备、牵走装备走的也是 moveCard**，
+   * 只在两个入口喊一声的话，那些路径会静默漏掉。
+   */
+  onEquipmentChange?: (players: IPlayer[]) => void
+}
 
 /**
  * 卡牌系统
@@ -23,7 +38,11 @@ import type { IGameState } from '@core/contracts/game.interface'
  * 以保持 zone、owner、visibleTo 三字段一致。
  */
 export class CardSystem {
-  constructor(private state: IGameState) {}
+  private options: CardSystemOptions
+
+  constructor(private state: GameStateSnapshot, options?: CardSystemOptions) {
+    this.options = options ?? {}
+  }
 
   // ── 区域移动基方法 ──
 
@@ -41,6 +60,10 @@ export class CardSystem {
    * @param player  新的所属玩家（可选）
    */
   moveCard(card: ICard, toZone: ZoneType, player?: IPlayer): void {
+    // 流转前先把「从哪来、原来归谁」记下来——下面会改掉这两个字段
+    const fromZone = card.zone
+    const previousOwner = card.owner
+
     // 从原区域移除
     this.removeFromCurrentZone(card)
 
@@ -48,6 +71,9 @@ export class CardSystem {
     card.zone = toZone
     if (player) {
       card.owner = player
+    } else if (toZone === ZoneType.Deck || toZone === ZoneType.Discard) {
+      // 公共区域无持有者——否则回收弃牌堆后，这张牌会把旧 owner 带进新主人的手牌
+      card.owner = undefined
     }
 
     // 添加到新区域
@@ -55,6 +81,59 @@ export class CardSystem {
 
     // 更新可见性
     this.updateVisibility(card, toZone)
+
+    if (fromZone === ZoneType.Equip || toZone === ZoneType.Equip) {
+      this.notifyEquipmentChange(previousOwner, card.owner)
+    }
+  }
+
+  /**
+   * 通知装备区变动
+   *
+   * 进出装备区都算，两头的持有者都要通知：
+   * 旧主人要摘掉装备技，新主人要挂上。
+   */
+  private notifyEquipmentChange(...candidates: (IPlayer | undefined)[]): void {
+    const affected: IPlayer[] = []
+    for (const player of candidates) {
+      if (player && !affected.includes(player)) affected.push(player)
+    }
+    if (affected.length > 0) this.options.onEquipmentChange?.(affected)
+  }
+
+  /**
+   * 虚拟牌的底牌 —— 移动一张牌之前，先把它换成真正该动的那几张
+   *
+   * 虚拟牌（`viewAs` 造出来的视图）**不属于任何区域**：它没有物理实体，
+   * 真正被使用与弃置的是 `viewedFrom` 指向的底牌。于是每个「移动一张牌」
+   * 的入口都要先做这一步翻译——用虚拟牌的人以为他在用这张视图，
+   * 动了的是那几张真牌。
+   *
+   * 翻译放在这里是刻意的：本系统是唯一个能改区域的地方，出牌、
+   * 响应出闪、濒死出桃走的都是这几个出口，因此翻译天然处处生效，
+   * 内容层不需要知道「虚拟牌」这件事的存在。
+   *
+   * @returns 底牌；空数组表示这就是一张普通的真实卡牌
+   */
+  private baseCardsOf(card: ICard): ICard[] {
+    if (!card.virtual || !card.viewedFrom?.length) return []
+
+    return card.viewedFrom
+      .map((instanceId) => this.findCard(instanceId))
+      .filter((found): found is ICard => found !== undefined)
+  }
+
+  /** 按实例 id 找一张牌（全区域扫描） */
+  private findCard(instanceId: string): ICard | undefined {
+    const seen: ICard[] = [
+      ...this.state.deck,
+      ...this.state.discardPile,
+      ...this.state.processingCards,
+    ]
+    for (const player of this.state.players) {
+      seen.push(...player.handCards, ...player.equipCards, ...player.judgeCards)
+    }
+    return seen.find((card) => card.instanceId === instanceId)
   }
 
   /**
@@ -67,28 +146,28 @@ export class CardSystem {
     switch (zone) {
       case ZoneType.Hand:
         if (owner) {
-          owner.handCards = owner.handCards.filter((c) => c.id !== card.id)
+          owner.handCards = owner.handCards.filter((c) => c.instanceId !== card.instanceId)
         }
         break
       case ZoneType.Equip:
         if (owner) {
-          owner.equipCards = owner.equipCards.filter((c) => c.id !== card.id)
+          owner.equipCards = owner.equipCards.filter((c) => c.instanceId !== card.instanceId)
         }
         break
       case ZoneType.Judge:
         if (owner) {
-          owner.judgeCards = owner.judgeCards.filter((c) => c.id !== card.id)
+          owner.judgeCards = owner.judgeCards.filter((c) => c.instanceId !== card.instanceId)
         }
         break
       case ZoneType.Deck:
-        this.state.deck = this.state.deck.filter((c) => c.id !== card.id)
+        this.state.deck = this.state.deck.filter((c) => c.instanceId !== card.instanceId)
         break
       case ZoneType.Discard:
-        this.state.discardPile = this.state.discardPile.filter((c) => c.id !== card.id)
+        this.state.discardPile = this.state.discardPile.filter((c) => c.instanceId !== card.instanceId)
         break
       case ZoneType.Processing:
         this.state.processingCards = this.state.processingCards.filter(
-          (c) => c.id !== card.id,
+          (c) => c.instanceId !== card.instanceId,
         )
         break
     }
@@ -110,7 +189,7 @@ export class CardSystem {
           if (card.equipSlot) {
             const oldEquip = player.getEquipInSlot(card.equipSlot)
             if (oldEquip) {
-              player.equipCards = player.equipCards.filter((c) => c.id !== oldEquip.id)
+              player.equipCards = player.equipCards.filter((c) => c.instanceId !== oldEquip.instanceId)
               this.discardCard(oldEquip, player)
             }
           }
@@ -159,15 +238,25 @@ export class CardSystem {
   /**
    * 使用卡牌——从手牌移入处理区。
    *
-   * @param card    要使用的卡牌
-   * @param source  使用卡牌的玩家
-   * @param targets 卡牌目标（可选，供事件使用）
+   * 只负责区域流转（手牌 → 处理区）。目标属于事件数据，不由牌堆系统持有。
+   *
+   * @param card   要使用的卡牌
+   * @param source 使用卡牌的玩家
    */
-  useCard(card: ICard, source: IPlayer, targets?: IPlayer[]): void {
+  useCard(card: ICard, source: IPlayer): void {
+    // 虚拟牌：真正流转的是底牌，视图本身只跟着改个区域标记供 UI / 日志读，
+    // 但**不进任何区域数组**——区域的盈亏只由真牌决定。
+    const bases = this.baseCardsOf(card)
+    if (bases.length > 0) {
+      for (const base of bases) this.useCard(base, source)
+      card.zone = ZoneType.Processing
+      return
+    }
+
     // 验证卡牌在来源玩家手牌区
     if (card.zone !== ZoneType.Hand || card.owner?.id !== source.id) {
       throw new Error(
-        `CardSystem.useCard: card "${card.name}" (${card.id}) is not in ${source.id}'s hand`,
+        `CardSystem.useCard: card "${card.name}" (${card.instanceId}) is not in ${source.id}'s hand`,
       )
     }
 
@@ -181,6 +270,14 @@ export class CardSystem {
    * @param player 弃置该牌的玩家（用于权限验证）
    */
   discardCard(card: ICard, player: IPlayer): void {
+    // 打出一张虚拟闪 / 虚拟桃：丢的是它消耗的那张真牌
+    const bases = this.baseCardsOf(card)
+    if (bases.length > 0) {
+      for (const base of bases) this.discardCard(base, player)
+      card.zone = ZoneType.Discard
+      return
+    }
+
     // 只能弃置自己区域内的牌（手牌、装备、判定）
     const validZones: ZoneType[] = [ZoneType.Hand, ZoneType.Equip, ZoneType.Judge]
     if (!validZones.includes(card.zone)) {
@@ -208,7 +305,24 @@ export class CardSystem {
   }
 
   /**
-   * 装备卡牌——从手牌移入装备区。
+   * 无条件送进弃牌堆 —— 给「不该被拒绝的弃牌」用
+   *
+   * `discardCard` 会校验来源区域与持有者，还会过 `cardDiscardable`，
+   * 那是**规则**：「这张牌能不能被弃」。而死亡清空三区是**结算**，
+   * 不是规则——人都没了，牌必须走，没有「弃不掉」这一说。
+   *
+   * 以前死亡结算是直接 `player.handCards = []`，牌的 `zone` / `owner`
+   * 原地不动，装备变动通知也不发：死者的装备技会一直挂在台账上。
+   */
+  moveToDiscard(card: ICard): void {
+    this.moveCard(card, ZoneType.Discard)
+  }
+
+  /**
+   * 装备卡牌——从手牌（或处理区）移入装备区。
+   *
+   * 走完整用牌流程时，装备牌会先被移入处理区再触发 `equip` 事件，
+   * 因此处理区与手牌一样是合法来源。
    *
    * 如果对应槽位已有装备，旧装备会被替换并移入弃牌堆。
    *
@@ -216,9 +330,10 @@ export class CardSystem {
    * @param player 装备者
    */
   equipCard(card: ICard, player: IPlayer): void {
-    if (card.zone !== ZoneType.Hand || card.owner?.id !== player.id) {
+    const validSourceZones: ZoneType[] = [ZoneType.Hand, ZoneType.Processing]
+    if (!validSourceZones.includes(card.zone) || card.owner?.id !== player.id) {
       throw new Error(
-        `CardSystem.equipCard: card "${card.name}" is not in ${player.id}'s hand`,
+        `CardSystem.equipCard: card "${card.name}" is not in ${player.id}'s hand or processing area`,
       )
     }
 
@@ -347,6 +462,24 @@ export class CardSystem {
    * 将卡牌从处理区移入弃牌堆（卡牌结算完毕）。
    */
   finishProcessing(card: ICard): void {
+    const bases = this.baseCardsOf(card)
+    if (bases.length > 0) {
+      // 虚拟牌结算完毕 = 它消耗的真牌离手进弃牌堆。
+      // 正常情况下它们此刻都在处理区（useCard 刚把它们放进去）；
+      // 其余区域也算数——无论是从哪里被端出来的，用了就不该还回去。
+      const removable: ZoneType[] = [
+        ZoneType.Processing,
+        ZoneType.Hand,
+        ZoneType.Equip,
+        ZoneType.Judge,
+      ]
+      for (const base of bases) {
+        if (removable.includes(base.zone)) this.moveCard(base, ZoneType.Discard)
+      }
+      card.zone = ZoneType.Discard
+      return
+    }
+
     if (card.zone !== ZoneType.Processing) {
       throw new Error(
         `CardSystem.finishProcessing: card "${card.name}" is not in processing zone`,
@@ -374,5 +507,16 @@ export class CardSystem {
     for (const card of cards) {
       this.obtainCard(card, player)
     }
+  }
+
+  /**
+   * 把一张牌摆上处理区——判定翻牌这类「先亮出来，稍后再弃」的场合
+   *
+   * 判定牌不是任何人打出来的，因此不走 `useCard`（后者要求牌在自己手里）。
+   * 单独开一个口子是为了让「放进处理区」也过一遍 `moveCard`：
+   * 可见性要设为全员可见，否则刚翻开的判定牌对别人不可见。
+   */
+  moveToProcessing(card: ICard, player: IPlayer): void {
+    this.moveCard(card, ZoneType.Processing, player)
   }
 }

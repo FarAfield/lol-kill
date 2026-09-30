@@ -19,19 +19,22 @@ import { GameEngine } from '@core/engine/game-engine'
 import { StoreService } from '@core/services/store-service'
 import type {
   IGameConfig,
-  IGameState,
+  GameStateSnapshot,
   IGameResult,
 } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
-import type { IUIDecisionService } from '@core/contracts/services.interface'
-import { GamePhase, ZoneType, TriggerTiming, EquipSlot } from '@core/contracts/enums'
+import type {
+  IUIDecisionService,
+  IRandomService,
+} from '@core/contracts/services.interface'
+import { SeededRandomService, randomSeed } from '@core/services/seeded-random'
+import { GamePhase, ZoneType } from '@core/contracts/enums'
 import { GameEvent } from '@core/event/game-event'
-import { DistanceSystem } from '@core/system/distance-system'
 
 // ── Pinia Store 类型（延迟导入，避免循环依赖） ──
 interface IGameStore {
-  syncFromEngine(state: IGameState): void
+  syncFromEngine(state: GameStateSnapshot): void
   reset(): void
 }
 
@@ -75,32 +78,6 @@ const EMPTY_ACTIONS: AvailableActions = {
   discardCount: 0,
 }
 
-// ── 辅助函数 —— 使用 IPlayer 接口兼容的方式 ──
-
-/** 检查玩家是否受伤（hp < maxHp）。IPlayer 兼容版本。 */
-function isPlayerWounded(player: IPlayer): boolean {
-  return player.hp < player.maxHp
-}
-
-/** 获取玩家存活列表。IGameState 兼容版本。 */
-function getAlivePlayers(state: IGameState): IPlayer[] {
-  return state.players.filter((p) => p.alive)
-}
-
-/** 获取玩家的攻击范围（基础 1 + 武器加成）。 */
-function getPlayerAttackRange(player: IPlayer): number {
-  const weapon = player.equipCards.find((c) => c.equipSlot === EquipSlot.Weapon)
-  return 1 + (weapon?.attackRange ?? 0)
-}
-
-/** 检查玩家本回合是否还能攻击（基于 usedAttackThisTurn + attackLimit）。 */
-function canPlayerAttack(player: IPlayer): boolean {
-  if (player.attackLimit === Infinity) return true
-  // usedAttackThisTurn 是 boolean，attackLimit 通常是 1
-  const attacksUsed = player.usedAttackThisTurn ? 1 : 0
-  return attacksUsed < player.attackLimit
-}
-
 /**
  * GameController — UI 与引擎的唯一交互入口。
  *
@@ -118,9 +95,13 @@ export class GameController {
   private piniaStore: IGameStore | null = null
   private isRunning = false
   private gameResult: IGameResult | null = null
+  private randomService: IRandomService
 
-  constructor() {
+  constructor(options?: { randomService?: IRandomService; seed?: number | string }) {
     this.storeService = new StoreService()
+    // 引擎现在强制要求随机源：UI 不指定就按种子现开一个确定性的
+    this.randomService =
+      options?.randomService ?? new SeededRandomService(options?.seed ?? randomSeed())
   }
 
   // ── 初始化 ──
@@ -167,6 +148,7 @@ export class GameController {
 
     // 创建引擎并注入服务
     this.engine = new GameEngine({
+      randomService: this.randomService,
       storeService: this.storeService,
       decisionService: this.decisionService ?? undefined,
     })
@@ -234,7 +216,7 @@ export class GameController {
     }
 
     // 查找卡牌
-    const card = player.handCards.find((c) => c.id === cardId)
+    const card = player.handCards.find((c) => c.instanceId === cardId)
     if (!card) {
       throw new Error(`[GameController] 找不到卡牌 ${cardId}`)
     }
@@ -247,6 +229,28 @@ export class GameController {
         throw new Error(`[GameController] 找不到目标玩家 ${targetId}`)
       }
       targets.push(target)
+    }
+
+    // 出牌前校验：boolean 否决器的最后一道闸
+    //
+    // `PhaseManager.getPlayableCards` 负责「不把禁用的牌摆进选项」，
+    // 这里负责「摆进去了但局面已变」——两条路径必须都查 `modQuery`，
+    // 否则 UI 能点、引擎也照收，否决器就成了摆设。
+    const modQuery = this.engine.modQuery
+    if (!modQuery.cardEnabled(player, card)) {
+      throw new Error(`[GameController] ${player.hero?.name ?? player.id} 不能使用【${card.name}】`)
+    }
+    for (const target of targets) {
+      if (!modQuery.targetEnabled(player, card, target)) {
+        throw new Error(
+          `[GameController] ${target.hero?.name ?? target.id} 不能作为【${card.name}】的目标`,
+        )
+      }
+      if (!modQuery.targetInRange(player, card, target)) {
+        throw new Error(
+          `[GameController] ${target.hero?.name ?? target.id} 不在【${card.name}】的范围内`,
+        )
+      }
     }
 
     // 通过引擎执行出牌
@@ -279,7 +283,7 @@ export class GameController {
     if (cardId) {
       const player = this.engine.getCurrentPlayer()
       if (player) {
-        const card = player.handCards.find((c) => c.id === cardId)
+        const card = player.handCards.find((c) => c.instanceId === cardId)
         if (!card) {
           throw new Error(`[GameController] 找不到卡牌 ${cardId}`)
         }
@@ -332,15 +336,14 @@ export class GameController {
 
     // 效果发动通过事件系统处理
     const event = new GameEvent({
-      name: `效果发动: ${effectId}`,
-      type: TriggerTiming.CardEffect,
+      name: 'useCardEffect',
       source: player,
       player,
       targets: targetIds
         .map((id) => state.players.find((p) => p.id === id))
         .filter((p): p is IPlayer => p !== undefined),
       cards: cardIds
-        .map((id) => player.handCards.find((c) => c.id === id))
+        .map((id) => player.handCards.find((c) => c.instanceId === id))
         .filter((c): c is ICard => c !== undefined),
       phase: state.currentPhase,
       round: state.currentRound,
@@ -369,7 +372,7 @@ export class GameController {
 
     const cards: ICard[] = []
     for (const cardId of cardIds) {
-      const card = player.handCards.find((c) => c.id === cardId)
+      const card = player.handCards.find((c) => c.instanceId === cardId)
       if (!card) {
         throw new Error(`[GameController] 找不到卡牌 ${cardId}`)
       }
@@ -391,7 +394,7 @@ export class GameController {
   /**
    * 获取当前游戏状态（只读）。
    */
-  getGameState(): Readonly<IGameState> | null {
+  getGameState(): Readonly<GameStateSnapshot> | null {
     return this.storeService.getGameStateSafe()
   }
 
@@ -452,11 +455,14 @@ export class GameController {
 
       case GamePhase.PhaseDiscard:
         if (isMyTurn) {
+          // 手牌上限默认等于当前体力，但 Mod 可以改写它——
+          // 这里必须走 `maxHandcard`，不能用 `maxHp`，否则「上限 ±N」
+          // 类技能在 UI 上完全看不出来。
           const handSize = targetPlayer.handCards.length
-          const maxHp = targetPlayer.maxHp
-          if (handSize > maxHp) {
+          const handLimit = this.engine?.getMaxHandcard(targetPlayer) ?? targetPlayer.hp
+          if (handSize > handLimit) {
             actions.needDiscard = true
-            actions.discardCount = handSize - maxHp
+            actions.discardCount = handSize - handLimit
           }
           actions.canEndPhase = true
         }
@@ -506,8 +512,8 @@ export class GameController {
     // 已经结束则返回已有结果
     if (this.gameResult) return this.gameResult
 
-    // 调用 DeathSystem 检查胜利条件
-    const result = this.engine.deathSystem.checkGameOver()
+    // 胜负规则在 `WinCondition`（纯函数），入口在引擎上
+    const result = this.engine.checkGameOver()
     if (result) {
       // 标记游戏结束
       this.engine.state.markFinished()
@@ -536,37 +542,9 @@ export class GameController {
     const player = this.engine.getCurrentPlayer()
     if (!player) return
 
-    const state = this.engine.getState()
-
-    // 1. 卡牌从手牌移入处理区
-    this.engine.cardSystem.useCard(card, player, targets)
-
-    // 2. 创建 CardUse 事件
-    const cardUseEvent = new GameEvent({
-      name: `使用: ${card.name}`,
-      type: TriggerTiming.CardUse,
-      source: player,
-      player,
-      targets,
-      cards: [card],
-      phase: state.currentPhase,
-      round: state.currentRound,
-      turn: player.seatIndex,
-    })
-
-    // 3. 分发事件
-    await this.engine.eventDispatcher.dispatch(
-      cardUseEvent,
-      this.engine.eventChain,
-    )
-
-    // 4. 卡牌结算完成
-    this.engine.cardSystem.finishProcessing(card)
-
-    // 5. 标记攻击使用（如果是杀）
-    if (card.tags.has('sha')) {
-      player.usedAttackThisTurn = true
-    }
+    // 完整的用牌流程收口在引擎：移入处理区 → useCard 事件（卡牌内容在此触发）
+    // → 结算完成入弃牌堆。出杀次数由「杀」的内容自己标记，这里不再重复处理。
+    await this.engine.useCard(player, card, targets)
   }
 
   /**
@@ -574,44 +552,36 @@ export class GameController {
    */
   private computePlayableCards(
     player: IPlayer,
-    state: IGameState,
+    _state: GameStateSnapshot,
   ): Array<{ cardId: string; validTargetIds: string[] }> {
     const engine = this.engine
     if (!engine) return []
 
     const result: Array<{ cardId: string; validTargetIds: string[] }> = []
-    const playerAttackRange = getPlayerAttackRange(player)
 
     for (const card of player.handCards) {
       if (card.zone !== ZoneType.Hand) continue
       if (card.isDelayed) continue
 
-      let validTargets: IPlayer[] = []
+      // 被 `mod.cardEnabled` 否决的牌根本不进选项（清单 #10）。
+      // UI 这一层是玩家真正看到的「我能点哪些牌」，漏了这里，
+      // 禁用就只存在于引擎的错误提示里——点了才知道不行。
+      if (!engine.modQuery.cardEnabled(player, card)) continue
 
-      if (card.tags.has('sha')) {
-        // 杀：攻击范围内的一名其他角色
-        if (!canPlayerAttack(player)) continue
-        validTargets = getAlivePlayers(state).filter((p) => {
-          if (p.id === player.id) return false
-          const dist = DistanceSystem.getDistance(player, p, state.players)
-          return dist <= playerAttackRange
-        })
-      } else if (card.tags.has('peach')) {
-        // 桃：自己（受伤时）
-        if (isPlayerWounded(player)) {
-          validTargets = [player]
-        }
-      } else if (card.tags.has('trick')) {
-        // 非延时锦囊：其他存活角色
-        validTargets = getAlivePlayers(state).filter((p) => p.id !== player.id)
-      } else if (card.tags.has('equip')) {
-        // 装备牌：只能装备到自己
-        validTargets = [player]
-      }
+      // 次数额度：与引擎、AI 共用同一个判定口（`CardBudget`）。
+      // 以前这里问的是 `player.canAttack` —— 一个不经过 Mod 的算式，
+      // 于是装了连弩以后 UI 与出牌阶段给出不同答案（欠账 D8）。
+      if (!engine.canPlayCard(player, card)) continue
+
+      // 目标范围也只有一处：`TargetSystem`。
+      // 早先这里按牌型写过一整段（杀看距离、桃看自己、锦囊看全场……），
+      // 与引擎里那份各算各的；距离、攻击范围、否决器三层判断
+      // 现在全在 `getValidTargets` 里一次做完。
+      const validTargets = engine.getValidTargets(player, card)
 
       if (validTargets.length > 0) {
         result.push({
-          cardId: card.id,
+          cardId: card.instanceId,
           validTargetIds: validTargets.map((p) => p.id),
         })
       }

@@ -25,18 +25,24 @@ import type {
   IAIDecisionMaker,
   AIPlayerConfig,
   AIDecisionLog,
-  AICardChoice,
 } from '@core/contracts/ai.interface'
 import { AIDifficulty } from '@core/contracts/ai.interface'
-import type { IUIDecisionService, CardPlayOption, CardPlayResult } from '@core/contracts/services.interface'
+import type {
+  IUIDecisionService,
+  CardPlayOption,
+  CardPlayResult,
+  IRandomService,
+} from '@core/contracts/services.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
-import type { IEffect } from '@core/contracts/effect.interface'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { ISkill } from '@core/contracts/skill.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import type { PlayerId } from '@core/contracts/types'
-import { LogLevel, RoleType } from '@core/contracts/enums'
+import { RoleType } from '@core/contracts/enums'
 import { AI_MIN_DELAY, AI_MAX_DELAY } from '@source/base/constants'
 import { createAIStrategy } from './ai-strategies'
+import type { CardBudget } from '@core/skill/card-budget'
+import { SeededRandomService, randomSeed } from './seeded-random'
 
 // ============================================================
 // 默认配置
@@ -70,11 +76,22 @@ export class AIController implements IUIDecisionService {
   private defaultMaxDelay: number
 
   /** 游戏状态访问器（由外部注入） */
-  private getStateFn: (() => IGameState) | null = null
+  private getStateFn: (() => GameStateSnapshot) | null = null
 
   /** 决策日志 */
   private decisionLogs: AIDecisionLog[] = []
   private logEnabled: boolean = true
+
+  /**
+   * AI 自己的随机源
+   *
+   * 刻意与洗牌那条流分开：回放时没有 AI 参与，共用一条流的话
+   * 两次运行消耗的次数不同，整条洗牌序列都会错位。
+   */
+  private randomService: IRandomService
+
+  /** 出牌额度查询（可选，见构造选项） */
+  private cardBudget: CardBudget | undefined
 
   /** 通知回调（可选，用于 UI 日志） */
   private onNotify: ((message: string, level: 'info' | 'warn' | 'error') => void) | null = null
@@ -84,11 +101,27 @@ export class AIController implements IUIDecisionService {
     minDelay?: number
     maxDelay?: number
     logEnabled?: boolean
+    /**
+     * AI 的随机源（挑牌 / 拟人思考延迟）
+     *
+     * 不传则为每局新开一颗种子——AI 同桌两位玩家的手气不必雷同。
+     * 需要可复现的场景（回放、回归测试）应当显式注入一颗固定种子。
+     */
+    randomService?: IRandomService
+    /**
+     * 出牌额度查询 —— 让 AI 与引擎、UI 用同一个「还能出几次」的答案
+     *
+     * 不注入时策略一律放行（与 `modQuery` 缺席的约定一致），
+     * 但那样 AI 就看不见【诸葛连弩】这类额度加成（欠账 D8 的症状）。
+     */
+    cardBudget?: CardBudget
   }) {
     this.defaultDifficulty = options?.defaultDifficulty ?? AIDifficulty.Normal
     this.defaultMinDelay = options?.minDelay ?? AI_MIN_DELAY
     this.defaultMaxDelay = options?.maxDelay ?? AI_MAX_DELAY
     this.logEnabled = options?.logEnabled ?? true
+    this.randomService = options?.randomService ?? new SeededRandomService(randomSeed())
+    this.cardBudget = options?.cardBudget
   }
 
   // ── 配置方法 ──
@@ -99,10 +132,19 @@ export class AIController implements IUIDecisionService {
    * AIController 通过此回调获取最新游戏状态，
    * 并将其传递给 AI 策略用于决策。
    *
-   * @param fn 返回当前 IGameState 的函数
+   * @param fn 返回当前 GameStateSnapshot 的函数
    */
-  setStateAccessor(fn: () => IGameState): void {
+  setStateAccessor(fn: () => GameStateSnapshot): void {
     this.getStateFn = fn
+  }
+
+  /**
+   * 设置出牌额度查询（由 `GameBoot` 在引擎就绪后回注）
+   *
+   * 与 `setStateAccessor` 同一套路：AI 先于引擎出生，只能事后补。
+   */
+  setCardBudget(budget: CardBudget): void {
+    this.cardBudget = budget
   }
 
   /**
@@ -118,7 +160,7 @@ export class AIController implements IUIDecisionService {
     config?: Partial<AIPlayerConfig>,
   ): void {
     const diff = difficulty ?? this.defaultDifficulty
-    const strategy = createAIStrategy(diff)
+    const strategy = createAIStrategy(diff, this.randomService, this.cardBudget)
     this.strategies.set(playerId, strategy)
 
     const fullConfig: AIPlayerConfig = {
@@ -207,7 +249,7 @@ export class AIController implements IUIDecisionService {
       }
 
       // 确保选择的卡牌在可用选项中
-      const option = options.find((o) => o.card.id === choice.card.id)
+      const option = options.find((o) => o.card.instanceId === choice.card.instanceId)
       if (!option) {
         this.logDecision(player.id, 'play', '选择无效，不出牌', Date.now() - startTime)
         return null
@@ -255,7 +297,7 @@ export class AIController implements IUIDecisionService {
     try {
       const card = strategy.respondToDefend(player, validCards, state)
 
-      if (card && validCards.some((c) => c.id === card.id)) {
+      if (card && validCards.some((c) => c.instanceId === card.instanceId)) {
         await this.simulateDelay(player.id)
         this.logDecision(
           player.id,
@@ -290,21 +332,9 @@ export class AIController implements IUIDecisionService {
     const startTime = Date.now()
 
     try {
-      // 使用策略选择目标
-      // 为简单起见，使用 chooseEffectTargets 方法
-      const activeEffects = this.getActiveEffects(player, state)
-      const effect = activeEffects[0]
-
-      let targets: IPlayer[]
-      if (effect) {
-        targets = strategy.chooseEffectTargets(player, effect, candidates, state)
-      } else {
-        // 无可用效果时，优先选择敌人
-        targets = candidates.filter((c) => {
-          // 需要 strategy 的判断，通过公共方法
-          return c.alive
-        })
-      }
+      // 按技能选目标要等 Phase 26（AI 适配新契约）：AI 得先能读到
+      // 台账里「这个人此刻有哪些主动技」。在那之前退回「活着的都算候选」。
+      const targets: IPlayer[] = candidates.filter((c) => c.alive)
 
       const minT = _minTargets ?? 1
       const maxT = _maxTargets ?? 1
@@ -325,9 +355,9 @@ export class AIController implements IUIDecisionService {
 
   async askForEffectUse(
     player: IPlayer,
-    effects: IEffect[],
+    effects: ISkill[],
     _prompt: string,
-  ): Promise<IEffect | null> {
+  ): Promise<ISkill | null> {
     const strategy = this.getStrategy(player.id)
     const state = this.getState()
 
@@ -475,7 +505,7 @@ export class AIController implements IUIDecisionService {
   /**
    * 获取当前游戏状态。
    */
-  private getState(): IGameState | null {
+  private getState(): GameStateSnapshot | null {
     if (!this.getStateFn) return null
     try {
       return this.getStateFn()
@@ -493,8 +523,7 @@ export class AIController implements IUIDecisionService {
       minDelay: this.defaultMinDelay,
       maxDelay: this.defaultMaxDelay,
     }
-    const delay = config.minDelay + Math.random() * (config.maxDelay - config.minDelay)
-    await new Promise((resolve) => setTimeout(resolve, delay))
+    await new Promise((resolve) => setTimeout(resolve, this.randomService.nextInt(config.minDelay, config.maxDelay)))
   }
 
   /**
@@ -518,27 +547,11 @@ export class AIController implements IUIDecisionService {
   }
 
   /**
-   * 获取玩家当前可用的主动效果。
-   */
-  private getActiveEffects(player: IPlayer, state: IGameState): IEffect[] {
-    const effects: IEffect[] = []
-    for (const hero of player.heroes) {
-      for (const effectId of hero.effectIds) {
-        // 从游戏状态中查找效果定义
-        // 由于 IEffect 可能在 EffectRegistry 中，此处简化处理
-        // 实际集成时通过 EffectRegistry 获取
-      }
-    }
-    return effects
-  }
-
-  /**
    * 降级——无策略时的随机出牌。
    */
   private fallbackCardPlay(options: CardPlayOption[]): CardPlayResult | null {
     if (options.length === 0) return null
-    const idx = Math.floor(Math.random() * options.length)
-    const option = options[idx]!
+    const option = options[this.randomService.nextInt(0, options.length - 1)]!
     return { card: option.card, targets: option.validTargets.slice(0, 1) }
   }
 }
@@ -560,7 +573,7 @@ export class AIController implements IUIDecisionService {
 export function createAIControllerForAllPlayers(
   playerIds: PlayerId[],
   difficulty: AIDifficulty = AIDifficulty.Normal,
-  getStateFn: () => IGameState,
+  getStateFn: () => GameStateSnapshot,
 ): AIController {
   const controller = new AIController({ defaultDifficulty: difficulty })
   controller.setStateAccessor(getStateFn)
@@ -579,7 +592,7 @@ export function createAIControllerForAllPlayers(
 export function createAIControllerForPlayers(
   aiPlayerIds: PlayerId[],
   difficulty: AIDifficulty = AIDifficulty.Normal,
-  getStateFn: () => IGameState,
+  getStateFn: () => GameStateSnapshot,
 ): AIController {
   const controller = new AIController({ defaultDifficulty: difficulty })
   controller.setStateAccessor(getStateFn)

@@ -2,4 +2,3 @@
 
 export * from './constants'
 export * from './phases'
-export * from './triggers'

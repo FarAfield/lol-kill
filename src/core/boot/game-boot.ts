@@ -38,7 +38,7 @@ import { GameEngine } from '@core/engine/game-engine'
 import type { GameEngineOptions } from '@core/engine/game-engine'
 import { StoreService } from '@core/services/store-service'
 import type { IGameConfig, IGameResult } from '@core/contracts/game.interface'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type {
   IStoreService,
@@ -47,42 +47,13 @@ import type {
   IUIDecisionService,
 } from '@core/contracts/services.interface'
 import { RoleType, LogLevel, GamePhase } from '@core/contracts/enums'
+import { SeededRandomService, randomSeed } from '@core/services/seeded-random'
 
 // ── 标准模式配置 ──
 import { standard5pConfig } from '@source/modes/standard-5p'
 import { standard8pConfig } from '@source/modes/standard-8p'
 
 // ── 默认服务实现 ──
-
-/**
- * 默认随机服务（使用 Math.random）。
- */
-class DefaultRandomService implements IRandomService {
-  shuffle<T>(array: T[]): T[] {
-    const result = [...array]
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[result[i], result[j]] = [result[j]!, result[i]!]
-    }
-    return result
-  }
-
-  nextInt(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min
-  }
-
-  pick<T>(array: T[]): T {
-    return array[this.nextInt(0, array.length - 1)]!
-  }
-
-  pickN<T>(array: T[], n: number): T[] {
-    return this.shuffle([...array]).slice(0, n)
-  }
-
-  uuid(): string {
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-  }
-}
 
 /**
  * 默认控制台日志服务。
@@ -92,7 +63,7 @@ class DefaultLoggerService implements ILoggerService {
 
   log(message: string, level: LogLevel): void {
     this.logs.push({ message, level, timestamp: Date.now() })
-    const prefix = `[GameBoot][${LogLevel[level]}]`
+    const prefix = `[GameBoot][${level}]`
     switch (level) {
       case LogLevel.Error:
         console.error(prefix, message)
@@ -128,8 +99,15 @@ class DefaultLoggerService implements ILoggerService {
  * 允许在启动时注入自定义服务实现。
  */
 export interface GameBootOptions {
-  /** 随机服务（洗牌等），不提供则使用 Math.random */
+  /** 随机服务（洗牌等），不提供则按 `seed`（或缺省的新种子）建一个确定性随机源 */
   randomService?: IRandomService
+  /**
+   * 随机种子 —— 同一种子必然产出同一局
+   *
+   * 不传则现场摇一颗（每局不同）；传了则完全可复现，
+   * 回放、复盘、回归测试都靠它。
+   */
+  seed?: number | string
   /** 日志服务，不提供则使用 console */
   loggerService?: ILoggerService
   /** 存储服务（同步到 UI），不提供则使用内存储存 */
@@ -194,7 +172,9 @@ export class GameBoot {
     this.options = options ?? {}
 
     // 初始化服务
-    this.randomService = options?.randomService ?? new DefaultRandomService()
+    this.randomService =
+      options?.randomService ??
+      new SeededRandomService(options?.seed ?? randomSeed())
     this.loggerService = options?.loggerService ?? new DefaultLoggerService()
     this.storeService = options?.storeService ?? new StoreService()
     this.decisionService = options?.decisionService
@@ -274,7 +254,14 @@ export class GameBoot {
     }
     this.engine = new GameEngine(engineOptions)
 
-    // 3. 初始化引擎
+    // 3. 把额度查询递给决策服务
+    //
+    // 「这张牌还能出几次」必须引擎、AI、UI 同答一个数。AI 在引擎
+    // **之前**就建好了（它要先被当成决策服务传进来），所以只能事后补上。
+    // 少了这一步，AI 会退回「无 Mod 知识」的老路——装了连弩也不肯出第二刀。
+    this.decisionService?.setCardBudget?.(this.engine.cardBudget)
+
+    // 4. 初始化引擎
     await this.engine.init(this.config)
 
     this.loggerService.info(
@@ -308,7 +295,7 @@ export class GameBoot {
     await this.engine.start()
 
     this.loggerService.info(
-      `GameBoot.start() — 游戏已启动，当前阶段: ${GamePhase[this.engine.state.currentPhase]}`,
+      `GameBoot.start() — 游戏已启动，当前阶段: ${this.engine.state.currentPhase}`,
     )
   }
 
@@ -371,7 +358,7 @@ export class GameBoot {
   /**
    * 获取当前游戏状态快照。
    */
-  getState(): Readonly<IGameState> | null {
+  getState(): Readonly<GameStateSnapshot> | null {
     return this.engine?.getState() ?? null
   }
 
@@ -451,9 +438,8 @@ export class GameBoot {
     }
 
     // 卡牌数量检查
-    const totalCardsInDeck = config.cards.reduce((sum, def) => sum + 1, 0)
     const minCards = config.playerCount * (config.initialHandSize + 5) // 初始手牌 + 缓冲
-    if (config.cards.length > 0 && totalCardsInDeck < minCards) {
+    if (config.cards.length > 0 && config.cards.length < minCards) {
       this.loggerService.warn(
         `[GameBoot] 卡牌种类较少 (${config.cards.length} 种)，` +
         `建议至少 ${minCards} 张卡牌以确保游戏可进行`,

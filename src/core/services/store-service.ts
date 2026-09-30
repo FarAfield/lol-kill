@@ -11,7 +11,7 @@
 // ============================================================
 
 import type { IStoreService } from '@core/contracts/services.interface'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 
 /**
@@ -21,9 +21,9 @@ import type { IPlayer } from '@core/contracts/player.interface'
  * 将最新的游戏状态推送到 Pinia Store 供 UI 组件消费。
  */
 export class StoreService implements IStoreService {
-  private gameState: Readonly<IGameState> | null = null
+  private gameState: Readonly<GameStateSnapshot> | null = null
   private playerStates: Map<string, Readonly<IPlayer>> = new Map()
-  private onChangeCallbacks: Array<(state: Readonly<IGameState>) => void> = []
+  private onChangeCallbacks: Array<(state: Readonly<GameStateSnapshot>) => void> = []
 
   /**
    * 同步完整游戏状态。
@@ -36,7 +36,7 @@ export class StoreService implements IStoreService {
    *
    * @param state 游戏状态快照
    */
-  syncGameState(state: IGameState): void {
+  syncGameState(state: GameStateSnapshot): void {
     // 浅拷贝确保 UI 侧拿到的是稳定快照
     this.gameState = Object.freeze({
       ...state,
@@ -64,7 +64,7 @@ export class StoreService implements IStoreService {
   /**
    * 获取当前游戏状态（只读）。
    */
-  getGameState(): Readonly<IGameState> {
+  getGameState(): Readonly<GameStateSnapshot> {
     if (!this.gameState) {
       throw new Error('[StoreService] 游戏状态尚未初始化，请先调用 syncGameState()')
     }
@@ -74,7 +74,7 @@ export class StoreService implements IStoreService {
   /**
    * 安全获取游戏状态（不抛异常）。
    */
-  getGameStateSafe(): Readonly<IGameState> | null {
+  getGameStateSafe(): Readonly<GameStateSnapshot> | null {
     return this.gameState
   }
 
@@ -90,14 +90,15 @@ export class StoreService implements IStoreService {
    *
    * Pinia Store 可以注册此回调以自动更新响应式状态。
    */
-  onChange(callback: (state: Readonly<IGameState>) => void): void {
+  onChange(callback: (state: Readonly<GameStateSnapshot>) => void): () => void {
     this.onChangeCallbacks.push(callback)
+    return () => this.offChange(callback)
   }
 
   /**
    * 取消注册状态变更回调。
    */
-  offChange(callback: (state: Readonly<IGameState>) => void): void {
+  offChange(callback: (state: Readonly<GameStateSnapshot>) => void): void {
     this.onChangeCallbacks = this.onChangeCallbacks.filter((cb) => cb !== callback)
   }
 

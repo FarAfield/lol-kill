@@ -107,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { NTag, NText } from 'naive-ui'
 import { SkillType } from '@core/contracts/enums'
 import type { SkillUIInfo } from '@/hooks/useSkill'

@@ -7,11 +7,11 @@
  *
  * @example
  * const gen = new IdGenerator()
- * gen.next('tao')      // "tao_1"
- * gen.next('tao')      // "tao_2"
+ * gen.next('card')     // "card_1"
+ * gen.next('card')     // "card_2"
  * gen.next('evt')      // "evt_1"
  * gen.reset()          // 计数器归零
- * gen.next('tao')      // "tao_1"（重置后重复）
+ * gen.next('card')     // "card_1"（重置后重复）
  */
 export class IdGenerator {
   private _counters = new Map<string, number>()

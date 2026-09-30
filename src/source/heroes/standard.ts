@@ -7,7 +7,8 @@
 //   Ionia  / 吴 (3): 孙权、吕蒙、黄月英
 //
 // 实际使用三国杀武将名称作为 ID 和数据基础。
-// 技能实现位于 Phase 8。
+// 技能本体在 `@source/heroes/skills/*`（按势力分文件），
+// 由 `collectEffects()` 汇总后交给引擎注册。
 // ============================================================
 
 import { Kingdom } from '@core/contracts/enums'

@@ -81,55 +81,14 @@ export enum GamePhase {
 }
 
 /**
- * 触发时机（纯事件类型，不含 Before/After）
- *
- * Before/After 由流水线阶段（EventStatus）表达：
- * - 技能监听 { timing: Damage, stage: 'Before' } → 在 Damage 事件的 BEFORE 阶段触发
- * - 技能监听 { timing: Damage, stage: 'After' }  → 在 Damage 事件的 AFTER 阶段触发
- *
- * 这避免了 "damageBefore 本身能否再有 before" 的语义混淆。
- */
-export enum TriggerTiming {
-  // ── 全局 ──
-  GameStart = 'gameStart',
-  RoundStart = 'roundStart',
-  TurnStart = 'turnStart',
-
-  // ── 回合内阶段 ──
-  PhasePre = 'phasePre',
-  PhaseJudge = 'phaseJudge',
-  PhaseDraw = 'phaseDraw',
-  PhaseUse = 'phaseUse',
-  PhaseDiscard = 'phaseDiscard',
-  PhasePost = 'phasePost',
-
-  // ── 回合 / 轮次 / 游戏结束 ──
-  TurnEnd = 'turnEnd',
-  RoundEnd = 'roundEnd',
-  GameOver = 'gameOver',
-
-  // ── 卡牌 ──
-  CardUse = 'cardUse',
-  CardTarget = 'cardTarget',
-  CardEffect = 'cardEffect',
-
-  // ── 伤害 ──
-  Damage = 'damage',
-  Damaged = 'damaged',
-
-  // ── 判定 ──
-  Judge = 'judge',
-
-  // ── 死亡 ──
-  PlayerDying = 'playerDying',
-  PlayerDeath = 'playerDeath',
-}
-
-/**
  * 触发阶段（相对于事件流水线的位置）
  *
  * TriggerStage 是 EventStatus 中「可以作为技能触发点」的子集。
- * 每个 TriggerStage 直接映射到同名 EventStatus 枚举值。
+ * 每个 TriggerStage 直接映射到同名 EventStatus 枚举值，
+ * 并通过 `contracts/event-name.ts` 的 STAGE_SUFFIX 映射为事件名后缀。
+ *
+ * 事件主体（damage / useCard / phaseUse ...）见 `contracts/event-name.ts`，
+ * 事件名 = 主体 + 阶段后缀。不再使用枚举表达时机 —— 时机是可扩展的字符串。
  *
  * 不可作为触发点的 EventStatus：
  * - Waiting / SkipCheck / Cancelled / Prevented / Completed

@@ -4,7 +4,7 @@
     <div class="judge-cards">
       <div
         v-for="card in judgeCards"
-        :key="card.id"
+        :key="card.instanceId"
         class="judge-card-wrapper"
       >
         <CardFace :card="card" size="small" />

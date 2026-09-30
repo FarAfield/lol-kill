@@ -43,16 +43,16 @@
         <div v-else class="cards-grid">
           <div
             v-for="card in validCards"
-            :key="card.id"
+            :key="card.instanceId"
             class="response-card-wrapper"
             :class="{
-              selected: selectedCardId === card.id,
+              selected: selectedCardId === card.instanceId,
               disabled: isDisabled,
             }"
-            @click="handleSelectCard(card.id)"
+            @click="handleSelectCard(card.instanceId)"
           >
-            <CardFace :card="card" :selected="selectedCardId === card.id" />
-            <div class="card-check" v-if="selectedCardId === card.id">
+            <CardFace :card="card" :selected="selectedCardId === card.instanceId" />
+            <div class="card-check" v-if="selectedCardId === card.instanceId">
               <n-icon size="20" color="#18a058">
                 <svg viewBox="0 0 24 24">
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor" />
@@ -132,7 +132,7 @@ const promptIcon = computed(() => {
 /** 确认按钮标签 */
 const confirmLabel = computed(() => {
   if (!props.selectedCardId) return '不出'
-  const card = props.validCards.find((c) => c.id === props.selectedCardId)
+  const card = props.validCards.find((c) => c.instanceId === props.selectedCardId)
   if (!card) return '确认'
   return `打出 ${card.name}`
 })

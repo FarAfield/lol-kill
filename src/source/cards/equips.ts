@@ -3,7 +3,7 @@
 //
 // 首批装备牌：
 //   武器：诸葛连弩、青釭剑、雌雄双股剑、丈八蛇矛、贯石斧
-//   防具：八卦阵、仁王盾
+//   防具：八卦阵、仁王盾、藤甲
 //   马：  +1马（防御马）、-1马（进攻马）
 //
 // 每张定义描述卡牌的类型模板。实际牌堆中的花色/点数分布
@@ -12,6 +12,7 @@
 
 import { CardType, CardSuit, EquipSlot } from '@core/contracts/enums'
 import type { CardDefinition } from '@core/entity/card'
+import { CardTag } from '@core/contracts/card-tag'
 
 // ── 武器牌 ──
 
@@ -25,7 +26,7 @@ export const ZhuGeLianNu: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '攻击范围1。出牌阶段可以出任意张杀',
-  tags: ['zhuGeLianNu', 'equip', 'weapon'],
+  tags: [CardTag.RepeatingCrossbow, CardTag.Equip, CardTag.Weapon],
   effectIds: ['zhuGeLianNu'],
   equipSlot: EquipSlot.Weapon,
   attackRange: 1,
@@ -43,7 +44,7 @@ export const QingGangJian: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '攻击范围2。使用杀时无视目标防具效果',
-  tags: ['qingGangJian', 'equip', 'weapon'],
+  tags: [CardTag.BlueSteelBlade, CardTag.Equip, CardTag.Weapon],
   effectIds: ['qingGangJian'],
   equipSlot: EquipSlot.Weapon,
   attackRange: 2,
@@ -61,7 +62,7 @@ export const CiXiongShuangGuJian: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '攻击范围2。对异性出杀时，目标需弃一张牌，否则你摸一张牌',
-  tags: ['ciXiongShuangGuJian', 'equip', 'weapon'],
+  tags: [CardTag.TwinBlades, CardTag.Equip, CardTag.Weapon],
   effectIds: ['ciXiongShuangGuJian'],
   equipSlot: EquipSlot.Weapon,
   attackRange: 2,
@@ -79,7 +80,7 @@ export const ZhangBaSheMao: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '攻击范围3。可将2张手牌当杀使用',
-  tags: ['zhangBaSheMao', 'equip', 'weapon'],
+  tags: [CardTag.SerpentSpear, CardTag.Equip, CardTag.Weapon],
   effectIds: ['zhangBaSheMao'],
   equipSlot: EquipSlot.Weapon,
   attackRange: 3,
@@ -97,7 +98,7 @@ export const GuanShiFu: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '攻击范围3。杀被闪抵消后可弃2张牌，强制造成伤害',
-  tags: ['guanShiFu', 'equip', 'weapon'],
+  tags: [CardTag.StoneAxe, CardTag.Equip, CardTag.Weapon],
   effectIds: ['guanShiFu'],
   equipSlot: EquipSlot.Weapon,
   attackRange: 3,
@@ -117,7 +118,7 @@ export const BaGuaZhen: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '需要出闪时可判定，若结果为红色则视为打出了闪',
-  tags: ['baGuaZhen', 'equip', 'armor'],
+  tags: [CardTag.EightTrigrams, CardTag.Equip, CardTag.Armor],
   effectIds: ['baGuaZhen'],
   equipSlot: EquipSlot.Armor,
   isDelayed: false,
@@ -134,8 +135,28 @@ export const RenWangDun: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '黑色杀对你无效',
-  tags: ['renWangDun', 'equip', 'armor'],
+  tags: [CardTag.BenevolentShield, CardTag.Equip, CardTag.Armor],
   effectIds: ['renWangDun'],
+  equipSlot: EquipSlot.Armor,
+  isDelayed: false,
+  canBeCanceled: false,
+}
+
+/**
+ * 藤甲 — 防具，受到的火焰伤害 +1。
+ *
+ * 它的效果由 `mods/equip-mods.ts` 的 `rattanArmorMod` 提供（数值 → Mod），
+ * 因此本定义不需要任何 effectIds。
+ */
+export const TengJia: CardDefinition = {
+  id: 'tengJia',
+  name: '藤甲',
+  type: CardType.Equip,
+  suit: CardSuit.None,
+  rank: 1,
+  description: '防具。你受到的火焰伤害+1',
+  tags: [CardTag.RattanArmor, CardTag.Equip, CardTag.Armor],
+  effectIds: [],
   equipSlot: EquipSlot.Armor,
   isDelayed: false,
   canBeCanceled: false,
@@ -153,7 +174,7 @@ export const PlusOneHorse: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '其他角色计算与你的距离时+1',
-  tags: ['plusOneHorse', 'equip', 'defensiveHorse'],
+  tags: [CardTag.DefensiveHorse, CardTag.Equip],
   effectIds: ['defensiveHorse'],
   equipSlot: EquipSlot.DefensiveHorse,
   isDelayed: false,
@@ -170,7 +191,7 @@ export const MinusOneHorse: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '你计算与其他角色的距离时-1',
-  tags: ['minusOneHorse', 'equip', 'offensiveHorse'],
+  tags: [CardTag.OffensiveHorse, CardTag.Equip],
   effectIds: ['offensiveHorse'],
   equipSlot: EquipSlot.OffensiveHorse,
   isDelayed: false,
@@ -193,7 +214,7 @@ export const weaponCards: CardDefinition[] = [
 /**
  * 全部防具牌定义
  */
-export const armorCards: CardDefinition[] = [BaGuaZhen, RenWangDun]
+export const armorCards: CardDefinition[] = [BaGuaZhen, RenWangDun, TengJia]
 
 /**
  * 全部坐骑牌定义

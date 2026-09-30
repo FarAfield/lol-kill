@@ -13,7 +13,6 @@ import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
 import type { GameController } from '@/services/game-controller'
 import { SkillType } from '@core/contracts/enums'
-import type { IEffect } from '@core/contracts/effect.interface'
 
 /** 技能的 UI 展示信息 */
 export interface SkillUIInfo {
@@ -118,23 +117,6 @@ export function useSkill(
     timestamp: number
   } | null>(null)
 
-  /** 当前玩家可用的效果 ID 列表 */
-  const usableEffectIds = computed(() => {
-    const ctrl = controllerGetter()
-    if (!ctrl) return []
-    return ctrl.getAvailableActions().usableEffects
-  })
-
-  /** 当前玩家的英雄列表 */
-  const currentHeroEffects = computed<IEffect[]>(() => {
-    const ctrl = controllerGetter()
-    if (!ctrl) return []
-    // 通过 GameController 的 getCurrentPlayer 获取英雄的效果 ID
-    // 然后从 EffectRegistry 查找（如果有权限访问的话）
-    // 这里返回占位 — 实际效果数据应在 engine 层暴露
-    return []
-  })
-
   /** 可用技能列表（从 GameController.getAvailableActions 获取） */
   const availableSkills = computed<SkillUIInfo[]>(() => {
     const ctrl = controllerGetter()
@@ -153,27 +135,22 @@ export function useSkill(
 
     const usable = new Set(ctrl.getAvailableActions().usableEffects)
 
-    // 构建技能信息 — 实际技能详情应从 EffectRegistry 获取
-    // 当前阶段使用简化的映射
-    return Array.from(allEffectIds).map((id) => {
-      const effect = findEffectById(id, player)
-      return {
-        id,
-        name: effect?.name ?? id,
-        description: effect?.description ?? '',
-        type: effect?.type ?? SkillType.Passive,
-        usable: usable.has(id),
-        // usedThisTurn/usedThisRound 在 CompiledHandler 上维护，
-        // UI 层暂从 handler 获取，这里用 false 兜底
-        usedThisTurn: false,
-        usedThisRound: false,
-        priority: effect?.priority ?? 0,
-        // 可用性由 isAvailable(ctx) 运行时判断，不再有简单的 boolean 字段
-        enabled: true,
-        typeLabel: SKILL_TYPE_LABELS[effect?.type ?? SkillType.Passive],
-        typeColor: SKILL_TYPE_COLORS[effect?.type ?? SkillType.Passive],
-      }
-    })
+    // 技能详情（名称 / 描述 / 类型）在 Phase 13 接入 SkillRegistry 后补齐，
+    // 当前以 id 作为展示名。
+    return Array.from(allEffectIds, (id) => ({
+      id,
+      name: id,
+      description: '',
+      type: SkillType.Passive,
+      usable: usable.has(id),
+      // usedThisTurn / usedThisRound 由 CompiledHandler 维护，Phase 15 接入后补齐
+      usedThisTurn: false,
+      usedThisRound: false,
+      priority: 0,
+      enabled: true,
+      typeLabel: SKILL_TYPE_LABELS[SkillType.Passive],
+      typeColor: SKILL_TYPE_COLORS[SkillType.Passive],
+    }))
   })
 
   /** 主动技列表 */
@@ -196,30 +173,6 @@ export function useSkill(
   )
 
   // ── 方法 ──
-
-  /**
-   * 在 player 的 heroes 数据中查找效果信息。
-   * 当前为简化实现 — Phase 15 中将从全局 EffectRegistry 获取。
-   */
-  function findEffectById(
-    effectId: string,
-    player: ReturnType<typeof controllerGetter> extends GameController | null
-      ? NonNullable<ReturnType<GameController['getCurrentPlayer']>>
-      : never,
-  ): IEffect | null {
-    // 尝试从 hero 数据中查找
-    for (const hero of player.heroes) {
-      // IHero 可能有内部效果数据引用
-      const heroAny = hero as Record<string, unknown>
-      if (Array.isArray(heroAny._effects)) {
-        const found = (heroAny._effects as IEffect[]).find(
-          (e: IEffect) => e.id === effectId,
-        )
-        if (found) return found
-      }
-    }
-    return null
-  }
 
   /** 发动主动技能 */
   async function activateSkill(

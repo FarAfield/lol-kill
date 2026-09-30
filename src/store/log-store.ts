@@ -13,7 +13,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { LogLevel } from '@core/contracts/enums'
-import type { LogEntry } from '@core/contracts/types'
+import type { LogEntry, UILogEntry } from '@core/contracts/types'
 
 /**
  * 日志颜色类别（用于 UI 渲染彩色日志）。
@@ -29,10 +29,19 @@ export type LogColorCategory =
   | 'error'     // 错误 → 橙红
 
 /** 带颜色分类的日志条目 */
-export interface ColoredLogEntry extends LogEntry {
+export interface ColoredLogEntry extends UILogEntry {
   /** 颜色类别 */
   colorCategory: LogColorCategory
 }
+
+/**
+ * 视图层自建日志的输入形态
+ *
+ * 引擎写出来的日志带 `tick`（本局第几步）；视图自己写的那些——
+ * 「正在初始化游戏」「连接已断开」——不在任何一局内部，
+ * 压根谈不上第几步，因此允许不带。缺省 0 就是字面意思「不属于任何一步」。
+ */
+export type ViewLogInput = Omit<LogEntry, 'tick'> & { tick?: number }
 
 // ── 颜色类别映射 ──
 const COLOR_CATEGORIES: Record<LogColorCategory, string> = {
@@ -102,13 +111,13 @@ const MAX_LOG_ENTRIES = 500
  *
  * 用法：
  *   const logStore = useLogStore()
- *   logStore.addLog({ id, timestamp, round, phase, message, level: LogLevel.Info })
+ *   logStore.addLog({ id, tick, round, phase, message, level: LogLevel.Info })
  *   console.log(logStore.coloredEntries)  // 彩色日志列表
  */
 export const useLogStore = defineStore('log', () => {
   // ── 状态 ──
-  /** 原始日志条目 */
-  const entries = ref<LogEntry[]>([])
+  /** 原始日志条目（含呈现层补的墙钟） */
+  const entries = ref<UILogEntry[]>([])
 
   /** 带颜色分类的日志条目 */
   const coloredEntries = computed<ColoredLogEntry[]>(() => {
@@ -141,10 +150,15 @@ export const useLogStore = defineStore('log', () => {
   /**
    * 添加一条日志。
    *
-   * 由 GameController / StoreService 在事件发生时调用。
+   * 由 GameController / StoreService / 视图在事件发生时调用。
+   *
+   * **墙钟由这里补，不由调用方传**。来自引擎的那份 `LogEntry` 只带
+   * `tick`（本局第几步），「现在几点几分」是呈现层自己的事——
+   * 它在这一刻才发生，也就该在这一刻被记下。
    */
-  function addLog(entry: LogEntry): void {
-    entries.value = [...entries.value, entry]
+  function addLog(entry: ViewLogInput): void {
+    const presented: UILogEntry = { tick: 0, ...entry, timestamp: Date.now() }
+    entries.value = [...entries.value, presented]
 
     // 超出上限时裁剪旧日志
     if (entries.value.length > MAX_LOG_ENTRIES) {
@@ -155,9 +169,13 @@ export const useLogStore = defineStore('log', () => {
   /**
    * 批量添加日志。
    */
-  function addLogs(newEntries: LogEntry[]): void {
+  function addLogs(newEntries: ViewLogInput[]): void {
     if (newEntries.length === 0) return
-    entries.value = [...entries.value, ...newEntries]
+    const now = Date.now()
+    entries.value = [
+      ...entries.value,
+      ...newEntries.map((entry) => ({ tick: 0, ...entry, timestamp: now }) as UILogEntry),
+    ]
     if (entries.value.length > MAX_LOG_ENTRIES) {
       entries.value = entries.value.slice(-MAX_LOG_ENTRIES)
     }

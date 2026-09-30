@@ -10,6 +10,7 @@
 
 import { CardType, CardSuit } from '@core/contracts/enums'
 import type { CardDefinition } from '@core/entity/card'
+import { CardTag } from '@core/contracts/card-tag'
 
 /**
  * 杀 — 对一名角色造成1点伤害。
@@ -26,7 +27,7 @@ export const Sha: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '对一名攻击范围内的角色造成1点伤害',
-  tags: ['sha', 'attack', 'basic'],
+  tags: [CardTag.Strike, CardTag.Attack, CardTag.Basic],
   effectIds: ['sha'],
   isDelayed: false,
   canBeCanceled: false,
@@ -46,7 +47,7 @@ export const Shan: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '抵消一张杀或万箭齐发的效果',
-  tags: ['shan', 'defense', 'basic', 'response'],
+  tags: [CardTag.Dodge, CardTag.Defense, CardTag.Basic, CardTag.Response],
   effectIds: ['shan'],
   isDelayed: false,
   canBeCanceled: false,
@@ -66,7 +67,7 @@ export const Tao: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '回复1点体力；可在濒死时使用',
-  tags: ['tao', 'heal', 'basic', 'dying'],
+  tags: [CardTag.Heal, CardTag.Basic, CardTag.Dying],
   effectIds: ['tao'],
   isDelayed: false,
   canBeCanceled: false,
@@ -87,7 +88,7 @@ export const Jiu: CardDefinition = {
   suit: CardSuit.None,
   rank: 1,
   description: '出牌阶段：本回合下一张杀伤害+1；濒死时：回复1点体力',
-  tags: ['jiu', 'boost', 'basic', 'dying'],
+  tags: [CardTag.Wine, CardTag.Boost, CardTag.Basic, CardTag.Dying],
   effectIds: ['jiu'],
   isDelayed: false,
   canBeCanceled: false,

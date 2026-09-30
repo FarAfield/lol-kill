@@ -50,6 +50,7 @@ import { computed } from 'vue'
 import { NTag } from 'naive-ui'
 import { CardSuit, CardType, EquipSlot } from '@core/contracts/enums'
 import type { ICard } from '@core/contracts/card.interface'
+import { CardTag } from '@core/contracts/card-tag'
 
 const props = defineProps<{
   card: ICard
@@ -101,10 +102,10 @@ const typeIcon = computed(() => {
   switch (props.card.type) {
     case CardType.Basic:
       // 根据 tag 细分
-      if (props.card.tags.has('sha')) return '⚔️'
-      if (props.card.tags.has('shan')) return '🛡️'
-      if (props.card.tags.has('tao')) return '🍑'
-      if (props.card.tags.has('jiu')) return '🍺'
+      if (props.card.tags.has(CardTag.Strike)) return '⚔️'
+      if (props.card.tags.has(CardTag.Dodge)) return '🛡️'
+      if (props.card.tags.has(CardTag.Heal)) return '🍑'
+      if (props.card.tags.has(CardTag.Wine)) return '🍺'
       return '📜'
     case CardType.Rune:
       return '✨'

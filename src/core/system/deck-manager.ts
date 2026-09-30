@@ -12,20 +12,10 @@
 
 import { ZoneType } from '@core/contracts/enums'
 import type { ICard, CardDefinition } from '@core/contracts/card.interface'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import type { IRandomService } from '@core/contracts/services.interface'
 import { Card } from '@core/entity/card'
 import { STANDARD_DECK_COMPOSITION } from '@source/base/constants'
-
-// ── 简易 Fisher-Yates 洗牌（不依赖 IRandomService 时使用） ──
-function fisherYatesShuffle<T>(array: T[]): T[] {
-  const result = [...array]
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[result[i], result[j]] = [result[j]!, result[i]!]
-  }
-  return result
-}
 
 /**
  * 牌堆管理器
@@ -34,17 +24,24 @@ function fisherYatesShuffle<T>(array: T[]): T[] {
  * 所有抽牌和弃牌操作通过此管理器执行，确保区域一致性。
  */
 export class DeckManager {
-  private random: IRandomService | null
+  /**
+   * 洗牌的随机源——**必填**
+   *
+   * 以前「不传就退回 Math.random」的分支被删掉了：那是一条
+   * 「悄悄引入不确定性」的后门，牌堆顺序一旦不可复现，
+   * 回放与批量回归测试就都失去意义。
+   */
+  private random: IRandomService
 
   /**
    * @param gameState 游戏全局状态
-   * @param random    随机服务（可选，不提供则使用 Math.random）
+   * @param random    随机服务（必填）
    */
   constructor(
-    private gameState: IGameState,
-    random?: IRandomService,
+    private gameState: GameStateSnapshot,
+    random: IRandomService,
   ) {
-    this.random = random ?? null
+    this.random = random
   }
 
   // ── 初始化 ──
@@ -61,7 +58,8 @@ export class DeckManager {
     const deck: ICard[] = []
 
     for (const def of cardDefs) {
-      const count = STANDARD_DECK_COMPOSITION[def.name] ?? 1
+      // 配比表以卡牌 id 为键（与 source/cards/* 的 def.id 一致）
+      const count = STANDARD_DECK_COMPOSITION[def.id] ?? 1
       for (let i = 0; i < count; i++) {
         const card = Card.create(def)
         card.zone = ZoneType.Deck
@@ -100,29 +98,16 @@ export class DeckManager {
 
   // ── 洗牌 ──
 
-  /**
-   * 洗牌——对牌堆执行随机排序。
-   *
-   * 若提供了 IRandomService，则使用其 shuffle 方法；
-   * 否则使用内置 Fisher-Yates。
-   */
+  /** 洗牌——对牌堆执行随机排序。 */
   shuffle(): void {
-    if (this.random) {
-      this.gameState.deck = this.random.shuffle(this.gameState.deck)
-    } else {
-      this.gameState.deck = fisherYatesShuffle(this.gameState.deck)
-    }
+    this.gameState.deck = this.random.shuffle(this.gameState.deck)
   }
 
   /**
    * 对弃牌堆洗牌（在回收前使用）。
    */
   private shuffleDiscardPile(): void {
-    if (this.random) {
-      this.gameState.discardPile = this.random.shuffle(this.gameState.discardPile)
-    } else {
-      this.gameState.discardPile = fisherYatesShuffle(this.gameState.discardPile)
-    }
+    this.gameState.discardPile = this.random.shuffle(this.gameState.discardPile)
   }
 
   // ── 抽牌 ──
@@ -132,6 +117,16 @@ export class DeckManager {
    *
    * 若牌堆不足，自动回收弃牌堆（洗牌后移入牌堆）继续抽牌。
    * 若回收后仍不足，则返回实际能抽到的数量。
+   *
+   * **交接契约**：本方法只把牌从牌堆里摘出来（并标上 `zone = Hand` 这个
+   * 「下一步该进手牌」的标记），**不负责**把它交到谁手里——`owner`、
+   * 可见性、手牌数组都还没动。调用方必须紧接着过一次
+   * `CardSystem.obtainCards()`，那才是完整的状态变更。
+   *
+   * 这个两步式是刻意的：摸牌数与「摸给谁」在引擎里由不同层决定，
+   * 合进一处就得让牌堆知道玩家。但它是个陷阱——漏掉第二步不会报错，
+   * 牌只是从此消失。因此三个调用点（发初始手牌 / 摸牌阶段 / 技能摸牌）
+   * 都紧挨着写，任何一个都不许隔着重入点。
    *
    * @param count  期望抽牌数量
    * @returns      实际抽到的卡牌数组
@@ -185,28 +180,18 @@ export class DeckManager {
   }
 
   // ── 弃牌 ──
-
-  /**
-   * 将卡牌放入弃牌堆。
-   *
-   * 自动更新每张卡牌的 zone 为 Discard。
-   *
-   * @param cards 要弃置的卡牌
-   */
-  discard(cards: ICard[]): void {
-    for (const card of cards) {
-      card.zone = ZoneType.Discard
-    }
-    this.gameState.discardPile.push(...cards)
-  }
-
-  /**
-   * 将单张卡牌放入弃牌堆。
-   */
-  discardOne(card: ICard): void {
-    card.zone = ZoneType.Discard
-    this.gameState.discardPile.push(card)
-  }
+  //
+  // 这里**没有** `discard()` / `discardOne()`。
+  //
+  // 它们原本只做两件事：把 `card.zone` 改成 Discard、push 进 `discardPile`。
+  // 少了另外两件同样必须做的事——把牌从原持有者的 `handCards` 里摘掉、
+  // 把 `owner` 清空。于是「弃一张手牌」之后，那张牌同时存在于
+  // 弃牌堆和某人手牌里，且还记着旧主人：等弃牌堆被回收洗回牌堆，
+  // 它会带着 `owner` 被摸给下一个玩家。
+  //
+  // Phase 19 把它们删了：弃牌一律走 `CardSystem.discardCard`，
+  // 那里一次性改完 zone / 区域数组 / owner / 可见性。
+  // 本类只管牌堆与弃牌堆这两个**公共区域**的进出，不碰任何人手里的牌。
 
   // ── 回收 ──
 

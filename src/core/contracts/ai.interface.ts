@@ -7,8 +7,8 @@
 
 import type { IPlayer } from './player.interface'
 import type { ICard } from './card.interface'
-import type { IEffect } from './effect.interface'
-import type { IGameState } from './game.interface'
+import type { ISkill } from './skill.interface'
+import type { GameStateSnapshot } from './game.interface'
 
 /**
  * AI 卡牌选择结果 — 包含选中的卡牌及其目标
@@ -40,7 +40,7 @@ export interface IAIDecisionMaker {
    * @param state  当前游戏状态（只读视角）
    * @returns 选择的卡牌和目标，null 表示不出牌
    */
-  chooseCardToPlay(player: IPlayer, state: IGameState): AICardChoice | null
+  chooseCardToPlay(player: IPlayer, state: GameStateSnapshot): AICardChoice | null
 
   /**
    * 选择一个可用的主动技能发动。
@@ -52,9 +52,9 @@ export interface IAIDecisionMaker {
    */
   chooseEffectToUse(
     player: IPlayer,
-    availableEffects: IEffect[],
-    state: IGameState,
-  ): IEffect | null
+    availableEffects: ISkill[],
+    state: GameStateSnapshot,
+  ): ISkill | null
 
   /**
    * 选择指定数量的卡牌弃置。
@@ -64,7 +64,7 @@ export interface IAIDecisionMaker {
    * @param state  当前游戏状态
    * @returns 选中的卡牌列表（长度应等于 count）
    */
-  chooseCardsToDiscard(player: IPlayer, count: number, state: IGameState): ICard[]
+  chooseCardsToDiscard(player: IPlayer, count: number, state: GameStateSnapshot): ICard[]
 
   /**
    * 选择英雄。
@@ -79,7 +79,7 @@ export interface IAIDecisionMaker {
     player: IPlayer,
     candidates: { id: string; name: string; title: string; kingdom: string }[],
     selectCount: number,
-    state: IGameState,
+    state: GameStateSnapshot,
   ): string[]
 
   // ── 响应决策 ──
@@ -95,7 +95,7 @@ export interface IAIDecisionMaker {
   respondToDefend(
     player: IPlayer,
     validCards: ICard[],
-    state: IGameState,
+    state: GameStateSnapshot,
   ): ICard | null
 
   /**
@@ -111,7 +111,7 @@ export interface IAIDecisionMaker {
     player: IPlayer,
     dyingPlayer: IPlayer,
     validCards: ICard[],
-    state: IGameState,
+    state: GameStateSnapshot,
   ): ICard | null
 
   /**
@@ -124,9 +124,9 @@ export interface IAIDecisionMaker {
    */
   respondWithEffect(
     player: IPlayer,
-    availableEffects: IEffect[],
-    state: IGameState,
-  ): IEffect | null
+    availableEffects: ISkill[],
+    state: GameStateSnapshot,
+  ): ISkill | null
 
   /**
    * 选择技能的目标。
@@ -139,9 +139,9 @@ export interface IAIDecisionMaker {
    */
   chooseEffectTargets(
     player: IPlayer,
-    effect: IEffect,
+    effect: ISkill,
     candidates: IPlayer[],
-    state: IGameState,
+    state: GameStateSnapshot,
   ): IPlayer[]
 
   /**
@@ -155,9 +155,9 @@ export interface IAIDecisionMaker {
    */
   chooseEffectCards(
     player: IPlayer,
-    effect: IEffect,
+    effect: ISkill,
     candidates: ICard[],
-    state: IGameState,
+    state: GameStateSnapshot,
   ): ICard[]
 }
 

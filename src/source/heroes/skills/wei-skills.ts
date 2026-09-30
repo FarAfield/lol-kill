@@ -6,380 +6,282 @@
 //   司马懿 — 反馈 (被动) / 鬼才 (主动)
 //   夏侯惇 — 刚烈 (被动)
 //   张辽   — 突袭 (主动)
+//
+// Phase 13 起全部按 `ISkill` 契约书写：
+// - `type: SkillType.X` → 分类布尔位（`locked` / `limited` / `equipSkill` …）
+// - `frequency: Frequency.X` → 字符串频率
+// - 选项是必要时才写（`priority` / `frequency` 都有默认值）
 // ============================================================
 
-import {
-  SkillType,
-  TriggerTiming,
-  Frequency,
-  CardSuit,
-  ZoneType,
-  GamePhase,
-} from '@core/contracts/enums'
-import type { IEffect } from '@core/contracts/effect.interface'
+import { CardSuit, ZoneType } from '@core/contracts/enums'
+import type { ISkill, ISkillContext } from '@core/contracts/skill.interface'
 import type { ICard } from '@core/contracts/card.interface'
-import type { IPlayer } from '@core/contracts/player.interface'
+import { CardTag } from '@core/contracts/card-tag'
+
+/**
+ * 取伤害事件里那张「造成伤害的牌」
+ *
+ * 伤害事件可能把牌挂在 `data.damageCard`，也可能挂在关联伤害事件上；
+ * 两处都试一遍，比在调用方各写一遍 `as` 强转强。
+ */
+function damageCardOf(ctx: ISkillContext): ICard | undefined {
+  const own = ctx.event.data?.['damageCard'] as ICard | undefined
+  if (own) return own
+  return ctx.damageEvent?.data?.['damageCard'] as ICard | undefined
+}
+
+/** 这次伤害有没有被防掉（被闪掉的奸雄 / 反馈都不该发动） */
+function damagePrevented(ctx: ISkillContext): boolean {
+  return ctx.event.data?.['damagePrevented'] === true
+}
 
 // ═══════════════════════════════════════════
 // 曹操 · 奸雄
 // 当你受到伤害后，你获得造成此伤害的牌。
 // ═══════════════════════════════════════════
 
-export const jianxiongEffect: IEffect = {
+export const jianxiong: ISkill = {
   id: 'jianxiong',
   name: '奸雄',
   description: '当你受到伤害后，你获得造成此伤害的牌。',
-  type: SkillType.Passive,
-  priority: 10,
-  frequency: Frequency.Unlimited,
 
-  trigger: {
-    target: [{ timing: TriggerTiming.Damage, stage: 'After' }],
-  },
+  trigger: { target: ['damageAfter'] },
 
   filter: (ctx) => {
-    // 伤害来源不是自己（自己伤害自己不触发奸雄）
-    if (!ctx.event.source) return false
-    if (ctx.event.source.id === ctx.player.id) return false
-
-    // 必须有造成伤害的卡牌
-    const damageCard = ctx.damageEvent?.data?.['damageCard'] as ICard | undefined
-    if (!damageCard) {
-      // 也可能是存储在 event data 中
-      const card = ctx.event.data?.['damageCard'] as ICard | undefined
-      if (!card) return false
-    }
-
-    // 伤害必须已应用（未被阻止）
-    const prevented = ctx.event.data?.['damagePrevented'] as boolean | undefined
-    if (prevented) return false
-
-    return true
+    // 自己伤害自己不算「别人的伤害」
+    const source = ctx.event.source
+    if (!source || source.id === ctx.player.id) return false
+    // 被闪掉不发动：牌还是对方的那张，不是「打进来的」
+    if (damagePrevented(ctx)) return false
+    return damageCardOf(ctx) !== undefined
   },
 
   content: async (ctx) => {
-    const source = ctx.event.source!
-    const damageCard =
-      (ctx.event.data?.['damageCard'] as ICard | undefined) ??
-      (ctx.damageEvent?.data?.['damageCard'] as ICard | undefined)
+    const card = damageCardOf(ctx)
+    if (!card) return
 
-    if (!damageCard) return
-
-    // 获得造成伤害的牌（从任意区域移入手牌）
-    // 检查卡牌所在区域
-    if (damageCard.zone === ZoneType.Processing || damageCard.zone === ZoneType.Discard) {
-      // 从处理区或弃牌堆获得
-      await ctx.obtainCards(ctx.player, [damageCard])
-    } else if (damageCard.zone === ZoneType.Hand || damageCard.zone === ZoneType.Equip) {
-      // 从来源手牌/装备区获得（转移）
-      await ctx.transferCards([damageCard], ctx.player)
+    // 已在流动中的牌（处理区 / 弃牌堆）直接获得；
+    // 还在别人身上（如借刀杀人时从对方装备取得）则走转移。
+    if (card.zone === ZoneType.Processing || card.zone === ZoneType.Discard) {
+      await ctx.obtainCards(ctx.player, [card])
+    } else {
+      await ctx.transferCards([card], ctx.player)
     }
   },
 
+  ai: {
+    order: 3,
+    result: { player: (p) => (p.isWounded ? 3 : 1) },
+  },
 }
 
 // ═══════════════════════════════════════════
 // 曹操 · 护驾
-// 当你需要使用或打出一张闪时，你可以令一名
-// 魏（Demacia）势力角色打出一张闪（视为由你使用或打出）。
+// 主公技，当你需要使用或打出一张闪时，
+// 你可以令一名魏势力角色打出一张闪。
 // ═══════════════════════════════════════════
 
-export const hujiaEffect: IEffect = {
+export const hujia: ISkill = {
   id: 'hujia',
   name: '护驾',
-  description: '当你需要使用闪时，可令一名魏势力角色替你打出闪。',
-  type: SkillType.Active,
-  priority: 20,
-  frequency: Frequency.Unlimited,
+  description: '当你需要使用【闪】时，可令一名魏势力角色替你打出闪。',
 
-  trigger: {
-    // 当曹操成为杀的目标时（Prevent阶段），提供替代响应
-    target: [{ timing: TriggerTiming.CardUse, stage: 'Prevent' }],
-  },
+  priority: 20,
+  trigger: { target: ['useCardPrevent'] },
 
   filter: (ctx) => {
-    // 仅在触发牌为杀/需要闪响应时触发
-    const cards = ctx.triggerCards
-    if (cards.length === 0) return false
-    const card = cards[0]!
-    // 检查是否为需要闪响应的场景
-    const needsShan =
-      card.tags.has('sha') ||
-      card.tags.has('attack') ||
-      card.name === '万箭齐发'
-    return needsShan
+    const card = ctx.triggerCards[0]
+    if (!card) return false
+    // 只有需要闪的场合才有「求救」的意义
+    return card.tags.has(CardTag.Strike) || card.tags.has(CardTag.Attack)
   },
 
+  /**
+   * 护驾不自己出闪，而是把这个标记挂上——真正的替代响应由
+   * ResponseInquiry 读到标记后把魏势力角色加进被询问名单。
+   */
   content: async (ctx) => {
-    // 护驾的核心效果：标记当前事件允许魏势力角色替曹操出闪
-    // 实际响应由 ResponseWindow 检查此标记后扩展可选响应者列表
-    ctx.player.setMark('hujiaActive', 1)
-
-    // 标记清除由事件结束时 EventDispatcher 处理
+    ctx.setMark(ctx.player, 'hujiaActive', 1)
   },
 
+  ai: { order: 6 },
 }
 
 // ═══════════════════════════════════════════
 // 司马懿 · 反馈
-// 当你受到伤害后，你获得伤害来源的一张牌
-// （手牌或装备区的牌，由你选择）。
+// 当你受到伤害后，你获得伤害来源的一张牌。
 // ═══════════════════════════════════════════
 
-export const fankuiEffect: IEffect = {
+export const fankui: ISkill = {
   id: 'fankui',
   name: '反馈',
   description: '当你受到伤害后，你获得伤害来源的一张牌。',
-  type: SkillType.Passive,
-  priority: 10,
-  frequency: Frequency.Unlimited,
 
-  trigger: {
-    target: [{ timing: TriggerTiming.Damage, stage: 'After' }],
-  },
+  trigger: { target: ['damageAfter'] },
 
   filter: (ctx) => {
     const source = ctx.event.source
     if (!source || source.id === ctx.player.id) return false
     if (!source.alive) return false
-
-    // 伤害必须已应用
-    const prevented = ctx.event.data?.['damagePrevented'] as boolean | undefined
-    if (prevented) return false
-
-    // 伤害来源必须有牌（手牌或装备）
+    if (damagePrevented(ctx)) return false
     return source.handCards.length > 0 || source.equipCards.length > 0
   },
 
   content: async (ctx) => {
-    const source = ctx.event.source!
-    if (!source.alive) return
+    const source = ctx.event.source
+    if (!source?.alive) return
 
-    // 汇总可获得的牌（手牌 + 装备）
-    const availableCards: ICard[] = [
-      ...source.handCards,
-      ...source.equipCards,
-    ]
+    // 没有决策服务时按「手牌优先于装备」的顺序取第一张。
+    // 用固定的确定顺序而不是随机——重放一局的必要条件。
+    const target =
+      source.handCards[0] ?? source.equipCards[0]
+    if (!target) return
 
-    if (availableCards.length === 0) return
-
-    // 随机选择一张（无决策服务时的默认行为）
-    // 实际应用中由 UIDecisionService 提供选择
-    const chosenIndex = Math.floor(Math.random() * availableCards.length)
-    const chosenCard = availableCards[chosenIndex]!
-
-    // 将牌转移给司马懿
-    if (chosenCard.zone === ZoneType.Equip) {
-      // 从装备区获得
-      await ctx.transferCards([chosenCard], ctx.player)
-    } else {
-      await ctx.transferCards([chosenCard], ctx.player)
-    }
+    await ctx.transferCards([target], ctx.player)
   },
 
+  ai: { order: 4 },
 }
 
 // ═══════════════════════════════════════════
 // 司马懿 · 鬼才
-// 当一名角色的判定牌生效前，你可以打出一张手牌
-// 代替之。
+// 当一名角色的判定牌生效前，你可以打出一张手牌代替之。
 // ═══════════════════════════════════════════
 
-export const guicaiEffect: IEffect = {
+export const guicai: ISkill = {
   id: 'guicai',
   name: '鬼才',
   description: '当判定牌生效前，你可以打出一张手牌代替之。',
-  type: SkillType.Active,
-  priority: 30,
-  frequency: Frequency.Unlimited,
 
-  trigger: {
-    global: [{ timing: TriggerTiming.Judge, stage: 'Prepare' }],
-  },
+  priority: 30,
+  trigger: { global: ['judgePrepare'] },
 
   filter: (ctx) => {
-    // 司马懿必须存活且有手牌
     if (!ctx.player.alive) return false
-    return ctx.player.handCards.length > 0
+    if (ctx.player.handCards.length === 0) return false
+    return Boolean(ctx.event.data?.['judgeCard'])
   },
 
+  /**
+   * 用一张手牌换掉判定牌
+   *
+   * 换下来的原判定牌进自己手里——这是「换」而不是「改」：
+   * 场上没有牌消失，只是位置变了。
+   */
   content: async (ctx) => {
-    // 获取当前判定牌
-    const judgeCard = ctx.event.data?.['judgeCard'] as ICard | undefined
-    if (!judgeCard) return
+    const original = ctx.event.data?.['judgeCard'] as ICard | undefined
+    if (!original) return
 
-    // 随机选择一张手牌替换（无决策服务时的默认行为）
-    const handCards = [...ctx.player.handCards]
-    if (handCards.length === 0) return
+    const replacement = ctx.player.handCards[0]
+    if (!replacement) return
 
-    const replaceIndex = Math.floor(Math.random() * handCards.length)
-    const replaceCard = handCards[replaceIndex]!
+    await ctx.discardCards([replacement])
+    await ctx.obtainCards(ctx.player, [original])
 
-    // 弃置原判定牌
-    judgeCard.zone = ZoneType.Discard
-    ctx.player.handCards = ctx.player.handCards.filter(
-      (c) => c.id !== replaceCard.id,
-    )
-
-    // 将手牌放入判定区替换
-    replaceCard.zone = ZoneType.Judge
-    ;(ctx.event.data as Record<string, unknown>)['judgeCard'] = replaceCard
-
-    // 原判定牌进入弃牌堆
-    ctx.player.handCards.push(judgeCard)
-    judgeCard.zone = ZoneType.Hand
-    judgeCard.owner = ctx.player
+    ;(ctx.event.data as Record<string, unknown>)['judgeCard'] = replacement
   },
 
+  ai: { order: 7 },
 }
 
 // ═══════════════════════════════════════════
 // 夏侯惇 · 刚烈
 // 当你受到伤害后，你可以进行判定：
-// 若结果不为红桃，伤害来源选择：
-//   1) 弃置两张手牌
-//   2) 受到你造成的1点伤害
+// 若结果不为红桃，伤害来源选择弃置两张手牌或受到1点伤害。
 // ═══════════════════════════════════════════
 
-export const ganglieEffect: IEffect = {
+export const ganglie: ISkill = {
   id: 'ganglie',
   name: '刚烈',
   description: '受到伤害后可判定：若不为红桃，伤害来源需弃2牌或受1点伤害。',
-  type: SkillType.Passive,
-  priority: 10,
-  frequency: Frequency.OncePerTurn,
 
-  trigger: {
-    target: [{ timing: TriggerTiming.Damage, stage: 'After' }],
-  },
+  frequency: 'oncePerTurn',
+  trigger: { target: ['damageAfter'] },
 
   filter: (ctx) => {
     const source = ctx.event.source
     if (!source || source.id === ctx.player.id) return false
     if (!source.alive) return false
-
-    const prevented = ctx.event.data?.['damagePrevented'] as boolean | undefined
-    if (prevented) return false
-
-    return true
+    return !damagePrevented(ctx)
   },
 
   content: async (ctx) => {
-    const source = ctx.event.source!
-    if (!source.alive) return
+    const source = ctx.event.source
+    if (!source?.alive) return
 
-    // 判定
     let judgeCard: ICard
     try {
       judgeCard = await ctx.judge(ctx.player)
     } catch {
-      // 无法判定时跳过
       return
     }
 
-    // 检查判定结果：不为红桃则触发效果
-    if (judgeCard.suit === CardSuit.Heart && judgeCard.rank >= 10) {
-      // 红桃10+（相当于红桃Q/K判定牌为红桃），刚烈不生效
-      // 简化：非红桃才生效
-      // 红桃 → 不触发
-      return
-    }
+    // 红桃 → 刚烈不发动
+    if (judgeCard.suit === CardSuit.Heart) return
 
-    // 判定不为红桃：伤害来源选择
-    const handCount = source.handCards.length
-
-    if (handCount >= 2) {
-      // 来源有 ≥2 张手牌：随机选择弃2牌或受1伤害（简化实现：弃牌优先）
-      if (source.handCards.length >= 2) {
-        const toDiscard = source.handCards.slice(0, 2)
-        await ctx.discardCards(toDiscard)
-        // 从手牌中移除
-        source.handCards = source.handCards.filter(
-          (c) => !toDiscard.some((d) => d.id === c.id),
-        )
-      }
-    } else {
-      // 来源手牌不足2张：只能受到1点伤害
+    // 来源手牌不足 2 张时只能吃伤害
+    if (source.handCards.length < 2) {
       await ctx.damageTarget(source, 1)
+      return
     }
+    await ctx.discardCards(source.handCards.slice(0, 2))
   },
 
+  ai: { order: 5, threaten: 2 },
 }
 
 // ═══════════════════════════════════════════
 // 张辽 · 突袭
-// 摸牌阶段，你可以放弃摸牌，改为获得一至两名
-// 其他角色的各一张手牌。
+// 摸牌阶段，你可以放弃摸牌，
+// 改为获得一至两名其他角色的各一张手牌。
 // ═══════════════════════════════════════════
 
-export const tuxiEffect: IEffect = {
+export const tuxi: ISkill = {
   id: 'tuxi',
   name: '突袭',
   description: '摸牌阶段可放弃摸牌，改为获得至多两名角色各一张手牌。',
-  type: SkillType.Active,
-  priority: 20,
-  frequency: Frequency.OncePerTurn,
 
-  trigger: {
-    player: [{ timing: TriggerTiming.PhaseDraw, stage: 'Begin' }],
-  },
+  frequency: 'oncePerTurn',
+  trigger: { player: ['phaseDrawBegin'] },
 
   filter: (ctx) => {
-    // 张辽的摸牌阶段
     if (!ctx.player.alive) return false
-
-    // 需要有其他存活的、有手牌的玩家
-    const otherPlayers = ctx.game.players.filter(
-      (p) =>
-        p.id !== ctx.player.id &&
-        p.alive &&
-        p.handCards.length > 0,
+    return ctx.game.players.some(
+      (p) => p.id !== ctx.player.id && p.alive && p.handCards.length > 0,
     )
-    return otherPlayers.length > 0
   },
 
   content: async (ctx) => {
-    // 标记跳过正常摸牌
-    ctx.player.setMark('skipDraw', 1)
+    ctx.setMark(ctx.player, 'skipDraw', 1)
 
-    // 选择目标（简化：选择手牌最多的前2名其他角色）
-    const otherPlayers = ctx.game.players
-      .filter(
-        (p) =>
-          p.id !== ctx.player.id &&
-          p.alive &&
-          p.handCards.length > 0,
-      )
-      .sort((a, b) => b.handCards.length - a.handCards.length)
-
-    const targets = otherPlayers.slice(0, 2)
+    // 多的优先：手牌最多的人最值得抽，且排序稳定（相同张数按座次）
+    const targets = [...ctx.game.players]
+      .filter((p) => p.id !== ctx.player.id && p.alive && p.handCards.length > 0)
+      .sort((a, b) => {
+        if (b.handCards.length !== a.handCards.length) {
+          return b.handCards.length - a.handCards.length
+        }
+        return a.seatIndex - b.seatIndex
+      })
+      .slice(0, 2)
 
     for (const target of targets) {
-      if (target.handCards.length === 0) continue
-
-      // 随机获得一张手牌
-      const randomIndex = Math.floor(Math.random() * target.handCards.length)
-      const stolenCard = target.handCards[randomIndex]!
-
-      // 从目标手牌中移除
-      target.handCards = target.handCards.filter(
-        (c) => c.id !== stolenCard.id,
-      )
-
-      // 加入张辽手牌
-      await ctx.obtainCards(ctx.player, [stolenCard])
+      const stolen = target.handCards[0]
+      if (!stolen) continue
+      await ctx.transferCards([stolen], ctx.player)
     }
   },
 
+  ai: { order: 4 },
 }
 
 // ── 汇总导出 ──
 
-export const weiSkills: IEffect[] = [
-  jianxiongEffect,
-  hujiaEffect,
-  fankuiEffect,
-  guicaiEffect,
-  ganglieEffect,
-  tuxiEffect,
+export const weiSkills: ISkill[] = [
+  jianxiong,
+  hujia,
+  fankui,
+  guicai,
+  ganglie,
+  tuxi,
 ]

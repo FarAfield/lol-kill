@@ -7,9 +7,15 @@
 
 import { GamePhase, RoleType } from '@core/contracts/enums'
 import type { LogEntry } from '@core/contracts/types'
-import type { IGameState, IGameConfig, IGameResult } from '@core/contracts/game.interface'
+import type {
+  IGameState,
+  GameStateSnapshot,
+  IGameConfig,
+  IGameResult,
+} from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
+import { gameClock } from '@core/utils/clock'
 
 // ── 默认配置 ──
 
@@ -48,7 +54,10 @@ export class GameState implements IGameState {
   finished: boolean
   processingCards: ICard[]
 
-  constructor(data?: Partial<IGameState>) {
+  /** 日志 id 的自增序号（跨局由 `reset()` 归零） */
+  private logSeq = 0
+
+  constructor(data?: Partial<GameStateSnapshot>) {
     this.players = data?.players ?? []
     this.deck = data?.deck ?? []
     this.discardPile = data?.discardPile ?? []
@@ -71,7 +80,7 @@ export class GameState implements IGameState {
    * @param config 游戏配置
    * @param overrides 可选覆盖项
    */
-  static create(config: IGameConfig, overrides?: Partial<IGameState>): GameState {
+  static create(config: IGameConfig, overrides?: Partial<GameStateSnapshot>): GameState {
     return new GameState({
       config,
       currentRound: 1,
@@ -82,6 +91,32 @@ export class GameState implements IGameState {
       finished: false,
       ...overrides,
     })
+  }
+
+  /**
+   * 原地重置为新一局。
+   *
+   * **这是 `init()` 唯一允许的状态重建入口**——禁止替换 `GameState` 实例本身。
+   * 引擎的子系统（DeckManager / CardSystem / TurnManager 等）与 `EventDispatcher.deps`
+   * 都持有本对象的引用，替换实例会让它们全部指向废弃对象。
+   *
+   * @param config    新的游戏配置
+   * @param overrides 可选覆盖项
+   */
+  reset(config: IGameConfig, overrides?: Partial<GameStateSnapshot>): void {
+    this.players = overrides?.players ?? []
+    this.deck = overrides?.deck ?? []
+    this.discardPile = overrides?.discardPile ?? []
+    this.currentRound = overrides?.currentRound ?? 1
+    this.currentPlayerIndex = overrides?.currentPlayerIndex ?? 0
+    this.currentPhase = overrides?.currentPhase ?? GamePhase.NotStarted
+    this.phaseIndex = overrides?.phaseIndex ?? 0
+    this.log = overrides?.log ?? []
+    this.config = overrides?.config ?? config
+    this.started = overrides?.started ?? false
+    this.finished = overrides?.finished ?? false
+    this.processingCards = overrides?.processingCards ?? []
+    this.logSeq = 0
   }
 
   // ── 玩家查询 ──
@@ -229,10 +264,36 @@ export class GameState implements IGameState {
   // ── 日志操作 ──
 
   /**
-   * 添加一条游戏日志。
+   * 添加一条游戏日志
+   *
+   * **时间与序号都不接受外部传入**——它们由本方法自己盖：
+   * - `tick` 取逻辑时钟当前刻度（不推进它，只读取）
+   * - `id` 未给出时用 `nextLogId` 发
+   *
+   * 这不是洁癖。`EffectContext` 里曾经写死 `timestamp: Date.now()`，
+   * 于是「同一份录像放两次」这件事在日志这一层天然不成立——
+   * 回放比对每次都得额外记得剔除时间戳，忘一次就是一次假阳性。
+   * 让调用方**没法**指定时间，这条规则就从「记得遵守」变成「不可能违反」。
+   *
+   * 再者 `tick` 只**读**逻辑时钟、不推进它：观测不该改变被观测的东西——
+   * 每写一条日志就把时钟往前拨一格，后续事件的 timestamp 会整体错位。
    */
-  addLog(entry: LogEntry): void {
-    this.log.push(entry)
+  addLog(entry: Omit<LogEntry, 'tick' | 'id'> & { id?: string }): void {
+    this.log.push({
+      ...entry,
+      id: entry.id ?? this.nextLogId(),
+      tick: gameClock.now,
+    })
+  }
+
+  /**
+   * 下一条日志的 id
+   *
+   * 自增序号而非时间戳 / 随机数：后者会让「两局同一过程」的日志
+   * 连 id 都对不上，回放比对里全是噪声。
+   */
+  nextLogId(prefix = 'log'): string {
+    return `${prefix}_${++this.logSeq}`
   }
 
   /**
@@ -278,7 +339,7 @@ export class GameState implements IGameState {
       reason,
       survivingPlayers: this.alivePlayers,
       totalRounds: this.currentRound,
-      endedAt: Date.now(),
+      endedAt: gameClock.next(),
     }
   }
 
@@ -290,7 +351,7 @@ export class GameState implements IGameState {
    * 数组通过展开运算符复制，但数组内的对象（Player、Card 等）是共享引用。
    * 用于 StoreService 同步——轻量且快速。调用方不应修改返回的对象属性。
    */
-  toJSON(): IGameState {
+  toJSON(): GameStateSnapshot {
     return {
       players: [...this.players],
       deck: [...this.deck],
@@ -304,13 +365,15 @@ export class GameState implements IGameState {
       started: this.started,
       finished: this.finished,
       processingCards: [...this.processingCards],
+      alivePlayers: this.alivePlayers,
+      aliveCount: this.aliveCount,
     }
   }
 
   /**
    * 获取只读快照（等同于 toJSON，浅拷贝）。
    */
-  snapshot(): Readonly<IGameState> {
+  snapshot(): Readonly<GameStateSnapshot> {
     return this.toJSON()
   }
 
@@ -328,9 +391,9 @@ export class GameState implements IGameState {
    * **性能注意**：深拷贝有开销，不适合高频调用（如 StoreService 同步）。
    * StoreService 应使用 toJSON()（浅拷贝），replay/save 使用 deepClone()。
    *
-   * @returns 完全独立的 IGameState 副本
+   * @returns 完全独立的 GameStateSnapshot 副本
    */
-  deepClone(): IGameState {
+  deepClone(): GameStateSnapshot {
     return structuredClone(this.toJSON())
   }
 
@@ -351,7 +414,7 @@ export class GameState implements IGameState {
    * const restored = GameState.restore(saved)
    * ```
    */
-  static restore(data: IGameState): GameState {
+  static restore(data: GameStateSnapshot): GameState {
     return new GameState(data)
   }
 }

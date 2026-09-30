@@ -3,6 +3,8 @@
 // ============================================================
 
 import type { CompiledHandler } from '@core/contracts/compiled-handler'
+import type { IPlayer } from '@core/contracts/player.interface'
+import { seatDistance } from './settlement'
 
 /**
  * 对同时机的 handler 按优先级排序
@@ -71,6 +73,33 @@ export class PriorityManager {
       const seatA = playerSeatMap.get(a.playerId) ?? 0
       const seatB = playerSeatMap.get(b.playerId) ?? 0
       return seatA - seatB
+    })
+  }
+
+  /**
+   * 按「距当前行动者的座次差」二次排序
+   *
+   * 同优先级且同锁定状态时，离发起者**近**的先结算——
+   * 顺时针顺序是三国杀里一切「多名玩家同时触发」的默认裁决规则。
+   *
+   * @param handlers 待排序列表
+   * @param from     当前行动者（排序锚点）
+   * @param seatOf   取玩家座次的映射（避免依赖 handler 上是否挂了 player 实体）
+   */
+  sortBySeatDistance(
+    handlers: CompiledHandler[],
+    from: IPlayer,
+    seatOf: (playerId: string) => number,
+    total: number,
+  ): CompiledHandler[] {
+    const distance = (playerId: string): number =>
+      seatDistance(from.seatIndex, seatOf(playerId), total)
+
+    return [...handlers].sort((a, b) => {
+      if (a.isLocked && !b.isLocked) return -1
+      if (!a.isLocked && b.isLocked) return 1
+      if (a.priority !== b.priority) return b.priority - a.priority
+      return distance(a.playerId) - distance(b.playerId)
     })
   }
 

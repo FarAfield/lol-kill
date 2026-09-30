@@ -5,11 +5,12 @@
 // 所有接口由外部实现（UI 层 / 测试 mock），通过 DI 容器注入引擎。
 // ============================================================
 
+import type { CardBudget } from '@core/skill/card-budget'
 import type { LogLevel, RoleType } from './enums'
-import type { IGameState } from './game.interface'
+import type { GameStateSnapshot } from './game.interface'
 import type { IPlayer } from './player.interface'
 import type { ICard } from './card.interface'
-import type { IEffect } from './effect.interface'
+import type { ISkill } from './skill.interface'
 
 /**
  * 存储服务 — 单向同步引擎状态到外部存储（Pinia Store 等）。
@@ -19,12 +20,20 @@ import type { IEffect } from './effect.interface'
  * UI 不通过此接口修改引擎状态。
  */
 export interface IStoreService {
-  /** 同步完整游戏状态 */
-  syncGameState(state: IGameState): void
+  /** 同步完整游戏状态快照 */
+  syncGameState(state: GameStateSnapshot): void
   /** 同步单个玩家状态 */
   syncPlayerState(player: IPlayer): void
   /** 获取缓存的游戏状态快照 */
-  getGameState(): Readonly<IGameState>
+  getGameState(): Readonly<GameStateSnapshot>
+  /**
+   * 注册状态变更回调，返回注销函数。
+   *
+   * Pinia Store 通过此回调自动更新响应式状态。
+   */
+  onChange(listener: (state: Readonly<GameStateSnapshot>) => void): () => void
+  /** 取消注册状态变更回调 */
+  offChange(listener: (state: Readonly<GameStateSnapshot>) => void): void
   /** 重置存储 */
   reset(): void
 }
@@ -53,14 +62,19 @@ export interface ILoggerService {
 }
 
 /**
- * 随机服务 — 提供可替换的随机数源。
+ * 随机服务 — 引擎唯一的随机来源。
  *
- * 默认实现使用 Math.random()。
- * 测试中可注入确定性实现（如固定种子），确保可重复性。
+ * 引擎对它是**必填**的（GameEngine / DeckManager 都不接受缺省）：
+ * 曾经「不传就退回 Math.random」的那条分支已经删除——那是一扇
+ * 「悄悄引入不确定性」的后门，牌堆顺序一旦不可复现，回放与
+ * 批量回归测试就都失去意义。
+ *
+ * 标准实现见 `core/services/seeded-random.ts`（mulberry32）：
+ * 同一种子 + 同一串调用 = 同一串结果。
  */
 export interface IRandomService {
-  /** Fisher-Yates 洗牌，返回新数组 */
-  shuffle<T>(array: T[]): T[]
+  /** Fisher-Yates 洗牌，返回新数组（不改动入参） */
+  shuffle<T>(array: readonly T[]): T[]
   /** 生成 [min, max] 范围内的随机整数 */
   nextInt(min: number, max: number): number
   /** 从数组中随机选取一个元素 */
@@ -83,6 +97,14 @@ export interface IRandomService {
  * 所有方法应支持超时（timeout 参数），超时后返回 null 或默认值。
  */
 export interface IUIDecisionService {
+  /**
+   * 把出牌额度查询递给决策服务（可选）
+   *
+   * AI 在引擎**之前**就建好了（它要被当成决策服务先传进 `GameBoot`），
+   * 因此只能在引擎就绪后由 `GameBoot` 补上这一步。
+   * 少了它，AI 就看不见【诸葛连弩】这类额度加成（欠账 D8）。
+   */
+  setCardBudget?(budget: CardBudget): void
   /** 询问玩家选择哪张牌出牌，并指定目标。返回 null 表示跳过 */
   askForCardPlay(player: IPlayer, options: CardPlayOption[]): Promise<CardPlayResult | null>
   /** 询问玩家是否响应（如是否出闪、是否出桃） */
@@ -101,7 +123,7 @@ export interface IUIDecisionService {
     maxTargets?: number,
   ): Promise<IPlayer[]>
   /** 询问玩家是否发动主动技能 */
-  askForEffectUse(player: IPlayer, effects: IEffect[], prompt: string): Promise<IEffect | null>
+  askForEffectUse(player: IPlayer, effects: ISkill[], prompt: string): Promise<ISkill | null>
   /** 询问玩家弃置哪些卡牌 */
   askForDiscard(player: IPlayer, count: number, validCards: ICard[]): Promise<ICard[]>
   /** 询问玩家选择英雄 */

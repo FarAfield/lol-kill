@@ -12,8 +12,9 @@
 // ============================================================
 
 import { GamePhase } from '@core/contracts/enums'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
+import { PlayerSystem } from '@core/system/player-system'
 
 /**
  * 回合管理器
@@ -33,7 +34,14 @@ export class TurnManager {
   /** 被跳过回合的玩家索引（乐不思蜀等） */
   private skippedPlayers: Set<number> = new Set()
 
-  constructor(private state: IGameState) {}
+  /**
+   * 玩家状态系统 —— 「每回合归零」那几笔账的写入口（Phase 19）
+   *
+   * 无状态，因此这里自建一份即可，不必由引擎注入。
+   */
+  private playerSystem = new PlayerSystem()
+
+  constructor(private state: GameStateSnapshot) {}
 
   // ── 轮次操作 ──
 
@@ -94,7 +102,7 @@ export class TurnManager {
       !this.skippedPlayers.has(currentPlayer.seatIndex)
     ) {
       this.playersActedThisRound.add(currentPlayer.seatIndex)
-      currentPlayer.resetTurnState()
+      this.playerSystem.resetTurnState(currentPlayer)
       this.state.currentPhase = GamePhase.PhasePre
       return currentPlayer
     }
@@ -123,7 +131,7 @@ export class TurnManager {
       this.playersActedThisRound.add(nextIndex)
 
       // 重置该玩家的回合状态
-      nextPlayer.resetTurnState()
+      this.playerSystem.resetTurnState(nextPlayer)
 
       // 设置当前阶段为回合准备阶段
       this.state.currentPhase = GamePhase.PhasePre
@@ -158,15 +166,17 @@ export class TurnManager {
    */
   skipTurn(player: IPlayer): void {
     this.skippedPlayers.add(player.seatIndex)
-    // 同时在玩家身上标记（供 PhaseManager 查询）
-    player.shouldSkipPhases = [
+    // 同时在玩家身上标记（供 PhaseManager 查询）。
+    // 写这行标记要走 PlayerSystem——自己 `player.shouldSkipPhases = [...]`
+    // 就是绕过唯一写入口。
+    this.playerSystem.setSkipPhases(player, [
       GamePhase.PhasePre,
       GamePhase.PhaseJudge,
       GamePhase.PhaseDraw,
       GamePhase.PhaseUse,
       GamePhase.PhaseDiscard,
       GamePhase.PhasePost,
-    ]
+    ])
   }
 
   /**
@@ -178,9 +188,9 @@ export class TurnManager {
    * @param phases 要跳过的阶段列表
    */
   skipPhases(player: IPlayer, phases: GamePhase[]): void {
-    player.shouldSkipPhases = [
-      ...new Set([...player.shouldSkipPhases, ...phases]),
-    ]
+    // 去重在 PlayerSystem 内部做——以前那句 `Set` 去重就写在这儿，
+    // 于是「同一个阶段被记两次怎么处理」这条规则也跟着住在调用方。
+    this.playerSystem.skipPhases(player, phases)
   }
 
   /**

@@ -35,7 +35,7 @@ export class EventChain {
   /**
    * 当前栈深度
    */
-  get depth(): number {
+  get size(): number {
     return this.stack.length
   }
 

@@ -3,7 +3,11 @@
 
   // Override to include only test files and clear exclusions.
   // Application code imported in tests is automatically included via module resolution.
-  "include": ["src/**/__tests__/*", "env.d.ts"],
+  //
+  // 两条都不能少：`src/**/__tests__/*` 里的 `*` 只匹配**文件**，
+  // 不递归进 `__tests__` 的子目录（event/ skill/ helpers/ …），
+  // 结果整个测试工程一个文件都没被检查过——脚手架漏了方法也照样绿灯。
+  "include": ["src/**/__tests__/**/*", "src/**/*.test.ts", "env.d.ts"],
   "exclude": [],
 
   "compilerOptions": {
@@ -11,6 +15,12 @@
     // Adjust lib and types accordingly.
     "lib": [],
     "types": ["node", "jsdom"],
+
+    // 测试里 `const [a, b] = env.players()` 是常态：一局必然有 5 个人，
+    // 但 `noUncheckedIndexedAccess` 会把它判成 `IPlayer | undefined`，
+    // 于是每个用例都要补一次 `!`——那 200 处断言噪音盖住了真正的错误
+    // （脚手架漏实现接口方法这种）。测试代码不需要付这个代价。
+    "noUncheckedIndexedAccess": false,
 
     // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
     // Specified here to keep it out of the root directory.

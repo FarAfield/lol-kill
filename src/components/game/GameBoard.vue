@@ -28,8 +28,8 @@
       :y="player.y"
       :is-current="player.isCurrentPlayer"
       :is-human="player.seatIndex === 0"
-      :is-targetable="validTargetIds.has(player.id)"
-      :is-selected-target="selectedTargetIds.includes(player.id)"
+      :is-targetable="props.validTargetIds.has(player.id)"
+      :is-selected-target="props.selectedTargetIds.includes(player.id)"
       :is-hovered-target="hoveredTargetId === player.id"
       @select-target="(id: string) => $emit('select-target', id)"
       @hover-target="(id: string | null) => $emit('hover-target', id)"
@@ -48,19 +48,26 @@ interface PositionedPlayer extends UIPlayerInfo {
   y: number
 }
 
-const props = defineProps<{
-  players: UIPlayerInfo[]
-  currentPhase: string
-  currentPlayerIndex: number
-  /** 合法目标 ID 集合（用于高亮可选目标） */
-  validTargetIds?: Set<string>
-  /** 已选中的目标 ID 列表 */
-  selectedTargetIds?: string[]
-  /** 悬停的目标 ID */
-  hoveredTargetId?: string | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    players: UIPlayerInfo[]
+    currentPhase: string
+    currentPlayerIndex: number
+    /** 合法目标 ID 集合（用于高亮可选目标） */
+    validTargetIds?: Set<string>
+    /** 已选中的目标 ID 列表 */
+    selectedTargetIds?: string[]
+    /** 悬停的目标 ID */
+    hoveredTargetId?: string | null
+  }>(),
+  {
+    validTargetIds: () => new Set<string>(),
+    selectedTargetIds: () => [],
+    hoveredTargetId: null,
+  },
+)
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'select-target', playerId: string): void
   (e: 'hover-target', playerId: string | null): void
 }>()
@@ -115,7 +122,8 @@ const positionedPlayers = computed<PositionedPlayer[]>(() => {
 
   const positions = getPositions(count)
 
-  return props.players
+  // `.sort()` 会**原地**改数组——直接对 props 调用等于改父组件的数据
+  return [...props.players]
     .sort((a, b) => a.seatIndex - b.seatIndex)
     .map((player, i) => ({
       ...player,

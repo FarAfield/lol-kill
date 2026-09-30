@@ -11,12 +11,12 @@
 //   cardPlay.cancelSelection()         // 取消（右键）
 // ============================================================
 
-import { ref, computed, shallowRef } from 'vue'
+import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
 import type { GameController } from '@/services/game-controller'
 import type { useGameStore } from '@/store/game-store'
-import type { ICard } from '@core/contracts/card.interface'
 import { ZoneType } from '@core/contracts/enums'
+import { CardTag } from '@core/contracts/card-tag'
 
 /** 卡牌-目标关联信息 */
 export interface CardTargetInfo {
@@ -75,11 +75,12 @@ export interface UseCardPlayReturn {
  * 4. 玩家确认 → 调用 GameController.playCard()
  *
  * @param controllerGetter 获取 GameController 实例的函数（支持响应式）
- * @param storeGetter      获取 Pinia GameStore 实例的函数
+ * @param _storeGetter     保留位：当前所有需要的状态都能从 controller 读到，
+ *                         不再绕道 Pinia。留着参数是为了不动调用方签名。
  */
 export function useCardPlay(
   controllerGetter: () => GameController | null,
-  storeGetter: () => ReturnType<typeof useGameStore>,
+  _storeGetter: () => ReturnType<typeof useGameStore>,
 ): UseCardPlayReturn {
   // ── 响应式状态 ──
   const selectedCardId = ref<string | null>(null)
@@ -129,7 +130,6 @@ export function useCardPlay(
     // 这里简化为：至少选择 0 个（桃等）或 1 个（杀、锦囊）
     if (!info) return 0
     // 检查是否只有自己可选（桃）
-    const store = storeGetter()
     const ctrl = controllerGetter()
     const humanPlayer = ctrl?.getCurrentPlayer()
     const isSelfOnly =
@@ -161,7 +161,7 @@ export function useCardPlay(
     const ctrl = controllerGetter()
     const player = ctrl?.getCurrentPlayer()
     if (!player) return new Set()
-    const card = player.handCards.find((c) => c.id === selectedCardId.value)
+    const card = player.handCards.find((c) => c.instanceId === selectedCardId.value)
     return card?.tags ?? new Set()
   })
 
@@ -193,8 +193,8 @@ export function useCardPlay(
     const ctrl = controllerGetter()
     const player = ctrl?.getCurrentPlayer()
     if (player) {
-      const card = player.handCards.find((c) => c.id === cardId)
-      if (card?.tags.has('peach') && card.zone === ZoneType.Hand) {
+      const card = player.handCards.find((c) => c.instanceId === cardId)
+      if (card?.tags.has(CardTag.Heal) && card.zone === ZoneType.Hand) {
         selectedTargetIds.value = [player.id]
       }
     }

@@ -1,10 +1,34 @@
 import { GamePhase, RoleType, EquipSlot } from '@core/contracts/enums'
-import type { PlayerId, Position } from '@core/contracts/types'
-import type { IPlayer } from '@core/contracts/player.interface'
+import type {
+  IPlayer,
+  PlayerSnapshot,
+  PlayerState,
+} from '@core/contracts/player.interface'
 import type { IHero } from '@core/contracts/hero.interface'
 import type { ICard } from '@core/contracts/card.interface'
 
+// ── 构造参数 ──
+
+/** 创建玩家所需的最小信息：座位与 ID，其余字段均有默认值 */
+export type PlayerInit = Partial<PlayerState> & Pick<PlayerState, 'id' | 'seatIndex'>
+
 // ── 玩家实体 ──
+//
+// **这里没有任何一个变更方法。**
+//
+// Phase 19 之前本类带着 17 个 `loseHp` / `equipCard` / `setMark` 之类的方法，
+// 于是「改玩家状态」有两套入口：实体自己一套、`system/*` 一套。
+// 后果是夹取规则各写各的——`recoverHp` 知道不能超过上限，而濒死救活
+// 那句 `hp = 1`（在 `DeathSystem` 里）不知道，它只是碰巧在 hp ≤ 0 时才被调用。
+//
+// 更糟的是其中 10 个方法**生产代码里根本没人调用**，只在测试里被用：
+// `addHandCards` / `removeHandCards` / `equipCard` / `unEquipSlot` /
+// `addJudgeCard` / `removeJudgeCard` / `chooseHeroes` / power 三件套。
+// 它们是 `CardSystem` 的重复实现，且绕过 `zone` / `owner` / `visibleTo`
+// 的同步与装备变动通知——「有一条路能改装备区却不会挂装备技」是纯粹的隐患。
+//
+// 现在：写入一律走 `system/player-system.ts`（数值与标记）
+// 与 `system/card-system.ts`（卡牌区域）。本类只留数据与派生只读量。
 
 export class Player implements IPlayer {
   readonly id: string
@@ -29,26 +53,7 @@ export class Player implements IPlayer {
   // ── 通用标记 ──
   marks: Map<string, number>
 
-  constructor(data: {
-    id: PlayerId
-    seatIndex: Position
-    role?: RoleType
-    roleRevealed?: boolean
-    alive?: boolean
-    hp?: number
-    maxHp?: number
-    power?: number
-    maxPower?: number
-    heroes?: IHero[]
-    handCards?: ICard[]
-    equipCards?: ICard[]
-    judgeCards?: ICard[]
-    usedAttackThisTurn?: boolean
-    attackLimit?: number
-    shouldSkipPhases?: GamePhase[]
-    skippedPhases?: GamePhase[]
-    marks?: Map<string, number>
-  }) {
+  constructor(data: PlayerInit) {
     this.id = data.id
     this.seatIndex = data.seatIndex
     this.role = data.role
@@ -73,132 +78,31 @@ export class Player implements IPlayer {
     return Array.from(
       { length: num },
       (_, i) =>
-        new Player({
-          id: `player_${i}` as PlayerId,
-          seatIndex: i as Position,
-        }),
+        new Player({ id: `player_${i}`, seatIndex: i }),
     )
   }
 
-  // ── 体力操作 ──
+  // ── 派生状态（只读）──
 
-  /**
-   * 扣减体力。
-   * HP 不会降到 0 以下（死亡由 DeathSystem 统一处理）。
-   * @param amount 扣减量
-   * @returns 实际扣减值
-   */
-  loseHp(amount: number): number {
-    const previous = this.hp
-    this.hp = Math.max(0, this.hp - amount)
-    return previous - this.hp
-  }
-
-  /**
-   * 回复体力。
-   * HP 不会超过 maxHp。
-   * @param amount 回复量
-   * @returns 实际回复值
-   */
-  recoverHp(amount: number): number {
-    const previous = this.hp
-    this.hp = Math.min(this.maxHp, this.hp + amount)
-    return this.hp - previous
-  }
-
-  /**
-   * 设置体力上限。
-   * @param delta 变化量（正数为增加，负数为减少）
-   */
-  modifyMaxHp(delta: number): void {
-    this.maxHp = Math.max(0, this.maxHp + delta)
-    // 当前体力不能超过新的上限
-    if (this.hp > this.maxHp) {
-      this.hp = this.maxHp
-    }
-  }
-
-  /**
-   * 消耗能量。
-   */
-  consumePower(amount: number): number {
-    const previous = this.power
-    this.power = Math.max(0, this.power - amount)
-    return previous - this.power
-  }
-  /**
-   * 获得能量。
-   */
-  gainPower(amount: number): void {
-    this.power = Math.min(this.maxPower, this.power + amount)
-  }
-
-  /**
-   * 设置能量上限。
-   *
-   * @param delta 变化量（正数为增加，负数为减少）
-   */
-  modifyMaxPower(delta: number): void {
-    this.maxPower = Math.max(0, this.maxPower + delta)
-    // 当前能量不能超过新的上限
-    if (this.power > this.maxPower) {
-      this.power = this.maxPower
-    }
-  }
-
-  /**
-   * 当前手牌数量。
-   */
+  /** 当前手牌数量 */
   get handSize(): number {
     return this.handCards.length
   }
 
-  // ── 手牌操作 ──
-
-  /**
-   * 获得手牌（加入手牌区）。
-   *
-   * @param cards 加入手牌的卡牌列表
-   */
-  addHandCards(cards: ICard[]): void {
-    this.handCards.push(...cards)
-  }
-
-  /**
-   * 失去手牌（从手牌区移除指定卡牌）。
-   *
-   * @param cardIds 要移除的卡牌 ID 列表
-   * @returns 实际移除的卡牌列表
-   */
-  removeHandCards(instanceIds: string[]): ICard[] {
-    const removed: ICard[] = []
-    for (const instanceId of instanceIds) {
-      const idx = this.handCards.findIndex((c) => c.instanceId === instanceId)
-      if (idx !== -1) {
-        removed.push(...this.handCards.splice(idx, 1))
-      }
-    }
-    return removed
-  }
-
-  /**
-   * 是否受伤（hp < maxHp）。
-   */
+  /** 是否受伤（hp < maxHp） */
   get isWounded(): boolean {
     return this.hp < this.maxHp
   }
 
-  /**
-   * 是否处于濒死状态（hp <= 0）。
-   */
+  /** 是否处于濒死状态（hp <= 0 且仍存活） */
   get isDying(): boolean {
     return this.alive && this.hp <= 0
   }
 
   /**
-   * 当前攻击范围。
+   * 当前攻击范围（基础 1 + 武器加成）
    *
-   * 基础攻击范围 = 1，加上武器提供的 attackRange。
+   * 诸葛连弩之类的**次数**加成不在这里——那是出牌阶段的 `mod.cardUsable`。
    */
   get attackRange(): number {
     const weapon = this.getEquipInSlot(EquipSlot.Weapon)
@@ -207,155 +111,43 @@ export class Player implements IPlayer {
     return baseRange + weaponBonus
   }
 
-  /**
-   * 获取当前英雄（标准模式下为 heroes[0]）。
-   */
+  /** 当前英雄（标准模式下为 heroes[0]） */
   get hero(): IHero | undefined {
     return this.heroes[0]
   }
 
-  /**
-   * 英雄选择后的回调方法。
-   *
-   * 设置玩家英雄列表，并同步体力/能量上限与当前值。
-   *
-   * @param heroes 选择的英雄列表
-   */
-  chooseHeroes(heroes: IHero[]): void {
-    this.heroes = heroes
-    const first = heroes[0]
-    if (first) {
-      this.maxHp = first.maxHp
-      this.hp = this.maxHp
-      this.maxPower = first.maxPower
-      this.power = this.maxPower
-    }
-  }
+  // ── 「本回合还能不能出杀」不在这里 ──
+  //
+  // 这个 getter 曾经叫 `canAttack`，算的是 `attackLimit > (usedAttackThisTurn ? 1 : 0)`
+  // ——一个**完全不经过 Mod 注册表**的算式。于是装了【诸葛连弩】以后，
+  // 出牌选项（走 `mod.cardUsable`）说「可以无限出」，而读这个 getter 的
+  // AI / UI 说「不行」。同一个问题两个答案，那是欠账 D8。
+  //
+  // 判定已收口到 `CardBudget.canPlay`（`src/core/skill/card-budget.ts`）：
+  // 它读同一个账本（`usedAttackThisTurn`），但上限只认 Mod。
+  // `Player` 是纯实体，不认识 ModRegistry，因此这类「要查规则才答得上来」
+  // 的问题一律不该挂在实体上。
 
-  // ── 装备区操作 ──
+  // ── 查询（只读）──
 
-  /**
-   * 获取指定装备槽位中的卡牌。
-   */
+  /** 获取指定装备槽位中的卡牌 */
   getEquipInSlot(slot: EquipSlot): ICard | undefined {
     return this.equipCards.find((c) => c.equipSlot === slot)
   }
 
   /**
-   * 装备一张卡牌到装备区。
+   * 获取标记值（不存在时返回 0）
    *
-   * 如果对应槽位已有装备，旧装备会被替换（移至弃牌堆）。
-   *
-   * @returns 被替换的旧装备，如果没有则返回 undefined
-   */
-  equipCard(card: ICard): ICard | undefined {
-    if (!card.equipSlot) return undefined
-
-    const oldEquip = this.getEquipInSlot(card.equipSlot)
-    if (oldEquip) {
-      this.equipCards = this.equipCards.filter((c) => c.id !== oldEquip.id)
-    }
-
-    this.equipCards.push(card)
-    return oldEquip
-  }
-
-  /**
-   * 卸下指定槽位的装备。
-   *
-   * @returns 被卸下的装备，如果槽位为空则返回 undefined
-   */
-  unEquipSlot(slot: EquipSlot): ICard | undefined {
-    const equip = this.getEquipInSlot(slot)
-    if (equip) {
-      this.equipCards = this.equipCards.filter((c) => c.id !== equip.id)
-    }
-    return equip
-  }
-
-  // ── 判定区操作 ──
-
-  /**
-   * 向判定区添加延时锦囊。
-   */
-  addJudgeCard(card: ICard): void {
-    this.judgeCards.push(card)
-  }
-
-  /**
-   * 从判定区移除卡牌。
-   */
-  removeJudgeCard(cardId: string): ICard | undefined {
-    const idx = this.judgeCards.findIndex((c) => c.id === cardId)
-    if (idx === -1) return undefined
-    const [removed] = this.judgeCards.splice(idx, 1)
-    return removed
-  }
-
-  // ── 标记操作 ──
-
-  /**
-   * 获取标记值。
+   * 只留读——写入归 `PlayerSystem.setMark` / `ctx.setMark`。
    */
   getMark(key: string): number {
     return this.marks.get(key) ?? 0
   }
 
-  /**
-   * 设置标记值。
-   */
-  setMark(key: string, value: number): void {
-    this.marks.set(key, value)
-  }
-
-  /**
-   * 增加标记值。
-   */
-  addMark(key: string, delta: number = 1): void {
-    this.marks.set(key, this.getMark(key) + delta)
-  }
-
-  /**
-   * 清除指定标记。
-   */
-  clearMark(key: string): void {
-    this.marks.delete(key)
-  }
-
-  // ── 回合追踪 ──
-
-  /**
-   * 重置回合内状态（在新回合开始时调用）。
-   */
-  resetTurnState(): void {
-    this.usedAttackThisTurn = false
-    this.attackLimit = 1
-    this.shouldSkipPhases = []
-    this.skippedPhases = []
-  }
-
-  /**
-   * 使用了一次攻击。
-   */
-  markAttackUsed(): void {
-    this.usedAttackThisTurn = true
-  }
-
-  /**
-   * 本回合是否还能攻击。
-   */
-  get canAttack(): boolean {
-    return this.attackLimit > (this.usedAttackThisTurn ? 1 : 0)
-    // 注意：此简化逻辑假设 usedAttackThisTurn 为 boolean。
-    // 诸葛连弩等效果通过 attackLimit = Infinity 实现。
-  }
-
   // ── 序列化 ──
 
-  /**
-   * 将玩家序列化为纯对象（用于 Store 同步 / 日志）。
-   */
-  toJSON(): Omit<IPlayer, 'marks'> & { marks: Record<string, number> } {
+  /** 将玩家序列化为纯对象（用于 Store 同步 / 日志） */
+  toJSON(): PlayerSnapshot {
     const marksObj: Record<string, number> = {}
     this.marks.forEach((v, k) => {
       marksObj[k] = v

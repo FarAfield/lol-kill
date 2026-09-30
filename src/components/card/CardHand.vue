@@ -6,14 +6,14 @@
     >
       <div
         v-for="(card, idx) in cards"
-        :key="card.id"
+        :key="card.instanceId"
         class="hand-card-pos"
         :class="{
-          'is-playable': playableCards.has(card.id),
-          'is-selected': selectedCardId === card.id,
+          'is-playable': playableCards.has(card.instanceId),
+          'is-selected': selectedCardId === card.instanceId,
         }"
         :style="getPosStyle(idx, cards.length)"
-        @click="handleCardClick(card.id)"
+        @click="handleCardClick(card.instanceId)"
       >
         <div
           class="hand-card-rot"
@@ -21,8 +21,8 @@
         >
           <CardFace
             :card="card"
-            :selected="selectedCardId === card.id"
-            :playable="playableCards.has(card.id)"
+            :selected="selectedCardId === card.instanceId"
+            :playable="playableCards.has(card.instanceId)"
           />
         </div>
       </div>

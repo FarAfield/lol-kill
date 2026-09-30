@@ -4,7 +4,8 @@
 // 定义游戏各阶段的基础数据：阶段名称、描述、所属时机等。
 // ============================================================
 
-import { GamePhase, TriggerTiming } from '@core/contracts/enums'
+import { GamePhase } from '@core/contracts/enums'
+import type { EventName } from '@core/contracts/event-name'
 
 /**
  * 阶段描述信息
@@ -16,8 +17,8 @@ export interface PhaseInfo {
   name: string
   /** 描述 */
   description: string
-  /** 对应的触发时机 */
-  triggerTiming: TriggerTiming
+  /** 该阶段对应的事件主体 */
+  event: EventName
   /** 是否为回合内阶段 */
   isInTurn: boolean
 }
@@ -30,77 +31,77 @@ export const PHASE_DEFINITIONS: PhaseInfo[] = [
     phase: GamePhase.NotStarted,
     name: '未开始',
     description: '游戏尚未开始',
-    triggerTiming: TriggerTiming.GameStart,
+    event: 'gameStart',
     isInTurn: false,
   },
   {
     phase: GamePhase.Prepare,
     name: '游戏准备',
     description: '选将、分配身份、发初始手牌',
-    triggerTiming: TriggerTiming.GameStart,
+    event: 'gameStart',
     isInTurn: false,
   },
   {
     phase: GamePhase.RoundStart,
     name: '轮次开始',
     description: '新的一轮开始',
-    triggerTiming: TriggerTiming.RoundStart,
+    event: 'roundStart',
     isInTurn: false,
   },
   {
     phase: GamePhase.PhasePre,
     name: '准备阶段',
     description: '回合开始前的准备',
-    triggerTiming: TriggerTiming.PhasePre,
+    event: 'phasePre',
     isInTurn: true,
   },
   {
     phase: GamePhase.PhaseJudge,
     name: '判定阶段',
     description: '处理判定区的延时锦囊',
-    triggerTiming: TriggerTiming.PhaseJudge,
+    event: 'phaseJudge',
     isInTurn: true,
   },
   {
     phase: GamePhase.PhaseDraw,
     name: '摸牌阶段',
     description: '从牌堆摸两张牌',
-    triggerTiming: TriggerTiming.PhaseDraw,
+    event: 'phaseDraw',
     isInTurn: true,
   },
   {
     phase: GamePhase.PhaseUse,
     name: '出牌阶段',
     description: '使用手牌的主要阶段',
-    triggerTiming: TriggerTiming.PhaseUse,
+    event: 'phaseUse',
     isInTurn: true,
   },
   {
     phase: GamePhase.PhaseDiscard,
     name: '弃牌阶段',
     description: '手牌数超过体力上限时需弃牌',
-    triggerTiming: TriggerTiming.PhaseDiscard,
+    event: 'phaseDiscard',
     isInTurn: true,
   },
   {
     phase: GamePhase.PhasePost,
     name: '结束阶段',
     description: '回合结束时的清理工作',
-    triggerTiming: TriggerTiming.PhasePost,
+    event: 'phasePost',
     isInTurn: true,
   },
   {
     phase: GamePhase.RoundEnd,
     name: '轮次结束',
     description: '一轮结束，检查胜利条件',
-    triggerTiming: TriggerTiming.RoundEnd,
+    event: 'roundEnd',
     isInTurn: false,
   },
   {
     phase: GamePhase.GameOver,
     name: '游戏结束',
     description: '游戏结束，显示结果',
-    triggerTiming: TriggerTiming.GameOver,
+    event: 'gameOver',
     isInTurn: false,
   },
 ]

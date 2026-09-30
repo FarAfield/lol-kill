@@ -1,7 +1,9 @@
 {
   "extends": "@vue/tsconfig/tsconfig.dom.json",
   "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
-  "exclude": ["src/**/__tests__/*"],
+  // 注意 `*` 只匹配文件、不递归子目录：写 `src/**/__tests__/*` 的话
+  // `__tests__/event/*.test.ts` 这类会被漏出去，测试文件反而进了应用工程。
+  "exclude": ["src/**/__tests__/**/*"],
   "compilerOptions": {
     // Extra safety for array and object lookups, but may have false positives.
     "noUncheckedIndexedAccess": true,

@@ -14,9 +14,26 @@
 // ============================================================
 
 import { DistanceSystem } from './distance-system'
+import type { DistanceMods } from './distance-system'
 import type { ICard } from '@core/contracts/card.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
-import type { IGameState } from '@core/contracts/game.interface'
+import type { GameStateSnapshot } from '@core/contracts/game.interface'
+import { CardTag } from '@core/contracts/card-tag'
+
+/**
+ * 目标相关的 Mod 查询接口
+ *
+ * 「这张牌能选几个目标」——多数技能（双目标锦囊、全军出动）改的是这个数。
+ *
+ * 布尔那两个是 Phase 12 的否决器落点：`targetEnabledOf` 回答「这个人
+ * 能不能被选」，`targetInRangeOf` 回答「够不够得着」。两者都与距离无关——
+ * 「够不够得着」是可以被技能改写的结论，不是距离本身。
+ */
+export interface TargetMods {
+  selectTargetOf(source: IPlayer, card: ICard, base: number): number
+  targetEnabledOf?(source: IPlayer, card: ICard, target: IPlayer): boolean
+  targetInRangeOf?(source: IPlayer, card: ICard, target: IPlayer): boolean
+}
 
 /**
  * 目标校验结果
@@ -45,17 +62,18 @@ export class TargetSystem {
     source: IPlayer,
     targets: IPlayer[],
     card: ICard,
-    state: IGameState,
+    state: GameStateSnapshot,
+    mods?: DistanceMods & TargetMods,
   ): TargetValidationResult {
     const minTargets = this.getMinTargets(card)
-    const maxTargets = this.getMaxTargets(card)
+    const maxTargets = this.getMaxTargets(card, source, mods)
 
     // Allow empty targets only when minTargets is 0 (AOE, self-targeting cards)
     if (targets.length === 0 && minTargets > 0) {
       return { valid: false, reason: '未选择目标' }
     }
 
-    const availableTargets = this.getAvailableTargets(source, card, state)
+    const availableTargets = this.getAvailableTargets(source, card, state, mods)
 
     // 检查是否多选（基本牌/普通锦囊通常只能选1个目标）
     if (targets.length > maxTargets) {
@@ -93,66 +111,106 @@ export class TargetSystem {
   static getAvailableTargets(
     source: IPlayer,
     card: ICard,
-    state: IGameState,
+    state: GameStateSnapshot,
+    mods?: DistanceMods & TargetMods,
+  ): IPlayer[] {
+    const candidates = this.computeAvailableTargets(source, card, state, mods)
+
+    // 否决器统一收口在这里，而不是散在各个分支里：
+    // 无论这张牌的目标规则多特殊，「这人能不能被选 / 够不够得着」
+    // 都是**覆盖在结论之上**的最后一层判断。
+    if (!mods) return candidates
+
+    return candidates.filter(
+      (target) =>
+        (mods.targetEnabledOf?.(source, card, target) ?? true) &&
+        (mods.targetInRangeOf?.(source, card, target) ?? true),
+    )
+  }
+
+  /**
+   * 按卡牌类型算出候选目标（不含 Mod 否决）
+   *
+   * 与 {@link getAvailableTargets} 分开，是为了让否决器只有一处生效——
+   * 下面每个分支都 `return`，若把过滤塞进去就会漏掉某个分支。
+   */
+  private static computeAvailableTargets(
+    source: IPlayer,
+    card: ICard,
+    state: GameStateSnapshot,
+    mods?: DistanceMods & TargetMods,
   ): IPlayer[] {
     const tags = card.tags
     const alivePlayers = state.players.filter((p) => p.alive)
 
     // ── 杀 ──
-    if (tags.has('sha') && tags.has('attack')) {
-      return this.getTargetsForAttack(source, alivePlayers)
+    if (tags.has(CardTag.Strike) && tags.has(CardTag.Attack)) {
+      return this.getTargetsForAttack(source, alivePlayers, mods)
     }
 
     // ── 桃 ──
-    if (tags.has('tao') && tags.has('heal')) {
+    //
+    // 判据必须是「具体牌 tag + 类别 tag」两个不同维度：`Heal` 不是桃独有的，
+    // 【桃园结义】同样带着它（`[PeachGardenOath, Trick, Heal, Aoe]`）。
+    // 只判 `Heal` 会把那张群体牌塞进桃的目标规则里——「只能对自己用」。
+    if (tags.has(CardTag.Heal) && tags.has(CardTag.Basic)) {
       return this.getTargetsForPeach(source, alivePlayers)
     }
 
     // ── 酒 ──
-    if (tags.has('jiu')) {
+    if (tags.has(CardTag.Wine)) {
       return [source] // 酒只能对自己使用
     }
 
+    // ── 装备 ──
+    //
+    // 装备牌只对自己生效。这一分支原先只在 `PhaseManager` 的副本里有，
+    // 本系统缺它——于是装备牌会一路落到文件末尾的「默认：距离 1 的其他角色」，
+    // 变成「把自己的武器装到别人身上」。补上才能让副本退休。
+    if (tags.has(CardTag.Equip) || card.type === 'equip') {
+      return [source]
+    }
+
     // ── 无懈可击 ──
-    if (tags.has('cancel') || card.name === '无懈可击') {
+    if (tags.has(CardTag.Cancel) || card.name === '无懈可击') {
       // 无懈可击的目标是锦囊牌（而非玩家）
       // 此处返回空数组——实际目标选择由响应窗口处理
       return []
     }
 
     // ── 过河拆桥 / 顺手牵羊 ──
-    if (tags.has('dismantle') || tags.has('snatch')) {
-      return this.getTargetsForStealOrDismantle(source, alivePlayers)
+    if (tags.has(CardTag.Dismantle) || tags.has(CardTag.Snatch)) {
+      return this.getTargetsForStealOrDismantle(source, alivePlayers, mods)
     }
 
     // ── 决斗 ──
-    if (tags.has('duel')) {
+    if (tags.has(CardTag.Duel)) {
       return alivePlayers.filter((p) => p.id !== source.id)
     }
 
     // ── 借刀杀人 ──
-    if (tags.has('blade')) {
+    if (tags.has(CardTag.BorrowedBlade)) {
       // 所有其他角色均可作为目标；具体合法性由效果内部校验
       return alivePlayers.filter((p) => p.id !== source.id)
     }
 
     // ── 延时锦囊（乐不思蜀/兵粮寸断/闪电） ──
     if (card.isDelayed) {
-      return this.getTargetsForDelayedCard(source, alivePlayers)
+      return this.getTargetsForDelayedCard(source, alivePlayers, card)
     }
 
     // ── 非延时锦囊（南蛮入侵/万箭齐发/五谷丰登/桃园结义） ──
-    if (tags.has('aoe')) {
+    if (tags.has(CardTag.Aoe)) {
       return alivePlayers.filter((p) => p.id !== source.id)
     }
 
     // ── 牌面效果仅对自己生效（无中生有、酒等） ──
-    if (tags.has('draw') || tags.has('boost') || card.tags.has('selfOnly')) {
+    if (tags.has(CardTag.Draw) || tags.has(CardTag.Boost) || card.tags.has(CardTag.SelfOnly)) {
       return [source]
     }
 
     // ── 默认：距离为1的其他角色 ──
-    return DistanceSystem.getPlayersWithinDistance(source, 1, alivePlayers)
+    return DistanceSystem.getPlayersWithinDistance(source, 1, alivePlayers, mods)
   }
 
   // ── 卡牌目标数限制 ──
@@ -162,27 +220,39 @@ export class TargetSystem {
    */
   static getMinTargets(card: ICard): number {
     // 无懈可击的最小目标为 0（可以选择是否使用）
-    if (card.tags.has('cancel') || card.name === '无懈可击') return 0
+    if (card.tags.has(CardTag.Cancel) || card.name === '无懈可击') return 0
     // 桃园结义、五谷丰登、南蛮入侵、万箭齐发无目标（AOE 全体生效）
-    if (card.tags.has('aoe') || card.tags.has('all')) return 0
+    if (card.tags.has(CardTag.Aoe) || card.tags.has(CardTag.All)) return 0
     // 借刀杀人需要选择2个目标
-    if (card.tags.has('blade')) return 2
+    if (card.tags.has(CardTag.BorrowedBlade)) return 2
     // 其他卡牌至少 1 个目标
     return 1
   }
 
   /**
    * 获取卡牌的最大目标数。
+   *
+   * 表里的数字只是**基础值**；实际额度还要过一遍 `mod.selectTarget`。
+   *
+   * @param card   使用的卡牌
+   * @param source 使用者（`mod.selectTarget` 需要知道「谁」在选）
+   * @param mods   Mod 查询口
    */
-  static getMaxTargets(card: ICard): number {
+  static getMaxTargets(card: ICard, source: IPlayer, mods?: TargetMods): number {
+    const base = this.baseMaxTargets(card)
+    return mods ? mods.selectTargetOf(source, card, base) : base
+  }
+
+  /** 最大目标数的**基础规则**（Mod 之前） */
+  private static baseMaxTargets(card: ICard): number {
     // AOE 无目标选择
-    if (card.tags.has('aoe') || card.tags.has('all')) return 0
+    if (card.tags.has(CardTag.Aoe) || card.tags.has(CardTag.All)) return 0
     // 无懈可击可以同时抵消多张同类型牌
-    if (card.tags.has('cancel') || card.name === '无懈可击') return 1
+    if (card.tags.has(CardTag.Cancel) || card.name === '无懈可击') return 1
     // 借刀杀人需要选择2个目标
-    if (card.tags.has('blade')) return 2
+    if (card.tags.has(CardTag.BorrowedBlade)) return 2
     // 五谷丰登无目标
-    if (card.tags.has('granary')) return 0
+    if (card.tags.has(CardTag.BountifulHarvest)) return 0
     // 默认 1 个目标
     return 1
   }
@@ -195,10 +265,11 @@ export class TargetSystem {
   private static getTargetsForAttack(
     source: IPlayer,
     alivePlayers: IPlayer[],
+    mods?: DistanceMods,
   ): IPlayer[] {
     return alivePlayers.filter((p) => {
       if (p.id === source.id) return false
-      return DistanceSystem.isInRange(source, p, alivePlayers)
+      return DistanceSystem.isInRange(source, p, alivePlayers, mods)
     })
   }
 
@@ -233,11 +304,12 @@ export class TargetSystem {
   private static getTargetsForStealOrDismantle(
     source: IPlayer,
     alivePlayers: IPlayer[],
+    mods?: DistanceMods,
   ): IPlayer[] {
     return alivePlayers.filter((p) => {
       if (p.id === source.id) return false
       // 必须在距离 1 内
-      if (DistanceSystem.getDistance(source, p, alivePlayers) > 1) return false
+      if (DistanceSystem.getDistance(source, p, alivePlayers, mods) > 1) return false
       // 允许目标区域内无牌（卡牌效果会空放）
       return true
     })
@@ -252,15 +324,12 @@ export class TargetSystem {
   private static getTargetsForDelayedCard(
     source: IPlayer,
     alivePlayers: IPlayer[],
+    card: ICard,
   ): IPlayer[] {
     return alivePlayers.filter((p) => {
       if (p.id === source.id) return true // 总是可以对自己使用
-      // 检查目标判定区是否已有同名牌
-      const hasSameDelayed = p.judgeCards.some(
-        (c) => c.name === (source as never) /* 此处检查同名 */,
-      )
-      // 简化：排除判定区已有牌的玩家（可扩展）
-      return true
+      // 同名延时锦囊不能叠放：判定区里已经有【乐不思蜀】的人不能再吃一张
+      return !p.judgeCards.some((c) => c.name === card.name)
     })
   }
 }

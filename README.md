@@ -47,10 +47,13 @@ npm run build
 
 ```sh
 # 全部单元测试 (Vitest)
-npm run test:unit
+npm run test
 
-# E2E 测试 (Playwright)
-npm run test:e2e
+# 监听模式
+npm run test:watch
+
+# 类型检查 + 单测（提交前跑这个）
+npm run verify
 
 # TypeScript 类型检查
 npm run type-check

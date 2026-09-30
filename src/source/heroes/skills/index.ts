@@ -6,44 +6,31 @@
 //   shuSkills  — Noxus（蜀）：刘备、关羽、张飞、赵云
 //   wuSkills   — Ionia（吴）：孙权、吕蒙
 //
-// 所有技能均为 IEffect 对象，通过 EffectRegistry 全局管理。
+// Phase 13 起全部是 `ISkill`，登记进 SkillRegistry 后
+// 由它按英雄 / 装备的持有关系挂到具体玩家身上。
 // ============================================================
 
 export {
-  jianxiongEffect,
-  hujiaEffect,
-  fankuiEffect,
-  guicaiEffect,
-  ganglieEffect,
-  tuxiEffect,
+  jianxiong,
+  hujia,
+  fankui,
+  guicai,
+  ganglie,
+  tuxi,
   weiSkills,
 } from './wei-skills'
 
-export {
-  rendeEffect,
-  wushengEffect,
-  paoxiaoEffect,
-  longdanEffect,
-  shuSkills,
-} from './shu-skills'
+export { rende, wusheng, paoxiao, longdan, shuSkills } from './shu-skills'
 
-export {
-  zhihengEffect,
-  kejiEffect,
-  wuSkills,
-} from './wu-skills'
+export { zhiheng, keji, wuSkills } from './wu-skills'
 
 import { weiSkills } from './wei-skills'
 import { shuSkills } from './shu-skills'
 import { wuSkills } from './wu-skills'
-import type { IEffect } from '@core/contracts/effect.interface'
+import type { ISkill } from '@core/contracts/skill.interface'
 
 /**
  * 所有英雄技能的汇总数组。
- * 在游戏启动时批量注册到 EffectRegistry。
+ * 在游戏启动时批量登记进 SkillRegistry。
  */
-export const allHeroSkills: IEffect[] = [
-  ...weiSkills,
-  ...shuSkills,
-  ...wuSkills,
-]
+export const allHeroSkills: ISkill[] = [...weiSkills, ...shuSkills, ...wuSkills]

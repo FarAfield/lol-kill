@@ -1,577 +1,205 @@
 // ============================================================
-// Player 实体 单元测试
+// Player 实体 —— 只测它**剩下**的东西：数据与派生只读量
+//
+// Phase 19 之前这里还测着 17 个变更方法（`loseHp` / `equipCard` /
+// `setMark` …）。它们已经迁走：
+//   数值与标记 → `PlayerSystem`（见 `__tests__/system/player-system.test.ts`）
+//   卡牌区域   → `CardSystem`（见 `__tests__/system/card-system.test.ts`）
+//
+// 本文件保留的意义是钉住一条边界：**实体没有变更方法**。
+// 最后那条「IPlayer 上没有写入口」的用例就是这条边界的哨兵——
+// 谁再往实体上加一个 `setXxx`，它会立刻红。
 // ============================================================
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { Player } from '@core/entity/player'
 import { Hero } from '@core/entity/hero'
 import { Card } from '@core/entity/card'
-import { GamePhase, Kingdom, ZoneType, EquipSlot, CardType, CardSuit, RoleType } from '@core/contracts/enums'
-import type { CardDefinition } from '@core/contracts/card.interface'
+import { CardTag } from '@core/contracts/card-tag'
+import { PlayerSystem } from '@core/system/player-system'
+import { CardSystem } from '@core/system/card-system'
+import {
+  CardRank,
+  CardSuit,
+  CardType,
+  EquipSlot,
+  Kingdom,
+  ZoneType,
+} from '@core/contracts/enums'
+import type { EquipSlot as EquipSlotType } from '@core/contracts/enums'
 
-// ── 测试辅助 ──
+const system = new PlayerSystem()
 
-function createTestHero(overrides?: Partial<Parameters<typeof Hero.create>[0]>): Hero {
-  return Hero.create({
-    id: 'test_hero',
-    name: '测试英雄',
+function makeHero(maxHp: number, maxPower = 0): Hero {
+  return new Hero({
+    id: 'hero_test',
+    name: '测试武将',
     title: '测试',
     kingdom: Kingdom.Demacia,
-    maxHp: 4,
-    ...overrides,
+    maxHp,
+    maxPower,
+    effectIds: ['skill_test'],
   })
 }
 
-function createTestCardDef(overrides?: Partial<CardDefinition>): CardDefinition {
-  return {
-    name: '测试卡牌',
-    type: CardType.Basic,
-    suit: CardSuit.Spade,
-    rank: 1,
-    description: '测试',
-    tags: ['test'],
-    effectIds: [],
-    isDelayed: false,
-    canBeCanceled: false,
-    ...overrides,
-  }
-}
-
-function createWeaponCard(): Card {
+function makeEquip(id: string, slot: EquipSlotType, attackRange?: number): Card {
   return Card.create({
-    name: '测试武器',
+    id,
+    name: id,
     type: CardType.Equip,
-    suit: CardSuit.Spade,
-    rank: 1,
-    description: '测试武器',
-    tags: ['weapon'],
+    suit: CardSuit.None,
+    rank: CardRank.A,
+    description: '',
+    tags: [CardTag.Equip],
     effectIds: [],
-    equipSlot: EquipSlot.Weapon,
-    attackRange: 2,
+    equipSlot: slot,
+    attackRange,
     isDelayed: false,
     canBeCanceled: false,
   })
 }
-
-function createArmorCard(): Card {
-  return Card.create({
-    name: '测试防具',
-    type: CardType.Equip,
-    suit: CardSuit.Heart,
-    rank: 2,
-    description: '测试防具',
-    tags: ['armor'],
-    effectIds: [],
-    equipSlot: EquipSlot.Armor,
-    isDelayed: false,
-    canBeCanceled: false,
-  })
-}
-
-// ── 测试套件 ──
 
 describe('Player', () => {
-  beforeEach(() => {
-    Card.resetCounter()
+  it('默认构造：存活、体力为 0、标记为空', () => {
+    const p = new Player({ id: 'p0', seatIndex: 0 })
+    expect(p.alive).toBe(true)
+    expect(p.hp).toBe(0)
+    expect(p.maxHp).toBe(0)
+    expect(p.getMark('anything')).toBe(0)
+    expect(p.handSize).toBe(0)
   })
 
-  // ================================================================
-  // 创建
-  // ================================================================
-
-  describe('create', () => {
-    it('should create a Player with defaults', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-
-      expect(player).toBeInstanceOf(Player)
-      expect(player.id).toBe('p1')
-      expect(player.seatIndex).toBe(0)
-      expect(player.alive).toBe(true)
-      expect(player.hp).toBe(4)
-      expect(player.maxHp).toBe(4)
-      expect(player.handCards).toEqual([])
-      expect(player.equipCards).toEqual([])
-      expect(player.judgeCards).toEqual([])
-    })
-
-    it('should inherit hero properties when hero provided', () => {
-      const hero = createTestHero({ maxHp: 3 })
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
-
-      expect(player.hp).toBe(3)
-      expect(player.maxHp).toBe(3)
-      expect(player.heroes).toEqual([hero])
-    })
-
-    it('should accept override properties', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, hp: 2, maxHp: 5, role: RoleType.Aspect, roleRevealed: true })
-
-      expect(player.hp).toBe(2)
-      expect(player.maxHp).toBe(5)
-      expect(player.role).toBe(RoleType.Aspect)
-      expect(player.roleRevealed).toBe(true)
-    })
-
-    it('should default to alive=true', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      expect(player.alive).toBe(true)
-    })
-
-    it('should initialize marks as empty Map', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      expect(player.marks).toBeInstanceOf(Map)
-      expect(player.marks.size).toBe(0)
-    })
-
-    it('should default attackLimit to 1', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      expect(player.attackLimit).toBe(1)
-      expect(player.usedAttackThisTurn).toBe(false)
-    })
+  it('batchCreate 生成连续座位与递增 ID', () => {
+    const players = Player.batchCreate(3)
+    expect(players.map((p) => p.seatIndex)).toEqual([0, 1, 2])
+    expect(players.map((p) => p.id)).toEqual(['player_0', 'player_1', 'player_2'])
   })
 
-  // ── 构造函数直接使用 ──
+  describe('派生状态（只读）', () => {
+    it('isWounded / isDying 按体力判定', () => {
+      const p = new Player({ id: 'p0', seatIndex: 0, hp: 4, maxHp: 4 })
+      expect(p.isWounded).toBe(false)
+      expect(p.isDying).toBe(false)
 
-  describe('constructor', () => {
-    it('should create player with full config', () => {
-      const player = new Player({
-        id: 'p2',
-        seatIndex: 3,
-        role: RoleType.Ascended,
-        hp: 5,
-        maxHp: 5,
-        attackLimit: 2,
-      })
+      system.loseHp(p, 2)
+      expect(p.isWounded).toBe(true)
+      expect(p.isDying).toBe(false)
 
-      expect(player.id).toBe('p2')
-      expect(player.seatIndex).toBe(3)
-      expect(player.role).toBe(RoleType.Ascended)
-      expect(player.hp).toBe(5)
-      expect(player.attackLimit).toBe(2)
+      system.loseHp(p, 2)
+      expect(p.isDying).toBe(true)
+
+      system.setAlive(p, false)
+      expect(p.isDying).toBe(false)
+    })
+
+    it('attackRange 为基础 1 加武器加成', () => {
+      const p = new Player({ id: 'p0', seatIndex: 0 })
+      expect(p.attackRange).toBe(1)
+      // 装备区写入归 CardSystem；这里只关心派生量怎么读它
+      p.equipCards.push(makeEquip('weapon', EquipSlot.Weapon, 3))
+      expect(p.attackRange).toBe(4)
+    })
+
+    it('markAttackUsed 只写账本，不再回答「能不能」（D8 形态甲）', () => {
+      const p = new Player({ id: 'p0', seatIndex: 0 })
+      // 「本回合还能不能出杀」已从实体上摘掉：它要查 Mod 注册表，
+      // 而 Player 是纯数据持有者。判定口是 `CardBudget.canPlay`。
+      expect(p.usedAttackThisTurn).toBe(false)
+      system.markAttackUsed(p)
+      expect(p.usedAttackThisTurn).toBe(true)
+      system.resetTurnState(p)
+      expect(p.usedAttackThisTurn).toBe(false)
+    })
+
+    it('hero 取 heroes[0]，为空时返回 undefined', () => {
+      const p = new Player({ id: 'p0', seatIndex: 0 })
+      expect(p.hero).toBeUndefined()
+      system.chooseHeroes(p, [makeHero(4)])
+      expect(p.hero?.id).toBe('hero_test')
+    })
+
+    it('chooseHeroes 同步体力与能量', () => {
+      const p = new Player({ id: 'p0', seatIndex: 0 })
+      system.chooseHeroes(p, [makeHero(3, 2)])
+      expect(p.maxHp).toBe(3)
+      expect(p.hp).toBe(3)
+      expect(p.maxPower).toBe(2)
+      expect(p.power).toBe(2)
     })
   })
 
-  // ================================================================
-  // 体力操作
-  // ================================================================
-
-  describe('loseHp', () => {
-    it('should decrease HP by specified amount', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      const lost = player.loseHp(2)
-
-      expect(lost).toBe(2)
-      expect(player.hp).toBe(2)
-    })
-
-    it('should not decrease HP below 0', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      const lost = player.loseHp(10)
-
-      expect(lost).toBe(4)
-      expect(player.hp).toBe(0)
-    })
-
-    it('should return 0 when HP is already 0', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.hp = 0
-      const lost = player.loseHp(3)
-
-      expect(lost).toBe(0)
-      expect(player.hp).toBe(0)
+  describe('标记（只留读）', () => {
+    it('getMark 读不到时返回 0；写入走 PlayerSystem', () => {
+      const p = new Player({ id: 'p0', seatIndex: 0 })
+      expect(p.getMark('rage')).toBe(0)
+      system.setMark(p, 'rage', 3)
+      expect(p.getMark('rage')).toBe(3)
+      system.clearMark(p, 'rage')
+      expect(p.getMark('rage')).toBe(0)
     })
   })
 
-  describe('recoverHp', () => {
-    it('should increase HP by specified amount', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      player.hp = 1
-      const recovered = player.recoverHp(2)
+  describe('序列化', () => {
+    it('toJSON 将 marks 转为普通对象，可被 JSON.stringify', () => {
+      const p = new Player({ id: 'p0', seatIndex: 0, hp: 2, maxHp: 4 })
+      system.setMark(p, 'rage', 2)
 
-      expect(recovered).toBe(2)
-      expect(player.hp).toBe(3)
-    })
-
-    it('should not exceed maxHp', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      player.hp = 3
-      const recovered = player.recoverHp(5)
-
-      expect(recovered).toBe(1)
-      expect(player.hp).toBe(4)
-    })
-
-    it('should return 0 when already at maxHp', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      const recovered = player.recoverHp(2)
-
-      expect(recovered).toBe(0)
-      expect(player.hp).toBe(4)
+      const snapshot = p.toJSON()
+      expect(snapshot.marks).toEqual({ rage: 2 })
+      expect(snapshot.marks).not.toBeInstanceOf(Map)
+      expect(() => JSON.stringify(snapshot)).not.toThrow()
+      expect(snapshot.hp).toBe(2)
     })
   })
 
-  describe('modifyMaxHp', () => {
-    it('should increase maxHp', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      player.modifyMaxHp(1)
+  // ── Phase 19 的边界哨兵 ──
 
-      expect(player.maxHp).toBe(5)
-    })
+  it('实体上没有任何变更方法——写入一律走 system/*', () => {
+    const p = new Player({ id: 'p0', seatIndex: 0 })
 
-    it('should decrease maxHp', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      player.modifyMaxHp(-1)
-
-      expect(player.maxHp).toBe(3)
-    })
-
-    it('should cap current HP to new maxHp', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      player.hp = 4
-      player.modifyMaxHp(-2)
-
-      expect(player.maxHp).toBe(2)
-      expect(player.hp).toBe(2) // capped
-    })
-
-    it('should not allow negative maxHp', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-      player.modifyMaxHp(-10)
-
-      expect(player.maxHp).toBe(0)
-    })
+    // 曾经挂在 Player 上的那一批，一个都不该还在
+    for (const name of [
+      'loseHp',
+      'recoverHp',
+      'modifyMaxHp',
+      'consumePower',
+      'gainPower',
+      'modifyMaxPower',
+      'addHandCards',
+      'removeHandCards',
+      'chooseHeroes',
+      'equipCard',
+      'unEquipSlot',
+      'addJudgeCard',
+      'removeJudgeCard',
+      'setMark',
+      'addMark',
+      'clearMark',
+      'resetTurnState',
+      'markAttackUsed',
+    ]) {
+      expect((p as unknown as Record<string, unknown>)[name]).toBeUndefined()
+    }
   })
-
-  // ================================================================
-  // 能量操作
-  // ================================================================
-
-  describe('power', () => {
-    it('should consume power', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.power = 3
-      const consumed = player.consumePower(2)
-
-      expect(consumed).toBe(2)
-      expect(player.power).toBe(1)
-    })
-
-    it('should gain power up to maxPower', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.maxPower = 5
-      player.power = 3
-      player.gainPower(4)
-
-      expect(player.power).toBe(5)
-    })
-  })
-
-  // ================================================================
-  // 查询
-  // ================================================================
-
-  describe('queries', () => {
-    it('should report handSize correctly', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const card = Card.create(createTestCardDef())
-
-      expect(player.handSize).toBe(0)
-
-      player.handCards.push(card)
-      expect(player.handSize).toBe(1)
-    })
-
-    it('should report isWounded when hp < maxHp', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [createTestHero({ maxHp: 4 })], hp: 4, maxHp: 4 })
-
-      expect(player.isWounded).toBe(false)
-
-      player.hp = 3
-      expect(player.isWounded).toBe(true)
-    })
-
-    it('should report isDying when hp <= 0 and alive', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-
-      expect(player.isDying).toBe(false)
-
-      player.hp = 0
-      expect(player.isDying).toBe(true)
-
-      player.alive = false
-      expect(player.isDying).toBe(false)
-    })
-
-    it('should report attackRange with weapon', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      // No weapon: base range = 1
-      expect(player.attackRange).toBe(1)
-
-      // Equip weapon with attackRange = 2: total = 1 + 2 = 3
-      const weapon = createWeaponCard()
-      player.equipCards.push(weapon)
-      expect(player.attackRange).toBe(3)
-    })
-
-    it('should return hero from heroes[0]', () => {
-      const hero = createTestHero()
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
-
-      expect(player.hero).toBe(hero)
-    })
-
-    it('should return undefined hero when heroes is empty', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      expect(player.hero).toBeUndefined()
-    })
-  })
-
-  // ================================================================
-  // 装备区操作
-  // ================================================================
-
-  describe('equipCard', () => {
-    it('should add equipment to equipCards', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const weapon = createWeaponCard()
-
-      const replaced = player.equipCard(weapon)
-
-      expect(replaced).toBeUndefined()
-      expect(player.equipCards).toContain(weapon)
-    })
-
-    it('should replace existing equipment in same slot', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const weapon1 = createWeaponCard()
-      const weapon2 = Card.create({
-        name: '新武器',
-        type: CardType.Equip,
-        suit: CardSuit.Club,
-        rank: 5,
-        description: '新武器',
-        tags: ['weapon'],
-        effectIds: [],
-        equipSlot: EquipSlot.Weapon,
-        attackRange: 3,
-        isDelayed: false,
-        canBeCanceled: false,
-      })
-
-      player.equipCard(weapon1)
-      const replaced = player.equipCard(weapon2)
-
-      expect(replaced).toBe(weapon1)
-      expect(player.equipCards).toContain(weapon2)
-      expect(player.equipCards).not.toContain(weapon1)
-      expect(player.equipCards).toHaveLength(1)
-    })
-
-    it('should return undefined for card without equipSlot', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const basicCard = Card.create(createTestCardDef())
-
-      const replaced = player.equipCard(basicCard)
-      expect(replaced).toBeUndefined()
-    })
-  })
-
-  describe('unequipSlot', () => {
-    it('should remove equipment from specified slot', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const weapon = createWeaponCard()
-      player.equipCards.push(weapon)
-
-      const removed = player.unequipSlot(EquipSlot.Weapon)
-
-      expect(removed).toBe(weapon)
-      expect(player.equipCards).toHaveLength(0)
-    })
-
-    it('should return undefined when slot is empty', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const removed = player.unequipSlot(EquipSlot.Weapon)
-
-      expect(removed).toBeUndefined()
-    })
-
-    it('should handle multiple equipment slots', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const weapon = createWeaponCard()
-      const armor = createArmorCard()
-      player.equipCards.push(weapon, armor)
-
-      player.unequipSlot(EquipSlot.Weapon)
-
-      expect(player.equipCards).toHaveLength(1)
-      expect(player.equipCards[0]).toBe(armor)
-    })
-  })
-
-  describe('getEquipInSlot', () => {
-    it('should find equipment by slot', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const armor = createArmorCard()
-      player.equipCards.push(armor)
-
-      expect(player.getEquipInSlot(EquipSlot.Armor)).toBe(armor)
-      expect(player.getEquipInSlot(EquipSlot.Weapon)).toBeUndefined()
-    })
-  })
-
-  // ================================================================
-  // 判定区操作
-  // ================================================================
-
-  describe('judge cards', () => {
-    it('should add judge card', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const card = Card.create(createTestCardDef({ isDelayed: true }))
-
-      player.addJudgeCard(card)
-      expect(player.judgeCards).toContain(card)
-    })
-
-    it('should remove judge card by id', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const card = Card.create(createTestCardDef({ isDelayed: true }))
-
-      player.addJudgeCard(card)
-      const removed = player.removeJudgeCard(card.id)
-
-      expect(removed).toBe(card)
-      expect(player.judgeCards).toHaveLength(0)
-    })
-
-    it('should return undefined when removing non-existent judge card', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const removed = player.removeJudgeCard('nonexistent')
-
-      expect(removed).toBeUndefined()
-    })
-  })
-
-  // ================================================================
-  // 标记操作
-  // ================================================================
-
-  describe('marks', () => {
-    it('should get default mark value as 0', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      expect(player.getMark('damageThisTurn')).toBe(0)
-    })
-
-    it('should set and get mark value', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.setMark('damageThisTurn', 3)
-      expect(player.getMark('damageThisTurn')).toBe(3)
-    })
-
-    it('should add to mark value', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.addMark('damageThisTurn')
-      player.addMark('damageThisTurn', 2)
-      expect(player.getMark('damageThisTurn')).toBe(3)
-    })
-
-    it('should clear mark', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.setMark('test', 5)
-      player.clearMark('test')
-      expect(player.getMark('test')).toBe(0)
-    })
-  })
-
-  // ================================================================
-  // 回合追踪
-  // ================================================================
-
-  describe('turn tracking', () => {
-    it('should reset turn state', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.usedAttackThisTurn = true
-      player.attackLimit = 3
-      player.shouldSkipPhases = [GamePhase.PhaseUse]
-      player.skippedPhases = [GamePhase.PhaseDraw]
-
-      player.resetTurnState()
-
-      expect(player.usedAttackThisTurn).toBe(false)
-      expect(player.attackLimit).toBe(1)
-      expect(player.shouldSkipPhases).toEqual([])
-      expect(player.skippedPhases).toEqual([])
-    })
-
-    it('should mark attack used', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.markAttackUsed()
-      expect(player.usedAttackThisTurn).toBe(true)
-    })
-
-    it('should report canAttack=true when attack not used', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      expect(player.canAttack).toBe(true)
-    })
-
-    it('should report canAttack=false when attack used with default limit', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.markAttackUsed()
-      // Default limit = 1, and we've used 1 attack
-      // canAttack returns: attackLimit > (usedAttackThisTurn ? 1 : 0) => 1 > 1 => false
-      expect(player.canAttack).toBe(false)
-    })
-  })
-
-  // ================================================================
-  // 序列化
-  // ================================================================
-
-  describe('toJSON', () => {
-    it('should serialize marks as plain object', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      player.setMark('test', 42)
-
-      const json = player.toJSON()
-      expect(json.marks).toEqual({ test: 42 })
-    })
-
-    it('should serialize all required fields', () => {
-      const player = new Player({ id: 'p1', seatIndex: 0 })
-      const json = player.toJSON()
-
-      expect(json.id).toBe('p1')
-      expect(json.seatIndex).toBe(0)
-      expect(json.alive).toBe(true)
-      expect(json.hp).toBe(4)
-      expect(typeof json.marks).toBe('object')
-    })
-  })
-
-  // ================================================================
-  // 边界情况
-  // ================================================================
-
-  describe('edge cases', () => {
-    it('should handle player with maxHp=0', () => {
-      const hero = createTestHero({ maxHp: 0 })
-      const player = new Player({ id: 'p1', seatIndex: 0, heroes: [hero], hp: hero.maxHp, maxHp: hero.maxHp, power: hero.maxPower ?? 0, maxPower: hero.maxPower ?? 0 })
-      expect(player.hp).toBe(0)
-      expect(player.maxHp).toBe(0)
-    })
-
-    it('should handle multiple heroes (dual-hero mode)', () => {
-      const hero1 = createTestHero({ id: 'h1', name: '英雄1' })
-      const hero2 = createTestHero({ id: 'h2', name: '英雄2' })
-      const player = new Player({
-        id: 'p1',
-        seatIndex: 0,
-        heroes: [hero1, hero2],
-        hp: 6,
-        maxHp: 6,
-      })
-
-      expect(player.heroes).toHaveLength(2)
-      expect(player.hero).toBe(hero1) // hero getter returns [0]
-    })
+})
+
+// `Card.moveTo` 这类「改区域」的方法已从实体上删掉（Phase 19），
+// 区域流转现在只有 `CardSystem` 一条路——下面这条走的就是它。
+describe('Card 区域流转（走 CardSystem）', () => {
+  it('进手牌 → 仅本人可见；进弃牌堆 → 谁都看不见', () => {
+    const p = new Player({ id: 'p0', seatIndex: 0 })
+    const other = new Player({ id: 'p1', seatIndex: 1 })
+    const state = { deck: [], discardPile: [], processingCards: [], players: [p, other] } as never
+    const cardSystem = new CardSystem(state)
+
+    const card = makeEquip('w1', EquipSlot.Weapon, 1)
+    cardSystem.obtainCard(card, p)
+    expect(card.zone).toBe(ZoneType.Hand)
+    expect(card.isVisibleTo(p)).toBe(true)
+    expect(card.isVisibleTo(other)).toBe(false)
+
+    cardSystem.discardCard(card, p)
+    expect(card.zone).toBe(ZoneType.Discard)
+    expect(card.visibleTo).toHaveLength(0)
   })
 })

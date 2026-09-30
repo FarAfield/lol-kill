@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   NSpace,
@@ -143,7 +143,7 @@ import { useGameStore } from '@/store/game-store'
 import { GameController } from '@/services/game-controller'
 import { GamePhase, SkillType, LogLevel } from '@core/contracts/enums'
 import type { ICard } from '@core/contracts/card.interface'
-import type { IGameConfig, IGameResult } from '@core/contracts/game.interface'
+import type { IGameConfig } from '@core/contracts/game.interface'
 import { standard5pConfig } from '@source/modes/standard-5p'
 import GameBoard from '@/components/game/GameBoard.vue'
 import CardHand from '@/components/card/CardHand.vue'
@@ -164,7 +164,8 @@ const router = useRouter()
 const gameStore = useGameStore()
 
 // ── GameController 实例 ──
-const controller = ref<GameController | null>(null)
+// 用 shallowRef：ref 的 UnwrapRef 会剥掉类的私有成员，导致类型不匹配
+const controller = shallowRef<GameController | null>(null)
 
 // ── 欢迎弹窗 ──
 const showWelcome = ref(true)
@@ -263,7 +264,7 @@ const responseValidCards = computed<ICard[]>(() => {
   const human = humanPlayer.value
   if (!human) return []
   const ids = new Set(response.validCardIds.value)
-  return human.handCards.filter((c) => ids.has(c.id))
+  return human.handCards.filter((c) => ids.has(c.instanceId))
 })
 
 // ── 卡牌选择处理 ──
@@ -358,7 +359,6 @@ function checkGameOverStatus(): void {
 
     logStore.addLog({
       id: `log_gameover_${Date.now()}`,
-      timestamp: Date.now(),
       round: result.totalRounds,
       phase: GamePhase.GameOver,
       message: `游戏结束: ${result.reason}`,
@@ -382,8 +382,7 @@ async function handleStartGame(): Promise<void> {
     const config: IGameConfig = { ...standard5pConfig }
 
     logStore.addLog({
-      id: `log_${Date.now()}`,
-      timestamp: Date.now(),
+      id: `log_init_${Date.now()}`,
       round: 0,
       phase: GamePhase.NotStarted,
       message: `正在初始化游戏 (模式: ${config.mode}, ${config.playerCount} 人局)...`,
@@ -394,8 +393,7 @@ async function handleStartGame(): Promise<void> {
     await ctrl.createGame(config)
 
     logStore.addLog({
-      id: `log_${Date.now() + 1}`,
-      timestamp: Date.now(),
+      id: `log_init_done_${Date.now()}`,
       round: 0,
       phase: GamePhase.Prepare,
       message: `游戏初始化完成 — ${config.playerCount} 名玩家就绪，开始第一回合`,
@@ -411,7 +409,6 @@ async function handleStartGame(): Promise<void> {
     console.error('[GameView] 游戏初始化失败:', err)
     logStore.addLog({
       id: `log_error_${Date.now()}`,
-      timestamp: Date.now(),
       round: 0,
       phase: GamePhase.NotStarted,
       message: `游戏初始化失败: ${err instanceof Error ? err.message : String(err)}`,

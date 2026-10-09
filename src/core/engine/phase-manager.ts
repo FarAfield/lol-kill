@@ -433,9 +433,14 @@ export class PhaseManager {
 
         // 询问玩家出牌决策
         try {
+          // 目标数与合法目标同一处算出，一并递给决策方——
+          // 让每个 UI / AI 自己去猜「取几个」必然猜错（AOE 是 0，
+          // 借刀杀人是 2），而引擎那道目标校验只认真正的规则。
           const options = playableCards.map((card) => ({
             card,
             validTargets: this.getValidTargetsForCard(player, card),
+            minTargets: TargetSystem.getMinTargets(card),
+            maxTargets: TargetSystem.getMaxTargets(card, player, this.modQuery),
           }))
 
           const result = await this.decisionService.askForCardPlay(

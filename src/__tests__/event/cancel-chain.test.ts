@@ -39,9 +39,20 @@ afterEach(() => {
   clearCancelGuards()
 })
 
-/** 一张带 Trick 标签的南蛮入侵（锦囊才会被开窗口） */
+/**
+ * 一张南蛮入侵
+ *
+ * tag 必须与 `src/source/cards/tricks.ts` 的真实定义一致
+ * （`[BarbarianRaid, Trick, Aoe]`）。少了 `Aoe` 它就落进 TargetSystem
+ * 的「默认：距离 1 的其他角色」分支，于是变成一张**要选目标**的牌；
+ * 引擎一开始校验目标（欠账 D31），这种「测试里的牌不是真的牌」就
+ * 立刻发作。fixture 的唯一真值源是卡牌定义，不是测试里的随手一列。
+ */
 function nanMan(user: IPlayer, extra: Partial<ReturnType<typeof cardDef>> = {}): ICard {
-  return giveCard(user, cardDef('nanManRuQin', [CardTag.Trick, CardTag.BarbarianRaid], extra))
+  return giveCard(
+    user,
+    cardDef('nanManRuQin', [CardTag.BarbarianRaid, CardTag.Trick, CardTag.Aoe], extra),
+  )
 }
 
 /**
@@ -290,14 +301,18 @@ describe('无懈可击本身', () => {
     const card = wuxie(user)
 
     const before = victim.hp
-    await env.engine.useCard(user, card, [victim])
+    // 无懈可击压根不设目标（它的目标是「某张锦囊」，不是人）——
+    // 硬塞一个目标进去，如今会被引擎判非法。
+    await env.engine.useCard(user, card, [])
 
     expect(victim.hp).toBe(before)
   })
 
   it('无懈可击不能抵消基本牌', async () => {
-    const [user, p1, victim] = env.players()
-    const sha = giveCard(user, cardDef('sha', CardTag.Strike))
+    // 目标取邻座：杀的射程是攻击范围（无武器时 = 1），
+    // 座次距离 2 的人从来就不是合法目标（Phase 21 · D4）。
+    const [user, victim, p1] = env.players()
+    const sha = giveCard(user, cardDef('sha', [CardTag.Strike, CardTag.Attack]))
     wuxie(p1)
 
     const before = victim.hp

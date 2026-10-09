@@ -158,6 +158,18 @@ export const useGameStore = defineStore('game', () => {
     return gameState.value?.players.filter((p) => p.alive).length ?? 0
   })
 
+  /**
+   * 牌堆剩余张数。
+   *
+   * 这里给的是**张数**而不是 `deck` 本身：UI 只数得清还剩几张，
+   * 把整个 `ICard[]` 递下去，组件就会顺手从里面派生别的东西，
+   * 于是同一件事出现第二个答案。要详情的那天再单独开一个查询口。
+   */
+  const deckCount = computed(() => gameState.value?.deck.length ?? 0)
+
+  /** 弃牌堆张数 */
+  const discardCount = computed(() => gameState.value?.discardPile.length ?? 0)
+
   // ── Actions ──
 
   /**
@@ -204,6 +216,8 @@ export const useGameStore = defineStore('game', () => {
     isPlaying,
     isGameOver,
     aliveCount,
+    deckCount,
+    discardCount,
 
     // Actions
     syncFromEngine,

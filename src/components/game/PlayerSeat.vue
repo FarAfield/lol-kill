@@ -59,6 +59,17 @@
       <!-- 手牌数 / 装备标记 -->
       <div class="card-indicators">
         <div class="hand-badge">
+          <!--
+            对手的手牌画成**卡背**（欠账 D25）。
+            张数只有一个答案：就是下面这个 `handCount`。
+            卡背不收 `ICard[]` —— 收了就有人能顺手读出花色来。
+          -->
+          <CardBack
+            v-if="!isHuman"
+            class="opponent-hand"
+            :count="player.handCount"
+            size="small"
+          />
           <n-tag size="small" round :type="player.handCount > 0 ? 'info' : 'default'">
             {{ isHuman ? `手牌 ×${player.handCount}` : `${player.handCount} 张` }}
           </n-tag>
@@ -94,6 +105,7 @@ import { RoleType, Kingdom } from '@core/contracts/enums'
 import type { UIPlayerInfo } from '@/store/game-store'
 import CardEquip from '@/components/card/CardEquip.vue'
 import CardJudge from '@/components/card/CardJudge.vue'
+import CardBack from '@/components/card/CardBack.vue'
 
 const props = defineProps<{
   player: UIPlayerInfo
@@ -331,6 +343,16 @@ function handleMouseLeave(): void {
 
 .hand-badge {
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+// 卡背那一叠自带 6px/张的横向偏移，最后一张后面留点空，
+// 否则「+N」会压在牌上面。
+.opponent-hand {
+  margin-right: 4px;
 }
 
 .human-hand-area {

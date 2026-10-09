@@ -62,7 +62,8 @@ import { ModRegistry } from '@core/skill/mod-registry'
 import { ModQuery } from '@core/skill/mod-query'
 import { CardBudget } from '@core/skill/card-budget'
 import * as WinCondition from '@core/system/win-condition'
-import { TargetSystem } from '@core/system/target-system'
+import { TargetSystem, TargetValidationError } from '@core/system/target-system'
+import type { TargetValidationResult } from '@core/system/target-system'
 import { SkillRegistry } from '@core/skill/skill-registry'
 import { ViewAsService } from '@core/skill/view-as'
 import { registerSkillMods } from '@core/skill/skill-mods'
@@ -304,6 +305,21 @@ export class GameEngine {
         playerSystem: this.playerSystem,
       },
     )
+
+    // ── 把三个查询口补发给决策服务 ──
+    //
+    // 「这张牌还能出几次」「对手身上有什么」「谁最危险」这三个答案都归引擎所有，
+    // 而决策服务（AI / 人类决策层）是在引擎**之前**出生的——
+    // 它被当成构造参数传进来时，这些东西还不存在，只能事后补。
+    //
+    // 补发放在引擎里而不是各自的启动器里：`GameBoot` 与 `GameController`
+    // 是两条互不相干的启动路径，以前只有前者补发（欠账 D37），
+    // 于是走 `GameController` 的那条路（图形界面）上的 AI 一直睁眼瞎——
+    // 看不见连弩的额度、看不见藤甲的加伤、算不出威胁度。
+    // 「由引擎补给它的决策服务」是全仓唯一一处答案。
+    this.decisionService?.setCardBudget?.(this.cardBudget)
+    this.decisionService?.setModQuery?.(this.modQuery)
+    this.decisionService?.setSkillRegistry?.(this.skillRegistry)
   }
 
   /**
@@ -441,6 +457,31 @@ export class GameEngine {
    */
   getValidTargets(player: IPlayer, card: ICard): IPlayer[] {
     return TargetSystem.getAvailableTargets(player, card, this.state, this.modQuery)
+  }
+
+  /**
+   * 「这张牌打这组目标」此刻合不合法
+   *
+   * 与 {@link getValidTargets} 是一对：那一个回答「能打谁」，
+   * 这一个回答「打他们行不行」，两者共用同一份规则。
+   *
+   * 调用方（UI / AI）应当在出牌**之前**问一次，好把 reason 说给玩家听；
+   * `useCard` 里那一道是兜底，不是替代品。
+   */
+  validatePlay(
+    player: IPlayer,
+    card: ICard,
+    targets: IPlayer[],
+  ): TargetValidationResult {
+    return TargetSystem.validateTargets(player, targets, card, this.state, this.modQuery)
+  }
+
+  /** 这张牌要求显式选出几个目标（AI / UI 收敛目标数时用） */
+  targetCountRange(player: IPlayer, card: ICard): { min: number; max: number } {
+    return {
+      min: TargetSystem.getMinTargets(card),
+      max: TargetSystem.getMaxTargets(card, player, this.modQuery),
+    }
   }
 
   // ── 可观测性开关 ──
@@ -678,6 +719,19 @@ export class GameEngine {
    * 引擎本身不认识任何一张具体的牌。
    */
   async useCard(player: IPlayer, card: ICard, targets: IPlayer[]): Promise<void> {
+    // 0. 先把关：目标不合法就一次都不许动——牌留在手牌、事件不许发。
+    //
+    //    这道校验此前根本没有（欠账 D31）：`TargetSystem.validateTargets`
+    //    写得很完整，却零调用方，于是「出牌时非法目标被拒绝并给出原因」
+    //    一直是个空头验收项。放在**移入处理区之前**是有意的——
+    //    先挪牌再校验，被拒的牌就卡在处理区里，回不去了。
+    const check = this.validatePlay(player, card, targets)
+    if (!check.valid) {
+      const reason = check.reason ?? '目标不合法'
+      this.log('warn', `useCard 被拒绝 — ${player.id} 想对 [${targets.map((t) => t.id).join(', ')}] 使用「${card.name}」: ${reason}`)
+      throw new TargetValidationError(card, reason)
+    }
+
     // 1. 从手牌移入处理区
     this.cardSystem.useCard(card, player)
 
@@ -838,16 +892,35 @@ export class GameEngine {
 
   /**
    * 分配身份。
+   *
+   * **主公（Aspect）固定 0 号位**（欠账 D7）：先把主公那一份从池子里摘出来
+   * 钉在座位 0，其余身份洗牌后按座次发下去。
+   *
+   * 以前整份 `roles` 一起 shuffle，于是主公坐在哪是随机的，先手也就跟着随机
+   * ——而「主公先手」是身份局的固定开局：忠臣开局只知道主公是谁，
+   * 反贼与内奸则靠「从主公往下的座次」推断敌友。座次一乱，
+   * 这些信息全部失去参照，胜负条件虽然仍成立，牌局却已经不是原来那个牌局。
+   *
+   * 池子里没有主公时（自定义模式）退回整份洗牌——那本来就没有「主公」可钉。
    */
   private assignRoles(roles: RoleType[]): void {
     if (roles.length === 0) return
 
-    // 随机打乱身份
-    const shuffled = this.randomService.shuffle([...roles])
+    const pool = [...roles]
+    const lordIndex = pool.indexOf(RoleType.Aspect)
 
-    for (let i = 0; i < this.state.players.length && i < shuffled.length; i++) {
+    let ordered: RoleType[]
+    if (lordIndex >= 0) {
+      // 摘出主公放在最前，其余身份照旧洗牌
+      const [lord] = pool.splice(lordIndex, 1)
+      ordered = [lord!, ...this.randomService.shuffle(pool)]
+    } else {
+      ordered = this.randomService.shuffle(pool)
+    }
+
+    for (let i = 0; i < this.state.players.length && i < ordered.length; i++) {
       const player = this.state.players[i]!
-      const role = shuffled[i]!
+      const role = ordered[i]!
       this.playerSystem.setRole(player, role)
 
       // 天命星灵（主公）身份公开

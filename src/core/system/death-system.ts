@@ -36,6 +36,20 @@ import type { PlayerSystem } from '@core/system/player-system'
  * 注意：实际游戏中的异步决策（出桃/不出桃）由 IUIDecisionService 处理。
  * 此系统提供流程框架，具体的玩家交互通过回调/钩子注入。
  */
+/**
+ * 奖惩标记 —— 「击杀反贼摸 3 张」
+ *
+ * 标记名写在常量里而不是两处各抄一遍字符串：`DeathSystem.handleReward`
+ * 记账、`dieContent` 消费，两边一旦拼错，效果是**奖惩静默消失**，
+ * 不报错、不红测试。
+ */
+export const REWARD_DRAW_MARK = 'rewardDraw'
+
+/**
+ * 惩罚标记 —— 「主公误杀忠臣 → 弃置所有牌」（欠账 D13）
+ */
+export const PENALTY_DISCARD_ALL_MARK = 'penaltyDiscardAll'
+
 export class DeathSystem {
   /**
    * @param state        局面快照（只需要玩家列表）
@@ -150,8 +164,12 @@ export class DeathSystem {
    * 奖惩机制。
    *
    * 当前规则（可扩展）：
-   * - 飞升者杀死飞升者 → 击杀者摸 3 张牌
-   * - 任意角色杀死飞升者 → 击杀者摸 3 张牌（经典规则）
+   * - 任意角色杀死飞升者（反贼）→ 击杀者摸 3 张牌
+   * - 天命星灵（主公）杀死守护者（忠臣）→ 主公弃置所有牌（**惩罚**，欠账 D13）
+   *
+   * **这里只判定并记账，不执行**。摸牌与弃牌都发生在 `dieContent`：
+   * 它们要发事件、要能被 Mod 拦（`cardDiscardable`），那是内容层的事。
+   * 奖惩张数 / 该不该罚属于规则判定，留在 system 层。
    *
    * @param deadPlayer 死亡玩家
    * @param killer     击杀者
@@ -159,10 +177,20 @@ export class DeathSystem {
   handleReward(deadPlayer: IPlayer, killer?: IPlayer): void {
     if (!killer || !killer.alive) return
 
-    // 飞升者死亡 → 击杀者奖惩
+    // 飞升者（反贼）死亡 → 击杀者摸 3 张
     if (deadPlayer.role === RoleType.Ascended) {
-      // 飞升者杀死飞升者 → 摸3张牌
-      this.playerSystem.setMark(killer, 'rewardDraw', REBEL_KILL_REWARD)
+      this.playerSystem.setMark(killer, REWARD_DRAW_MARK, REBEL_KILL_REWARD)
+    }
+
+    // 主公误杀忠臣 → 主公弃置所有牌
+    //
+    // 判定挂的是**双方身份**，不是「主公杀了人」：主公杀反贼是拿奖惩，
+    // 杀内奸什么都没有，只有杀忠臣才是惩罚。
+    if (
+      killer.role === RoleType.Aspect &&
+      deadPlayer.role === RoleType.Guardian
+    ) {
+      this.playerSystem.setMark(killer, PENALTY_DISCARD_ALL_MARK, 1)
     }
 
     // 潜伏者死亡的特殊处理（可在此扩展）

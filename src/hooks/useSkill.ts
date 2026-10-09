@@ -12,6 +12,7 @@
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
 import type { GameController } from '@/services/game-controller'
+import type { ISkill } from '@core/contracts/skill.interface'
 import { SkillType } from '@core/contracts/enums'
 
 /** 技能的 UI 展示信息 */
@@ -95,6 +96,27 @@ const SKILL_TYPE_COLORS: Record<SkillType, string> = {
 }
 
 /**
+ * `ISkill` 的布尔矩阵 → 面板上那一个 `SkillType`。
+ *
+ * 技能定义给的是**一组布尔位**（`locked` / `limited` / `awaken` / `enable`），
+ * 而面板要的是**一个**类型，所以这里必须有且只有一条优先序：
+ *
+ * 1. `limited` → 限定技。它压过 `locked`：限定技是要人点的，
+ *    判成锁定技就再也点不到（面板的 `activeSkills` 只收 Active / Limited）。
+ * 2. `awaken` → 觉醒技。
+ * 3. `enable` 非空 → 主动技（写明了在哪些上下文可以手动发动）。
+ * 4. `locked` → 锁定技（强制发动，不可拒绝）。
+ * 5. 其余 → 被动技。
+ */
+function skillTypeOf(skill: ISkill): SkillType {
+  if (skill.limited) return SkillType.Limited
+  if (skill.awaken) return SkillType.Awaken
+  if (skill.enable && skill.enable.length > 0) return SkillType.Active
+  if (skill.locked) return SkillType.Locked
+  return SkillType.Passive
+}
+
+/**
  * 技能发动 Hook。
  *
  * 管理技能可用性判断、发动和触发通知：
@@ -117,7 +139,7 @@ export function useSkill(
     timestamp: number
   } | null>(null)
 
-  /** 可用技能列表（从 GameController.getAvailableActions 获取） */
+  /** 可用技能列表（技能定义来自 `SkillRegistry`，可发动与否来自引擎的上下文判定） */
   const availableSkills = computed<SkillUIInfo[]>(() => {
     const ctrl = controllerGetter()
     if (!ctrl) return []
@@ -125,32 +147,34 @@ export function useSkill(
     const player = ctrl.getCurrentPlayer()
     if (!player) return []
 
-    // 从当前玩家所有英雄收集效果 ID
-    const allEffectIds = new Set<string>()
-    for (const hero of player.heroes) {
-      for (const eid of hero.effectIds) {
-        allEffectIds.add(eid)
+    // **欠账 D36。** 这里以前读的是英雄牌上那串**裸 id**：
+    // 于是 `name` 就是 id、`description` 是空串、`type` 一律 Passive
+    // ——`activeSkills`（只收 Active / Limited）因此**恒为空数组**，面板永远空白。
+    // 真值源是 `SkillRegistry`（`ctrl.getPlayerSkills`）：
+    // 它才含有装备技与临时技能，也才有真名、真描述与类型位。
+    // （旧写法不在这里复述：`skill-panel.test.ts` 里那条源码级断言
+    //  按模式匹配盯着它，连注释里出现也算——与 `GameBoard`
+    //  那两个已删 props 同一规矩。）
+    const skills = ctrl.getPlayerSkills(player.id)
+    const usable = new Set(ctrl.getAvailableActions(player.id).usableEffects)
+
+    return skills.map((skill) => {
+      const type = skillTypeOf(skill)
+      return {
+        id: skill.id,
+        name: skill.name,
+        description: skill.description,
+        type,
+        usable: usable.has(skill.id),
+        // usedThisTurn / usedThisRound 由频率记账维护，接入后补齐
+        usedThisTurn: false,
+        usedThisRound: false,
+        priority: 0,
+        enabled: true,
+        typeLabel: SKILL_TYPE_LABELS[type],
+        typeColor: SKILL_TYPE_COLORS[type],
       }
-    }
-
-    const usable = new Set(ctrl.getAvailableActions().usableEffects)
-
-    // 技能详情（名称 / 描述 / 类型）在 Phase 13 接入 SkillRegistry 后补齐，
-    // 当前以 id 作为展示名。
-    return Array.from(allEffectIds, (id) => ({
-      id,
-      name: id,
-      description: '',
-      type: SkillType.Passive,
-      usable: usable.has(id),
-      // usedThisTurn / usedThisRound 由 CompiledHandler 维护，Phase 15 接入后补齐
-      usedThisTurn: false,
-      usedThisRound: false,
-      priority: 0,
-      enabled: true,
-      typeLabel: SKILL_TYPE_LABELS[SkillType.Passive],
-      typeColor: SKILL_TYPE_COLORS[SkillType.Passive],
-    }))
+    })
   })
 
   /** 主动技列表 */

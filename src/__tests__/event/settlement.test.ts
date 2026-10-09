@@ -272,9 +272,15 @@ describe('濒死求桃', () => {
 // ── 无懈可击窗口 ──
 
 describe('无懈可击窗口', () => {
-  /** 一张带 Trick 标签的南蛮入侵（锦囊才会被开窗口） */
+  /**
+   * 一张南蛮入侵
+   *
+   * tag 对齐 `src/source/cards/tricks.ts` 的真实定义（`BarbarianRaid, Trick, Aoe`）。
+   * 少了 `Aoe` 就不是群体牌了，会被当成「要选一个目标」的普通锦囊，
+   * 而这条用例恰恰是「不设目标」地打出它。
+   */
   function nanMan(user: IPlayer): ICard {
-    return giveCard(user, cardDef('nanManRuQin', [CardTag.Trick, CardTag.BarbarianRaid]))
+    return giveCard(user, cardDef('nanManRuQin', [CardTag.BarbarianRaid, CardTag.Trick, CardTag.Aoe]))
   }
 
   /**
@@ -343,8 +349,10 @@ describe('无懈可击窗口', () => {
   })
 
   it('基本牌不开窗口（无懈可击只针对锦囊）', async () => {
-    const [user, p1, victim] = env.players()
-    const sha = giveCard(user, cardDef('sha', CardTag.Strike))
+    // 目标取邻座：杀的射程是攻击范围（无武器时 = 1），
+    // 座次距离 2 的人从来就不是合法目标（Phase 21 · D4）
+    const [user, victim, p1] = env.players()
+    const sha = giveCard(user, cardDef('sha', [CardTag.Strike, CardTag.Attack]))
     wuxie(p1)
 
     const before = victim.hp

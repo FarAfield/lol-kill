@@ -44,13 +44,34 @@ export interface TargetValidationResult {
 }
 
 /**
+ * 目标非法 —— `GameEngine.useCard` 拒绝一次出牌时抛出
+ *
+ * 为什么抛而不是静默跳过：静默的「这张牌没生效」是本仓最难查的一类
+ * 故障。调用方若想避免它，`GameEngine.validatePlay` 可以先问一次。
+ */
+export class TargetValidationError extends Error {
+  constructor(
+    readonly card: ICard,
+    readonly reason: string,
+  ) {
+    super(`[Target] 非法目标 —— 「${card.name}」: ${reason}`)
+    this.name = 'TargetValidationError'
+    Object.setPrototypeOf(this, TargetValidationError.prototype)
+  }
+}
+
+/**
  * 目标选择系统
  *
  * 所有方法均为纯函数——不修改游戏状态。
  */
 export class TargetSystem {
   /**
-   * 校验目标集合是否合法。
+   * 校验目标集合是否合法
+   *
+   * **生产入口是 `GameEngine.useCard`**（欠账 D31）：本函数此前零调用方，
+   * 于是「出牌时非法目标被拒绝并给出原因」这条验收项一直不成立——
+   * 校验写得很完整，只是没人叫它。
    *
    * @param source  卡牌/效果的使用者
    * @param targets 候选目标列表
@@ -68,7 +89,8 @@ export class TargetSystem {
     const minTargets = this.getMinTargets(card)
     const maxTargets = this.getMaxTargets(card, source, mods)
 
-    // Allow empty targets only when minTargets is 0 (AOE, self-targeting cards)
+    // 空目标只在「这张牌要求显式选目标」时才算错——
+    // AOE 与自标牌的目标数下限是 0（见 getMinTargets）。
     if (targets.length === 0 && minTargets > 0) {
       return { valid: false, reason: '未选择目标' }
     }
@@ -96,6 +118,26 @@ export class TargetSystem {
     }
 
     return { valid: true }
+  }
+
+  /**
+   * 按一张牌的目标数规则，从合法目标里取出「该选的那几个」
+   *
+   * 决策服务（UI / AI / 自动回放）共用的收敛口。此前每一处都各写一句
+   * `validTargets.slice(0, 1)`，于是 AOE（上限 0）被塞进一个目标、
+   * 【借刀杀人】（下限 2）只拿到一个——引擎一旦开始校验目标，
+   * 这些出牌全都被判非法。「取几个」和「能打谁」必须同出一处。
+   */
+  static pickTargets(option: {
+    validTargets: IPlayer[]
+    minTargets: number
+    maxTargets: number
+  }): IPlayer[] {
+    const { validTargets, minTargets, maxTargets } = option
+    // 上限 0 = 这张牌不设目标（AOE / 五谷丰登）
+    if (maxTargets <= 0) return []
+    const want = Math.max(minTargets, 1)
+    return validTargets.slice(0, Math.min(want, maxTargets))
   }
 
   /**
@@ -216,7 +258,14 @@ export class TargetSystem {
   // ── 卡牌目标数限制 ──
 
   /**
-   * 获取卡牌的最小目标数。
+   * 获取卡牌的最小目标数 —— 「必须显式选出几个目标」
+   *
+   * 与 {@link getMaxTargets} 必须同口径，否则会出现「至少 1 个、
+   * 至多 0 个」这种无论如何都打不出去的牌（【五谷丰登】曾经就是这样）。
+   *
+   * 注意「显式」二字：**只对自己生效的牌不算**。装备、酒、无中生有
+   * 在各处调用时一律传 `[]`——目标就是自己，写出来是冗余。把它们算成
+   * 「至少 1 个」会让每一次正常出牌都被判「未选择目标」。
    */
   static getMinTargets(card: ICard): number {
     // 无懈可击的最小目标为 0（可以选择是否使用）
@@ -225,8 +274,29 @@ export class TargetSystem {
     if (card.tags.has(CardTag.Aoe) || card.tags.has(CardTag.All)) return 0
     // 借刀杀人需要选择2个目标
     if (card.tags.has(CardTag.BorrowedBlade)) return 2
+    // 只对自己生效的牌：目标隐含为自己，无需显式给出
+    if (this.isSelfOnly(card)) return 0
     // 其他卡牌至少 1 个目标
     return 1
+  }
+
+  /**
+   * 这张牌是否**只对自己生效**
+   *
+   * 判据与 {@link computeAvailableTargets} 里那些 `return [source]`
+   * 的分支一一对应——两处必须一致，否则「能选的目标只有自己」与
+   * 「必须选一个目标」会同时成立，自标牌就永远打不出去。
+   */
+  static isSelfOnly(card: ICard): boolean {
+    const tags = card.tags
+    return (
+      tags.has(CardTag.Equip) ||
+      card.type === 'equip' ||
+      tags.has(CardTag.Wine) ||
+      tags.has(CardTag.Draw) ||
+      tags.has(CardTag.Boost) ||
+      tags.has(CardTag.SelfOnly)
+    )
   }
 
   /**

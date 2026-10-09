@@ -66,9 +66,14 @@ function peach(user: IPlayer): ICard {
   return giveCard(user, cardDef('tao', CardTag.Heal))
 }
 
-/** 一张南蛮入侵（锦囊才会开无懈窗口） */
+/**
+ * 一张南蛮入侵（锦囊才会开无懈窗口）
+ *
+ * tag 对齐真实定义（`BarbarianRaid, Trick, Aoe`）：它是**群体牌**，
+ * 不设目标。少了 `Aoe` 就会被 TargetSystem 当成「要选一个目标」的普通锦囊。
+ */
 function nanMan(user: IPlayer): ICard {
-  return giveCard(user, cardDef('nanManRuQin', [CardTag.Trick, CardTag.BarbarianRaid]))
+  return giveCard(user, cardDef('nanManRuQin', [CardTag.BarbarianRaid, CardTag.Trick, CardTag.Aoe]))
 }
 
 /** 一张无懈可击 */

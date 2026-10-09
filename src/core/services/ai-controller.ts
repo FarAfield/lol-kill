@@ -42,6 +42,9 @@ import { RoleType } from '@core/contracts/enums'
 import { AI_MIN_DELAY, AI_MAX_DELAY } from '@source/base/constants'
 import { createAIStrategy } from './ai-strategies'
 import type { CardBudget } from '@core/skill/card-budget'
+import type { IModQuery } from '@core/contracts/mod.interface'
+import type { ISkillRegistry } from '@core/contracts/skill.interface'
+import { TargetSystem } from '@core/system/target-system'
 import { SeededRandomService, randomSeed } from './seeded-random'
 
 // ============================================================
@@ -93,6 +96,12 @@ export class AIController implements IUIDecisionService {
   /** 出牌额度查询（可选，见构造选项） */
   private cardBudget: CardBudget | undefined
 
+  /** Mod 查询口（可选，见构造选项） */
+  private modQuery: IModQuery | undefined
+
+  /** 技能台账（可选，见构造选项） */
+  private skillRegistry: ISkillRegistry | undefined
+
   /** 通知回调（可选，用于 UI 日志） */
   private onNotify: ((message: string, level: 'info' | 'warn' | 'error') => void) | null = null
 
@@ -115,6 +124,19 @@ export class AIController implements IUIDecisionService {
      * 但那样 AI 就看不见【诸葛连弩】这类额度加成（欠账 D8 的症状）。
      */
     cardBudget?: CardBudget
+    /**
+     * Mod 查询口 —— AI 靠它感知「对手身上的东西」
+     *
+     * 不注入时策略按牌面值估算伤害（与 `cardBudget` 缺席的约定一致），
+     * 于是藤甲、减伤技这些在 AI 眼里统统不存在（欠账 D19 的症状）。
+     */
+    modQuery?: IModQuery
+    /**
+     * 技能台账 —— AI 读别人的 `ai.threaten` 时要问它
+     *
+     * 不注入时威胁度一律算 0（与其余查询口缺席的约定一致）。
+     */
+    skillRegistry?: ISkillRegistry
   }) {
     this.defaultDifficulty = options?.defaultDifficulty ?? AIDifficulty.Normal
     this.defaultMinDelay = options?.minDelay ?? AI_MIN_DELAY
@@ -122,6 +144,8 @@ export class AIController implements IUIDecisionService {
     this.logEnabled = options?.logEnabled ?? true
     this.randomService = options?.randomService ?? new SeededRandomService(randomSeed())
     this.cardBudget = options?.cardBudget
+    this.modQuery = options?.modQuery
+    this.skillRegistry = options?.skillRegistry
   }
 
   // ── 配置方法 ──
@@ -145,6 +169,48 @@ export class AIController implements IUIDecisionService {
    */
   setCardBudget(budget: CardBudget): void {
     this.cardBudget = budget
+    // 已经注册过的策略也要补上——它们是 `registerPlayer` 那一刻造的，
+    // 而那时引擎还没出生。只改自己的字段等于没注入。
+    this.rebuildStrategies()
+  }
+
+  /**
+   * 设置 Mod 查询口（由 `GameBoot` 在引擎就绪后回注）
+   *
+   * 与 `setCardBudget` 同一套路。
+   */
+  setModQuery(modQuery: IModQuery): void {
+    this.modQuery = modQuery
+    this.rebuildStrategies()
+  }
+
+  /**
+   * 设置技能台账（由 `GameBoot` 在引擎就绪后回注）
+   */
+  setSkillRegistry(skillRegistry: ISkillRegistry): void {
+    this.skillRegistry = skillRegistry
+    this.rebuildStrategies()
+  }
+
+  /**
+   * 用当前持有的全部查询口重建策略
+   *
+   * 注入是**事后**发生的（AI 先于引擎出生），而策略在 `registerPlayer`
+   * 时就造好了，晚到的 `cardBudget` / `modQuery` 需要一个补发动作。
+   * 少了它，AI 会一直用「出生那天」的空查询口思考。
+   */
+  private rebuildStrategies(): void {
+    const deps = {
+      budget: this.cardBudget,
+      mods: this.modQuery,
+      skills: this.skillRegistry,
+    }
+    for (const [playerId, config] of this.configs) {
+      this.strategies.set(
+        playerId,
+        createAIStrategy(config.difficulty, this.randomService, deps),
+      )
+    }
   }
 
   /**
@@ -160,7 +226,11 @@ export class AIController implements IUIDecisionService {
     config?: Partial<AIPlayerConfig>,
   ): void {
     const diff = difficulty ?? this.defaultDifficulty
-    const strategy = createAIStrategy(diff, this.randomService, this.cardBudget)
+    const strategy = createAIStrategy(diff, this.randomService, {
+      budget: this.cardBudget,
+      mods: this.modQuery,
+      skills: this.skillRegistry,
+    })
     this.strategies.set(playerId, strategy)
 
     const fullConfig: AIPlayerConfig = {
@@ -241,7 +311,10 @@ export class AIController implements IUIDecisionService {
     const startTime = Date.now()
 
     try {
-      const choice = strategy.chooseCardToPlay(player, state)
+      // 把引擎给的候选整份递进去：视作造出来的虚拟牌**不在**
+      // `player.handCards` 里，策略自己翻手牌永远翻不到它。
+      // 让 AI 另问一趟 `viewAs.getViews` 则会得到同一件事的第二个答案。
+      const choice = strategy.chooseCardToPlay(player, state, options)
 
       if (!choice) {
         this.logDecision(player.id, 'play', '不出牌', Date.now() - startTime)
@@ -255,12 +328,26 @@ export class AIController implements IUIDecisionService {
         return null
       }
 
-      // 确保目标合法
+      // 确保目标合法：先按「能打谁」滤一遍，再按「该打几个」收敛。
+      //
+      // 两步都不能省——策略是按敌我关系挑人的，它并不知道距离与攻击范围，
+      // 于是经常挑出一个打不着的人；而 AOE 与自标牌的目标数是 0，
+      // 照原样递上去又会被判「多给了目标」。
       const validTargetIds = new Set(option.validTargets.map((t) => t.id))
-      const filteredTargets = choice.targets.filter((t) => validTargetIds.has(t.id))
+      const allowed = choice.targets.filter((t) => validTargetIds.has(t.id))
+      const filteredTargets = TargetSystem.pickTargets({
+        validTargets: allowed,
+        minTargets: option.minTargets,
+        maxTargets: option.maxTargets,
+      })
 
-      if (filteredTargets.length === 0) {
-        this.logDecision(player.id, 'play', '无合法目标', Date.now() - startTime)
+      if (filteredTargets.length < option.minTargets) {
+        this.logDecision(
+          player.id,
+          'play',
+          `目标不足（需要 ${option.minTargets} 个，合法的只有 ${filteredTargets.length} 个），不出牌`,
+          Date.now() - startTime,
+        )
         return null
       }
 
@@ -552,7 +639,7 @@ export class AIController implements IUIDecisionService {
   private fallbackCardPlay(options: CardPlayOption[]): CardPlayResult | null {
     if (options.length === 0) return null
     const option = options[this.randomService.nextInt(0, options.length - 1)]!
-    return { card: option.card, targets: option.validTargets.slice(0, 1) }
+    return { card: option.card, targets: TargetSystem.pickTargets(option) }
   }
 }
 

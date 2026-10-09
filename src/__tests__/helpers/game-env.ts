@@ -9,6 +9,7 @@
 
 import { GameBoot } from '@core/boot/game-boot'
 import { Card } from '@core/entity/card'
+import { TargetSystem } from '@core/system/target-system'
 import { CardSuit, CardRank, ZoneType, type LogLevel } from '@core/contracts/enums'
 import type { CardDefinition, ICard } from '@core/contracts/card.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
@@ -178,9 +179,11 @@ export class ScriptedDecisionService implements IUIDecisionService {
     const option = options.find((o) => o.card.instanceId === wanted.card.instanceId)
     if (!option) return null
 
+    // 剧本里点名要打谁就按名字筛；没点名就按这张牌的目标数规则取
+    // （AOE 取 0 个、借刀杀人取 2 个）——「取一个」只是多数牌的巧合。
     const targets = wanted.targetIds
       ? option.validTargets.filter((p) => wanted.targetIds!.includes(p.id))
-      : option.validTargets.slice(0, 1)
+      : TargetSystem.pickTargets(option)
 
     // 打出去就出队，否则出牌阶段的 while 循环会无限重复同一张牌
     queue.shift()
@@ -261,9 +264,10 @@ export function giveCard(player: IPlayer, def: CardDefinition): ICard {
   return card
 }
 
-export interface TestEnv {
+export interface TestEnv<D extends IUIDecisionService = ScriptedDecisionService> {
   engine: NonNullable<ReturnType<GameBoot['getEngine']>>
-  decisions: ScriptedDecisionService
+  /** 传进来的那个决策服务本身——用它自己的类型，便于读它自己的观测字段 */
+  decisions: D
   players(): IPlayer[]
 }
 
@@ -272,16 +276,19 @@ export interface TestEnv {
  *
  * @param decisions 可选的决策替身——需要观察「问了什么 / 候选里有什么」
  *   的测试（Phase 16 的视作窗口就是这样）自己塞一个子类进来。
+ *   不传则用 `ScriptedDecisionService`，于是 `env.decisions.answers`
+ *   这类字段仍然可直接读。
  */
-export async function createTestEnv(
-  decisions = new ScriptedDecisionService(),
-): Promise<TestEnv> {
+export async function createTestEnv<D extends IUIDecisionService = ScriptedDecisionService>(
+  decisions?: D,
+): Promise<TestEnv<D>> {
+  const service = (decisions ?? new ScriptedDecisionService()) as D
   const boot = GameBoot.createStandard5P({
     loggerService: new SilentLoggerService(),
     randomService: new IdentityRandomService(),
-    decisionService: decisions,
+    decisionService: service,
   })
   await boot.boot()
   const engine = boot.getEngine()!
-  return { engine, decisions, players: () => engine.state.players }
+  return { engine, decisions: service, players: () => engine.state.players }
 }

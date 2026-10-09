@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:stress": "vitest run --config vitest.stress.config.ts",
     "verify": "run-s type-check test",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",

@@ -151,7 +151,9 @@ describe('基本牌', () => {
   it('【桃】对自己使用回复 1 点体力', async () => {
     const player = players()[0]!
     player.hp = Math.max(1, player.maxHp - 2)
-    const tao = giveCard(player, cardDef('tao', CardTag.Heal))
+    // 真实定义是 `[Heal, Basic, Dying]` —— 只给 `Heal` 的话它进不了
+    // 桃的目标规则，会落到「默认：距离 1 的其他角色」，自己反而不是合法目标
+    const tao = giveCard(player, cardDef('tao', [CardTag.Heal, CardTag.Basic]))
     const before = player.hp
 
     await engine.useCard(player, tao, [player])
@@ -188,7 +190,10 @@ describe('基本牌', () => {
 describe('锦囊牌', () => {
   it('【无中生有】摸 2 张', async () => {
     const player = players()[0]!
-    const card = giveCard(player, cardDef('wuZhongShengYou', CardTag.SomethingFromNothing))
+    const card = giveCard(
+      player,
+      cardDef('wuZhongShengYou', [CardTag.SomethingFromNothing, CardTag.Draw]),
+    )
     const before = player.handCards.length
 
     await engine.useCard(player, card, [])
@@ -223,7 +228,7 @@ describe('锦囊牌', () => {
 
   it('【南蛮入侵】按座次询问，不出杀者受到 1 点伤害', async () => {
     const user = players()[0]!
-    const card = giveCard(user, cardDef('nanManRuQin', CardTag.BarbarianRaid))
+    const card = giveCard(user, cardDef('nanManRuQin', [CardTag.BarbarianRaid, CardTag.Aoe]))
 
     // 让 2 号位出杀，其余放弃
     const responder = players()[1]!
@@ -241,7 +246,7 @@ describe('锦囊牌', () => {
 
   it('【万箭齐发】按座次询问，不出闪者受到 1 点伤害', async () => {
     const user = players()[0]!
-    const card = giveCard(user, cardDef('wanJianQiFa', CardTag.ArrowBarrage))
+    const card = giveCard(user, cardDef('wanJianQiFa', [CardTag.ArrowBarrage, CardTag.Aoe]))
     const before = players().map((p) => p.hp)
 
     await engine.useCard(user, card, [])
@@ -279,7 +284,10 @@ describe('锦囊牌', () => {
     const user = players()[0]!
     for (const p of players()) p.hp = Math.max(1, p.maxHp - 2)
     const before = players().map((p) => p.hp)
-    const card = giveCard(user, cardDef('taoYuanJieYi', CardTag.PeachGardenOath))
+    const card = giveCard(
+      user,
+      cardDef('taoYuanJieYi', [CardTag.PeachGardenOath, CardTag.Heal, CardTag.Aoe]),
+    )
 
     await engine.useCard(user, card, [])
 
@@ -290,7 +298,10 @@ describe('锦囊牌', () => {
 
   it('【五谷丰登】亮出牌并按座次分完，没人要的进弃牌堆', async () => {
     const user = players()[0]!
-    const card = giveCard(user, cardDef('wuGuFengDeng', CardTag.BountifulHarvest))
+    const card = giveCard(
+      user,
+      cardDef('wuGuFengDeng', [CardTag.BountifulHarvest, CardTag.Draw]),
+    )
     const aliveCount = engine.state.alivePlayers.length
     const handBefore = engine.state.alivePlayers.reduce((n, p) => n + p.handCards.length, 0)
 
@@ -401,9 +412,11 @@ describe('Content 与 Trigger 的分工', () => {
     }
     engine.contentRegistry.register('probeCard', probe)
 
-    const cardForA = giveCard(a, cardDef('probeCard', CardTag.Basic))
+    // `SelfOnly`：这是一张只用来观察「内容被谁触发」的探测牌，
+    // 不设目标。缺了它就会被当成「要选一个距离 1 的目标」的普通牌。
+    const cardForA = giveCard(a, cardDef('probeCard', [CardTag.Basic, CardTag.SelfOnly]))
     await engine.useCard(a, cardForA, [])
-    const cardForB = giveCard(b, cardDef('probeCard', CardTag.Basic))
+    const cardForB = giveCard(b, cardDef('probeCard', [CardTag.Basic, CardTag.SelfOnly]))
     await engine.useCard(b, cardForB, [])
 
     // 同一个内容被两个不同玩家触发 —— 证明它挂在事件上而不是玩家上

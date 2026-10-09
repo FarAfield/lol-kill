@@ -6,11 +6,12 @@
 // ============================================================
 
 import type { CardBudget } from '@core/skill/card-budget'
+import type { IModQuery } from './mod.interface'
 import type { LogLevel, RoleType } from './enums'
 import type { GameStateSnapshot } from './game.interface'
 import type { IPlayer } from './player.interface'
 import type { ICard } from './card.interface'
-import type { ISkill } from './skill.interface'
+import type { ISkill, ISkillRegistry } from './skill.interface'
 
 /**
  * 存储服务 — 单向同步引擎状态到外部存储（Pinia Store 等）。
@@ -105,6 +106,23 @@ export interface IUIDecisionService {
    * 少了它，AI 就看不见【诸葛连弩】这类额度加成（欠账 D8）。
    */
   setCardBudget?(budget: CardBudget): void
+
+  /**
+   * 把 Mod 查询口递给决策服务（可选）
+   *
+   * 与 `setCardBudget` 同一条理由、同一条注入路径。少了它，AI 评估
+   * 「这张牌打这个人会掉几点血」时看不见任何防具与加减伤——
+   * 藤甲挨火杀是 2 点，它一律按 1 点算（欠账 D19）。
+   */
+  setModQuery?(modQuery: IModQuery): void
+
+  /**
+   * 把技能台账递给决策服务（可选）
+   *
+   * AI 评估「谁最危险」要读技能定义上的 `ai.threaten`，而「谁有哪个技能」
+   * 只有台账知道。缺了它，威胁度一律是 0（欠账 D21）。
+   */
+  setSkillRegistry?(skillRegistry: ISkillRegistry): void
   /** 询问玩家选择哪张牌出牌，并指定目标。返回 null 表示跳过 */
   askForCardPlay(player: IPlayer, options: CardPlayOption[]): Promise<CardPlayResult | null>
   /** 询问玩家是否响应（如是否出闪、是否出桃） */
@@ -141,13 +159,23 @@ export interface IUIDecisionService {
 }
 
 /**
- * 卡牌出牌选项 — 包含可选卡牌及其合法目标
+ * 卡牌出牌选项 — 包含可选卡牌、其合法目标，以及该选几个
+ *
+ * `minTargets` / `maxTargets` 与合法目标**同一处**算出
+ * （`TargetSystem`），一并递给决策方。少了它们，每个决策服务只能
+ * 各自猜「取第一个」——于是 AOE 被塞进 1 个目标（它的上限是 0）、
+ * 【借刀杀人】只拿到 1 个（它的下限是 2），而引擎那新装的目标校验
+ * 会把这些出牌全判非法。
  */
 export interface CardPlayOption {
   /** 可使用的卡牌 */
   card: ICard
   /** 该卡牌的合法目标列表 */
   validTargets: IPlayer[]
+  /** 至少选几个目标（0 = 可以不选，如 AOE / 只对自己生效的牌） */
+  minTargets: number
+  /** 至多选几个目标（0 = 这张牌不设目标） */
+  maxTargets: number
 }
 
 /**

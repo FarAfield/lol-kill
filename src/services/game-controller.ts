@@ -30,6 +30,7 @@ import type {
 } from '@core/contracts/services.interface'
 import { SeededRandomService, randomSeed } from '@core/services/seeded-random'
 import { GamePhase, ZoneType } from '@core/contracts/enums'
+import type { ISkill, SkillEnableContext } from '@core/contracts/skill.interface'
 import { GameEvent } from '@core/event/game-event'
 
 // ── Pinia Store 类型（延迟导入，避免循环依赖） ──
@@ -329,8 +330,13 @@ export class GameController {
     }
 
     // 验证效果存在
-    const heroEffectIds = player.heroes.flatMap((h) => h.effectIds)
-    if (!heroEffectIds.includes(effectId)) {
+    //
+    // 走 `getPlayerSkills`（= `SkillRegistry`），不是 `hero.effectIds`：
+    // 后者看不见装备技与临时技能，于是「装上青龙偃月刀后发动【追击】」
+    // 会被这句判成「找不到效果」——面板上明明显示着，点了却报错。
+    // 「这人有哪些技能」只有一个答案（欠账 D36）。
+    const owned = this.getPlayerSkills(player.id).map((s) => s.id)
+    if (!owned.includes(effectId)) {
       throw new Error(`[GameController] 找不到效果 ${effectId}`)
     }
 
@@ -448,7 +454,6 @@ export class GameController {
       case GamePhase.PhaseUse:
         if (isMyTurn) {
           actions.playableCards = this.computePlayableCards(targetPlayer, state)
-          actions.usableEffects = this.computeUsableEffects(targetPlayer)
           actions.canEndPhase = true
         }
         break
@@ -481,7 +486,75 @@ export class GameController {
         break
     }
 
+    // ── 可发动的技能 ──
+    //
+    // 放在 switch **之后**：`needDiscard` 是在上面那一段里才算出来的，
+    // 而「弃牌阶段能发动什么」要读它。
+    actions.usableEffects = this.computeUsableEffects(targetPlayer, {
+      phase,
+      isMyTurn,
+      isWaitingResponse: actions.isWaitingResponse,
+      needDiscard: actions.needDiscard,
+    })
+
     return actions
+  }
+
+  /**
+   * 玩家此刻持有的一整套技能定义。
+   *
+   * **欠账 D36。** UI 此前读的是 `player.heroes.flatMap(h => h.effectIds)`——
+   * 一串裸 id。它漏掉的东西比它给的东西更致命：
+   * **装备带来的技能与临时技能都不在 `hero.effectIds` 上**
+   * （那些是 `SkillRegistry.attach` / `addTempSkill` 挂上去的），
+   * 于是穿了青龙偃月刀的玩家在面板上看不见「追击」。
+   * 唯一真值源是 `SkillRegistry.getSkills(player)`。
+   */
+  getPlayerSkills(playerId?: string): ISkill[] {
+    if (!this.engine) return []
+
+    const state = this.engine.getState()
+    const targetPlayer = playerId
+      ? state.players.find((p) => p.id === playerId)
+      : this.engine.getCurrentPlayer()
+
+    if (!targetPlayer) return []
+
+    return this.engine.skillRegistry.getSkills(targetPlayer)
+  }
+
+  /**
+   * 此刻能**手动发动**的技能 id。
+   *
+   * 判据是技能自己写的 `enable: SkillEnableContext[]` 与当前上下文的交集，
+   * 不是「出牌阶段就全都可用」。以前的实现（`player.heroes.flatMap`）
+   * 对任何技能都返回「可用」——包括【仁德】这种锁定技，
+   * 于是面板上出现一个点了也没反应的按钮。
+   *
+   * `enable` 是**技能定义的一部分**，因此这个判据只有一个答案：
+   * 改技能的可发动时机改的是 `source/` 里的定义，不是这里。
+   */
+  private computeUsableEffects(
+    player: IPlayer,
+    ctx: {
+      phase: GamePhase
+      isMyTurn: boolean
+      isWaitingResponse: boolean
+      needDiscard: boolean
+    },
+  ): string[] {
+    if (!this.engine || !ctx.isMyTurn) return []
+
+    // 当前上下文：技能写 `enable: [GamePhase.PhaseUse, 'response']` 时，
+    // 出牌阶段与被【杀】命中时都能点。
+    const contexts = new Set<SkillEnableContext>()
+    contexts.add(ctx.phase)
+    if (ctx.isWaitingResponse) contexts.add('response')
+    if (ctx.needDiscard) contexts.add('discard')
+
+    return this.getPlayerSkills(player.id)
+      .filter((skill) => skill.enable?.some((c) => contexts.has(c)) ?? false)
+      .map((skill) => skill.id)
   }
 
   /**
@@ -542,6 +615,15 @@ export class GameController {
     const player = this.engine.getCurrentPlayer()
     if (!player) return
 
+    // 先把关再出牌：引擎那道校验会**抛错**（它不知道该把原因说给谁听），
+    // 而 UI 这一层的职责恰恰是把原因讲清楚——点在打不着的人身上，
+    // 玩家应当看到「为什么不行」，而不是一张静默退回手里的牌。
+    const check = this.engine.validatePlay(player, card, targets)
+    if (!check.valid) {
+      this.decisionService?.notifyPlayer(player, check.reason ?? '目标不合法', 'warn')
+      return
+    }
+
     // 完整的用牌流程收口在引擎：移入处理区 → useCard 事件（卡牌内容在此触发）
     // → 结算完成入弃牌堆。出杀次数由「杀」的内容自己标记，这里不再重复处理。
     await this.engine.useCard(player, card, targets)
@@ -593,12 +675,6 @@ export class GameController {
   /**
    * 计算当前玩家可选用的技能。
    */
-  private computeUsableEffects(player: IPlayer): string[] {
-    // 从英雄技能列表中获取所有效果 ID
-    // 在后续 Phase 集成时完善：需结合 PhaseManager 中的主动技判定逻辑
-    return player.heroes.flatMap((h) => h.effectIds)
-  }
-
   /**
    * 同步引擎状态到 Pinia Store。
    */

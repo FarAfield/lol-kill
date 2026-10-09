@@ -38,8 +38,8 @@
       <div class="board-wrapper">
         <GameBoard
           :players="gameStore.uiPlayers"
-          :current-phase="uiState?.phase ?? ''"
-          :current-player-index="uiState?.currentPlayerIndex ?? 0"
+          :deck-count="gameStore.deckCount"
+          :discard-count="gameStore.discardCount"
           :valid-target-ids="cardPlay.validTargetIds.value"
           :selected-target-ids="cardPlay.selectedTargetIds.value"
           :hovered-target-id="cardPlay.hoveredTargetId.value"
@@ -141,6 +141,10 @@ import {
 } from 'naive-ui'
 import { useGameStore } from '@/store/game-store'
 import { GameController } from '@/services/game-controller'
+import { HumanDecisionService } from '@/services/human-decision'
+import type { ResponseRequest } from '@/services/human-decision'
+import { AIController } from '@core/services/ai-controller'
+import { AIDifficulty } from '@core/contracts/ai.interface'
 import { GamePhase, SkillType, LogLevel } from '@core/contracts/enums'
 import type { ICard } from '@core/contracts/card.interface'
 import type { IGameConfig } from '@core/contracts/game.interface'
@@ -163,9 +167,29 @@ import { useLogStore } from '@/store/log-store'
 const router = useRouter()
 const gameStore = useGameStore()
 
-// ── GameController 实例 ──
+/**
+ * 人类坐哪个位。
+ *
+ * 全仓只有这一个答案：下面 `humanPlayer` 取的就是 `players[0]`，
+ * `HumanDecisionService` 判「这个座位是不是人」时也读它。
+ */
+const HUMAN_SEAT = 0
+
+/**
+ * 一局所用的全部执行者。
+ *
+ * 控制器与 AI 兜底方**必须成对出生**：决策服务是 `createGame` 的入参，
+ * 而 AI 要在 `createGame` 之后才注册得上（那时才有玩家 ID）。
+ * 分成两个 ref 就会出现「换了控制器没换 AI」这种半新半旧的组合。
+ */
+interface GameSession {
+  controller: GameController
+  /** 其余座位的兜底决策方 */
+  ai: AIController
+}
+
 // 用 shallowRef：ref 的 UnwrapRef 会剥掉类的私有成员，导致类型不匹配
-const controller = shallowRef<GameController | null>(null)
+const session = shallowRef<GameSession | null>(null)
 
 // ── 欢迎弹窗 ──
 const showWelcome = ref(true)
@@ -175,12 +199,12 @@ const discardSelectedIds = ref<string[]>([])
 
 // ── Controller getter（用于 hooks） ──
 function getController(): GameController | null {
-  return controller.value
+  return session.value?.controller ?? null
 }
 
 // ── Hooks ──
 const cardPlay = useCardPlay(getController, () => gameStore)
-const response = useResponse(getController)
+const response = useResponse()
 const skill = useSkill(getController)
 const animation = useAnimation()
 const logStore = useLogStore()
@@ -203,9 +227,9 @@ const currentPlayerName = computed(() => {
 
 /** 人类玩家信息 */
 const humanPlayer = computed(() => {
-  const state = controller.value?.getGameState()
+  const state = getController()?.getGameState()
   if (!state) return null
-  const human = state.players[0]
+  const human = state.players[HUMAN_SEAT]
   if (!human) return null
   const uiInfo = gameStore.uiPlayers.find((p) => p.id === human.id)
   return { ...human, isCurrentPlayer: uiInfo?.isCurrentPlayer ?? false }
@@ -217,7 +241,8 @@ const isMyTurn = computed(() => {
 })
 
 const availableActions = computed(() => {
-  if (!controller.value) {
+  const ctrl = getController()
+  if (!ctrl) {
     return {
       phase: GamePhase.NotStarted,
       isMyTurn: false,
@@ -229,7 +254,7 @@ const availableActions = computed(() => {
       discardCount: 0,
     }
   }
-  return controller.value.getAvailableActions()
+  return ctrl.getAvailableActions()
 })
 
 const playableCardIds = computed(() => {
@@ -259,13 +284,93 @@ function getSkillTypeLabel(type: SkillType): string {
   return labels[type] ?? type
 }
 
-// ── 响应窗口卡牌列表（从 humanPlayer 的手牌中筛选） ──
-const responseValidCards = computed<ICard[]>(() => {
-  const human = humanPlayer.value
-  if (!human) return []
-  const ids = new Set(response.validCardIds.value)
-  return human.handCards.filter((c) => ids.has(c.instanceId))
-})
+// ── 人类决策通道（D34 的插头）──
+//
+// 人那一位被问到时（`waitForResponse` → `HumanDecisionService` → 这里），
+// 把问题摆到弹窗上，等他的手指。
+//
+// **不要把 `validCards` 拿去过一遍 `humanPlayer.handCards`**——
+// 引擎给的候选里可能混着**虚拟牌**（`viewAs` 造出来充当【闪】的那一张），
+// 它们压根不在手牌数组里。滤一遍就把它们滤没了，
+// 于是「明明有闪却一张都点不到」（`response-inquiry.ts:70` 记的就是这件事）。
+const responseCardPool = ref<ICard[]>([])
+
+/** 弹窗上摆的那几张牌 */
+const responseValidCards = computed<ICard[]>(() => responseCardPool.value)
+
+async function askHumanResponse(req: ResponseRequest): Promise<ICard | null> {
+  responseCardPool.value = [...req.validCards]
+
+  const chosenId = await response.open({
+    prompt: req.prompt,
+    validCardIds: req.validCards.map((c) => c.instanceId),
+    // 引擎没给倒计时就不限时：人在想，不该替他按秒表。
+    // 反过来说，只要开了倒数，超时也必须答复（= 不出）——
+    // 见 `useResponse.settleWith`，一条悬着的 Promise 就是一次事件栈死锁。
+    timeoutMs: req.timeout && req.timeout > 0 ? req.timeout : 0,
+    required: false,
+  })
+
+  responseCardPool.value = []
+  if (!chosenId) return null
+  return req.validCards.find((c) => c.instanceId === chosenId) ?? null
+}
+
+/**
+ * 开一局所需的全部执行者。
+ *
+ * **这里必须装上决策服务**（欠账 D34）：引擎是全仓唯一的问题发起者，
+ * 它问【闪】【桃】【无懈】时如果 `decisionService` 缺席，
+ * `EffectContext.waitForResponse` 进门一行就返回「不响应」——
+ * 攻击必中、濒死必死，界面上却看不出任何异常。
+ *
+ * 而装上之后也**不能把 UI 直接塞进去**：引擎对**所有座位**提问，
+ * 除了 `HUMAN_SEAT` 那一位，其余都得交给 AI。`HumanDecisionService`
+ * 干的就是这次分流。
+ *
+ * 开局与「再来一局」都走这一个出口：以前这两处各写了一遍构造，
+ * 第二遍漏了这一句——第二局又变回一个不会防守的单机。
+ */
+function createSession(): GameSession {
+  const ctrl = new GameController()
+  // gameStore 满足 IGameStore 接口（syncFromEngine / reset），直接绑定
+  ctrl.bindStore(gameStore as unknown as { syncFromEngine: (s: never) => void; reset: () => void })
+
+  const ai = new AIController({ defaultDifficulty: AIDifficulty.Normal })
+
+  ctrl.setDecisionService(
+    new HumanDecisionService({
+      humanSeatIndex: HUMAN_SEAT,
+      fallback: ai,
+      channel: {
+        askForResponse: askHumanResponse,
+        // 其余四种提问此刻**刻意不登记**，走 `HumanDecisionService` 的缺省答案：
+        // 出牌、弃牌由下方的按钮直接驱动（`handleConfirmPlay` / `handleConfirmDiscard`），
+        // 再给它开一条 await 手指的路，就是同一件事的第二本账——
+        // 而且那条 await 永远等不到界面上的第二个入口。
+      },
+    }),
+  )
+
+  return { controller: ctrl, ai }
+}
+
+/**
+ * 把 AI 注册到「不是人的那几个座位」上。
+ *
+ * 时机是有讲究的：必须在 `createGame` **之后**（那时才有玩家的 ID）、
+ * `startGame` **之前**（否则第一个回合里 AI 还没有脑可用，一律降级随机）。
+ */
+function registerAIPlayers(ctrl: GameController, ai: AIController): void {
+  const state = ctrl.getGameState()
+  if (!state) return
+
+  ai.setStateAccessor(() => ctrl.getGameState()!)
+  ai.registerPlayers(
+    state.players.filter((p) => p.seatIndex !== HUMAN_SEAT).map((p) => p.id),
+    AIDifficulty.Normal,
+  )
+}
 
 // ── 卡牌选择处理 ──
 
@@ -294,7 +399,7 @@ async function handleConfirmPlay(): Promise<void> {
 async function handleEndPhase(): Promise<void> {
   cardPlay.cancelSelection()
   discardSelectedIds.value = []
-  await controller.value?.endPhase()
+  await getController()?.endPhase()
   checkGameOverStatus()
 }
 
@@ -318,7 +423,7 @@ function handleDiscardSelect(cardId: string): void {
 }
 
 async function handleConfirmDiscard(): Promise<void> {
-  await controller.value?.discardCards([...discardSelectedIds.value])
+  await getController()?.discardCards([...discardSelectedIds.value])
   discardSelectedIds.value = []
   checkGameOverStatus()
 }
@@ -348,7 +453,7 @@ async function handleActivateSkill(effectId: string): Promise<void> {
 
 /** 检查游戏是否结束，若结束则显示结果弹窗 */
 function checkGameOverStatus(): void {
-  const ctrl = controller.value
+  const ctrl = getController()
   if (!ctrl) return
 
   const result = ctrl.checkGameOver()
@@ -370,7 +475,7 @@ function checkGameOverStatus(): void {
 // ── 游戏流程 ──
 
 async function handleStartGame(): Promise<void> {
-  const ctrl = controller.value
+  const ctrl = getController()
   if (!ctrl) return
 
   showWelcome.value = false
@@ -391,6 +496,10 @@ async function handleStartGame(): Promise<void> {
 
     // 创建并初始化游戏引擎
     await ctrl.createGame(config)
+
+    // AI 有了脑之后才能进第一个回合
+    const s = session.value
+    if (s) registerAIPlayers(s.controller, s.ai)
 
     logStore.addLog({
       id: `log_init_done_${Date.now()}`,
@@ -420,7 +529,8 @@ async function handleStartGame(): Promise<void> {
 }
 
 function handleLeave(): void {
-  controller.value?.destroy()
+  getController()?.destroy()
+  session.value = null
   gameStore.reset()
   logStore.clear()
   router.push('/')
@@ -434,19 +544,18 @@ async function handlePlayAgain(): Promise<void> {
   logStore.clear()
   animation.clearHistory()
   // 清理上一局状态并重新初始化
-  controller.value?.destroy()
+  getController()?.destroy()
   gameStore.reset()
-  // 重新创建 controller 并绑定 store
-  const ctrl = new GameController()
-  ctrl.bindStore(gameStore as unknown as { syncFromEngine: (s: never) => void; reset: () => void })
-  controller.value = ctrl
+  // 连同 AI 兜底方一起重建，走的是开局那一套唯一的出口
+  session.value = createSession()
   await handleStartGame()
 }
 
 /** 返回大厅 */
 function handleGoLobby(): void {
   showGameOver.value = false
-  controller.value?.destroy()
+  getController()?.destroy()
+  session.value = null
   gameStore.reset()
   logStore.clear()
   animation.clearHistory()
@@ -455,14 +564,12 @@ function handleGoLobby(): void {
 
 // ── 生命周期 ──
 onMounted(() => {
-  const ctrl = new GameController()
-  // gameStore 满足 IGameStore 接口（syncFromEngine / reset），直接绑定
-  ctrl.bindStore(gameStore as unknown as { syncFromEngine: (s: never) => void; reset: () => void })
-  controller.value = ctrl
+  session.value = createSession()
 })
 
 onUnmounted(() => {
-  controller.value?.destroy()
+  getController()?.destroy()
+  session.value = null
 })
 </script>
 

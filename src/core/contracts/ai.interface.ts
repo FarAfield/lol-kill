@@ -9,6 +9,7 @@ import type { IPlayer } from './player.interface'
 import type { ICard } from './card.interface'
 import type { ISkill } from './skill.interface'
 import type { GameStateSnapshot } from './game.interface'
+import type { CardPlayOption } from './services.interface'
 
 /**
  * AI 卡牌选择结果 — 包含选中的卡牌及其目标
@@ -36,11 +37,26 @@ export interface IAIDecisionMaker {
   /**
    * 选择一张卡牌打出，并指定目标。
    *
-   * @param player AI 玩家
-   * @param state  当前游戏状态（只读视角）
+   * @param player  AI 玩家
+   * @param state   当前游戏状态（只读视角）
+   * @param options 引擎给出的**此刻可打的牌**（含视作造出来的虚拟牌）
    * @returns 选择的卡牌和目标，null 表示不出牌
+   *
+   * ── `options` 是候选的唯一真值源 ──
+   *
+   * 出牌阶段能打什么由引擎一处算出（`PhaseManager.getPlayableCards`）：
+   * 真手牌、视作技能造出来的虚拟牌、被 Mod 禁掉的牌、额度用完的牌，
+   * 四件事在那儿一次性收口。AI **只在它给的候选里挑**——
+   * 自己翻一遍 `player.handCards` 就会漏掉虚拟牌（视作牌不在手牌数组里），
+   * 而另问一趟 `viewAs.getViews` 是同一件事的第二个答案。
+   *
+   * 缺省时（纯策略单测）退回手牌，行为与注入前一致。
    */
-  chooseCardToPlay(player: IPlayer, state: GameStateSnapshot): AICardChoice | null
+  chooseCardToPlay(
+    player: IPlayer,
+    state: GameStateSnapshot,
+    options?: readonly CardPlayOption[],
+  ): AICardChoice | null
 
   /**
    * 选择一个可用的主动技能发动。

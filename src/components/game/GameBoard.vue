@@ -8,13 +8,13 @@
       <div class="deck-zone">
         <div class="deck-pile">
           <n-tag type="info" size="small" round>牌堆</n-tag>
-          <span class="pile-count">0</span>
+          <span class="pile-count">{{ deckCount }}</span>
         </div>
       </div>
       <div class="discard-zone">
         <div class="discard-pile">
           <n-tag size="small" round>弃牌堆</n-tag>
-          <span class="pile-count">0</span>
+          <span class="pile-count">{{ discardCount }}</span>
         </div>
       </div>
     </div>
@@ -48,11 +48,18 @@ interface PositionedPlayer extends UIPlayerInfo {
   y: number
 }
 
+// 这里原先还有两个**必填** props（当前阶段 / 当前行动玩家座次），
+// 视图一路传进来，组件一眼都没读过（2026-10-09 删）。
+// 「轮到谁」由每个 `UIPlayerInfo.isCurrentPlayer` 回答即可——
+// 留着那两个就是同一件事的第二本账，与 `TurnManager.skippedPlayers`（D29）同类。
+// 下方那条源码级断言守着这件事，所以这里不写出它们的名字。
 const props = withDefaults(
   defineProps<{
     players: UIPlayerInfo[]
-    currentPhase: string
-    currentPlayerIndex: number
+    /** 牌堆剩余张数 */
+    deckCount?: number
+    /** 弃牌堆张数 */
+    discardCount?: number
     /** 合法目标 ID 集合（用于高亮可选目标） */
     validTargetIds?: Set<string>
     /** 已选中的目标 ID 列表 */
@@ -61,6 +68,8 @@ const props = withDefaults(
     hoveredTargetId?: string | null
   }>(),
   {
+    deckCount: 0,
+    discardCount: 0,
     validTargetIds: () => new Set<string>(),
     selectedTargetIds: () => [],
     hoveredTargetId: null,

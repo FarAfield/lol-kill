@@ -254,12 +254,12 @@ export class GameBoot {
     }
     this.engine = new GameEngine(engineOptions)
 
-    // 3. 把额度查询递给决策服务
+    // 3. 决策服务要的那三个查询口（额度 / Mod / 技能台账）**由引擎自己补发**
+    //    ——见 `GameEngine` 构造函数末尾。
     //
-    // 「这张牌还能出几次」必须引擎、AI、UI 同答一个数。AI 在引擎
-    // **之前**就建好了（它要先被当成决策服务传进来），所以只能事后补上。
-    // 少了这一步，AI 会退回「无 Mod 知识」的老路——装了连弩也不肯出第二刀。
-    this.decisionService?.setCardBudget?.(this.engine.cardBudget)
+    // 以前这一步写在这里：于是只有走 `GameBoot` 的启动路径能拿到它们，
+    // 走 `GameController` 的（图形界面）永远拿不到（欠账 D37）。
+    // 「由两个启动器各自记得补一遍」从来不是办法——漏一个就是一整类 AI 失明。
 
     // 4. 初始化引擎
     await this.engine.init(this.config)

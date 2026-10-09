@@ -144,6 +144,49 @@ export function aiValueOf(skill: ISkill, player: IPlayer): number {
   return typeof result === 'function' ? result(player) : skillPriority(skill)
 }
 
+/**
+ * 以**别人**为目标时这条技能值多少
+ *
+ * 与 `aiValueOf` 是一对：同一个技能对「自己」和「某个目标」的价值
+ * 不是一回事——【仁德】给自己是 0 分，给快死的盟友很值钱。
+ * 没写就退回 0（「没有额外意见」），而不是退回升序噪声。
+ */
+export function aiTargetValueOf(skill: ISkill, player: IPlayer, target: IPlayer): number {
+  return skill.ai?.result?.target?.(player, target) ?? 0
+}
+
+/**
+ * AI 的考虑顺序（数字越大越先考虑）
+ *
+ * **不是** `skillPriority`：后者是「同一时机上谁的钩子先结算」，
+ * 是引擎的事；`ai.order` 是「AI 脑子里先盘算哪个技能」。
+ * 混用会让调 AI 手感的人无意中改动结算顺序。
+ */
+export function aiOrderOf(skill: ISkill): number {
+  return skill.ai?.order ?? 0
+}
+
+/**
+ * 这条技能让它的主人有多危险
+ *
+ * 写在技能定义上（`ai.threaten`），而不是让 AI 背一份「哪个武将厉害」
+ * 的名单——那份名单迟早和技能定义脱节，且每加一个武将都要改 AI。
+ */
+export function threatenOf(skill: ISkill): number {
+  return skill.ai?.threaten ?? 0
+}
+
+/**
+ * 发动这条技能会暴露多少身份信息
+ *
+ * 身份未明的人（内奸、没亮身份的反贼）靠藏活着，发动一个一眼
+ * 能认出来的技能等于自报家门。`expose` 就是这个代价，由 AI 在
+ * 「要不要发动」时扣掉，而不是写死「不许用」。
+ */
+export function exposeOf(skill: ISkill): number {
+  return skill.ai?.expose ?? 0
+}
+
 // ── 视作 ──
 
 /**

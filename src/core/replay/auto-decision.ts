@@ -20,6 +20,7 @@ import type {
   CardPlayResult,
   IUIDecisionService,
 } from '@core/contracts/services.interface'
+import { TargetSystem } from '@core/system/target-system'
 
 export class AutoDecisionService implements IUIDecisionService {
   /** 出牌：取第一张「有合法目标」的牌；都不挑目标就取第一张 */
@@ -29,7 +30,8 @@ export class AutoDecisionService implements IUIDecisionService {
   ): Promise<CardPlayResult | null> {
     if (options.length === 0) return null
     const option = options.find((o) => o.validTargets.length > 0) ?? options[0]!
-    return { card: option.card, targets: option.validTargets.slice(0, 1) }
+    // 取几个交给 `TargetSystem`：AOE 是 0、借刀杀人是 2，猜不得
+    return { card: option.card, targets: TargetSystem.pickTargets(option) }
   }
 
   /** 响应：有牌就出第一张 */

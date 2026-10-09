@@ -56,7 +56,10 @@ export const rende: ISkill = {
     ctx.setMark(ctx.player, 'rendePhaseActive', 1)
   },
 
-  ai: { order: 5 },
+  // 给牌是一眼能看懂的站队动作：身份还没亮的人（内奸、没翻面的反贼）
+  // 用它等于自报家门。代价记在 `expose` 上，由 AI 在「要不要发动」
+  // 时自己权衡——不是写死「不许用」。
+  ai: { order: 5, expose: 2 },
 }
 
 // ═══════════════════════════════════════════

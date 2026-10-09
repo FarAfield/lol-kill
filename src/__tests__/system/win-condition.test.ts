@@ -136,5 +136,8 @@ describe('D17 · 生产落点：引擎的胜负入口就是它', () => {
     expect(fromEngine).not.toBeNull()
     expect(fromEngine!.winner).toBe(fromPure.winner)
     expect(fromEngine!.reason).toBe(fromPure.reason)
-  })
+    // 单独跑 600ms，但这里的 `await import` 会把整张引擎依赖图的转换成本
+    // 算进**这一条用例**的预算（别的文件是顶层静态引入，那份开销记在收集阶段）。
+    // 并行满载时它会顶破默认 5s —— 给它一条自己的线，而不是把断言放水。
+  }, 20_000)
 })

@@ -14,22 +14,48 @@ import type { IAIDecisionMaker, AICardChoice } from '@core/contracts/ai.interfac
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
 import type { CardTagValue } from '@core/contracts/card-tag'
-import type { ISkill } from '@core/contracts/skill.interface'
+import type { ISkill, ISkillRegistry } from '@core/contracts/skill.interface'
+import type { CardPlayOption } from '@core/contracts/services.interface'
 import {
+  aiOrderOf,
+  aiTargetValueOf,
   aiValueOf,
+  exposeOf,
   isDeclinableSkill,
   isManualSkill,
   skillPriority,
+  threatenOf,
 } from '@core/skill/skill-utils'
 import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import type { IRandomService } from '@core/contracts/services.interface'
 import { SeededRandomService, randomSeed } from './seeded-random'
 import { CardBudget } from '@core/skill/card-budget'
+import { DamageResolver } from '@core/system/damage-resolver'
+import type { IModQuery } from '@core/contracts/mod.interface'
 import { RoleType, ZoneType } from '@core/contracts/enums'
 
 // ============================================================
 // 工具函数
 // ============================================================
+
+/**
+ * 策略需要的**引擎侧查询口**
+ *
+ * 三样都是「AI 出生时还不存在、只能事后补」的东西：AI 要先被当成
+ * 决策服务传进 `GameBoot`，那时引擎还没构造完。因此它们一律**可缺席**——
+ * 缺了就退回无 Mod 知识的旧行为，而不是崩。
+ *
+ * 收成一个对象而不是四个位置参数：`createAIStrategy(diff, random,
+ * undefined, undefined)` 这种调用点读不出来哪个 `undefined` 是什么。
+ */
+export interface AIStrategyDeps {
+  /** 出牌额度（D8） */
+  budget?: CardBudget
+  /** Mod 查询（D19） */
+  mods?: IModQuery
+  /** 技能台账（D21：读别人的 `ai.threaten`） */
+  skills?: ISkillRegistry
+}
 
 /**
  * 获取存活玩家列表。
@@ -167,14 +193,37 @@ export abstract class BaseAIStrategy implements IAIDecisionMaker {
    */
   protected readonly budget: CardBudget | undefined
 
-  constructor(random?: IRandomService, budget?: CardBudget) {
+  /**
+   * Mod 查询口 —— 「这张牌打这个人真的会造成几点伤害」的唯一答案
+   *
+   * 没有它，AI 只能按牌面想当然：藤甲挨火杀是 2 点血，它却当成 1 点，
+   * 于是挑目标时看不出「这一刀下去人就死了」。易伤 / 减伤 / 加伤
+   * 全是 Mod 上的事，AI 不必认识任何一个具体防具。
+   */
+  protected readonly mods: IModQuery | undefined
+
+  /**
+   * 技能台账 —— 「谁身上有哪些技能」的唯一答案
+   *
+   * 评估一个**别人**有多危险要读它：威胁度写在各自的技能定义上
+   * （`ai.threaten`），AI 自己不该记一份「哪个武将厉害」的名单。
+   */
+  protected readonly skills: ISkillRegistry | undefined
+
+  constructor(random?: IRandomService, deps: AIStrategyDeps = {}) {
     this.random = random ?? new SeededRandomService(randomSeed())
-    this.budget = budget
+    this.budget = deps.budget
+    this.mods = deps.mods
+    this.skills = deps.skills
   }
 
   // ── 实现 IAIDecisionMaker ──
 
-  abstract chooseCardToPlay(player: IPlayer, state: GameStateSnapshot): AICardChoice | null
+  abstract chooseCardToPlay(
+    player: IPlayer,
+    state: GameStateSnapshot,
+    options?: readonly CardPlayOption[],
+  ): AICardChoice | null
 
   abstract chooseEffectToUse(
     player: IPlayer,
@@ -296,9 +345,63 @@ export abstract class BaseAIStrategy implements IAIDecisionMaker {
 
   /**
    * 获取玩家手牌中可打出的卡牌（非延时、在手牌区）。
+   *
+   * **只翻手牌**——视作造出来的虚拟牌不在 `handCards` 里，
+   * 要连它们一起看就得用 {@link playContext} 拿引擎给的候选。
    */
   protected getPlayableHandCards(player: IPlayer): ICard[] {
     return player.handCards.filter((c) => c.zone === ZoneType.Hand && !c.isDelayed)
+  }
+
+  /**
+   * 一次出牌决策的候选视图
+   *
+   * 两样东西都只从引擎给的 `options` 读，AI 自己不算第二遍：
+   *
+   * - **能打什么**：真手牌在前，视作造出来的虚拟牌在后。
+   *   虚拟牌不在 `handCards` 里，翻手牌永远翻不到它——【武圣】
+   *   把红牌当杀、【丈八蛇矛】把两张手牌当杀，此前 AI 一张都用不上。
+   * - **这张牌能打谁**：已经过了距离、攻击范围与目标否决，
+   *   因此「挑一个够不着的人」这件事在这里就不可能发生了。
+   *
+   * 没给 `options` 时（纯策略单测）退回手牌 + 其他存活玩家，
+   * 行为与接线前一致。
+   */
+  protected playContext(
+    player: IPlayer,
+    state: GameStateSnapshot,
+    options?: readonly CardPlayOption[],
+  ): {
+    /** 此刻能打出的牌 */
+    cards: ICard[]
+    /** 这张牌此刻的合法目标 */
+    targetsOf: (card: ICard) => IPlayer[]
+  } {
+    if (!options) {
+      const fallback = this.getPlayableHandCards(player)
+      return {
+        cards: fallback,
+        targetsOf: () => this.getOtherAlivePlayers(player, state),
+      }
+    }
+
+    // 虚拟牌的 instanceId 由「技能 + 底牌」推导出来，每次问都一样，
+    // 因此拿它当 key 是稳的（见 `Card.createVirtual`）。
+    const byCard = new Map(options.map((o) => [o.card.instanceId, o.validTargets]))
+    return {
+      cards: options.map((o) => o.card),
+      targetsOf: (card) => byCard.get(card.instanceId) ?? [],
+    }
+  }
+
+  /**
+   * 这张牌此刻能打到的人里，哪些是敌人
+   *
+   * 自标牌（装备 / 桃 / 酒 / 无中生有）的合法目标本来就只有自己，
+   * 去掉自己后就空了——不会因此被误当成「没有敌人可用」。
+   */
+  protected enemiesAmong(player: IPlayer, candidates: IPlayer[]): IPlayer[] {
+    return candidates.filter((p) => p.id !== player.id && this.isEnemy(player, p))
   }
 
   /**
@@ -338,36 +441,26 @@ export abstract class BaseAIStrategy implements IAIDecisionMaker {
  * - 不考虑身份/距离/手牌管理
  */
 export class BeginnerAIStrategy extends BaseAIStrategy {
-  chooseCardToPlay(player: IPlayer, state: GameStateSnapshot): AICardChoice | null {
-    const playableCards = this.getPlayableHandCards(player)
-    if (playableCards.length === 0) return null
+  chooseCardToPlay(
+    player: IPlayer,
+    state: GameStateSnapshot,
+    options?: readonly CardPlayOption[],
+  ): AICardChoice | null {
+    const { cards, targetsOf } = this.playContext(player, state, options)
+    if (cards.length === 0) return null
 
     // 随机选择一张卡牌
-    const card = this.pickRandom(playableCards)
+    const card = this.pickRandom(cards)
     if (!card) return null
 
-    // 根据卡牌类型选择目标
-    let targets: IPlayer[] = []
-
-    if (card.tags.has(CardTag.Strike) || card.tags.has(CardTag.Duel) || card.tags.has(CardTag.BorrowedBlade)) {
-      // 攻击牌：随机选择一名其他存活玩家
-      const others = this.getOtherAlivePlayers(player, state)
-      const target = this.pickRandom(others)
-      if (target) targets = [target]
-    } else if (card.tags.has(CardTag.Heal) || card.tags.has(CardTag.Wine)) {
-      // 回复牌：对自己使用
-      targets = [player]
-    } else if (card.tags.has(CardTag.Equip)) {
-      // 装备牌：对自己使用
-      targets = [player]
-    } else if (card.tags.has(CardTag.Trick) && !card.isDelayed) {
-      // 非延时锦囊：随机选择目标
-      const others = this.getOtherAlivePlayers(player, state)
-      const target = this.pickRandom(others)
-      if (target) targets = [target]
-    }
-
-    return { card, targets }
+    // 目标也从这张牌自己的合法目标里随机挑一个。
+    //
+    // 不必再按牌型分支（「桃给自己、杀给别人」）——合法目标已经
+    // 回答了这件事：自标牌的合法目标就是自己，攻击牌的已经按距离
+    // 筛过。这里唯一要守的是「别挑打不着的人」，而那是 `targetsOf`
+    // 的事。
+    const target = this.pickRandom(targetsOf(card))
+    return { card, targets: target ? [target] : [] }
   }
 
   chooseEffectToUse(
@@ -414,48 +507,52 @@ export class BeginnerAIStrategy extends BaseAIStrategy {
  * - 按价值弃牌（保留高价值卡牌）
  */
 export class NormalAIStrategy extends BaseAIStrategy {
-  chooseCardToPlay(player: IPlayer, state: GameStateSnapshot): AICardChoice | null {
-    const hand = this.getPlayableHandCards(player)
-    if (hand.length === 0) return null
+  chooseCardToPlay(
+    player: IPlayer,
+    state: GameStateSnapshot,
+    options?: readonly CardPlayOption[],
+  ): AICardChoice | null {
+    const { cards, targetsOf } = this.playContext(player, state, options)
+    if (cards.length === 0) return null
 
-    const enemies = this.getOtherAlivePlayers(player, state).filter((p) =>
-      this.isEnemy(player, p),
-    )
+    // 敌人是**按牌**算的：这张牌够得着谁，才谈得上打谁。
+    const enemiesOf = (card: ICard) => this.enemiesAmong(player, targetsOf(card))
 
     // 出牌阶段策略：
     // 1. 装备牌优先（直接装备）
-    const equipCard = hand.find((c) => c.tags.has(CardTag.Equip) || c.equipSlot)
+    const equipCard = cards.find((c) => c.tags.has(CardTag.Equip) || c.equipSlot)
     if (equipCard) {
-      return { card: equipCard, targets: [player] }
+      return { card: equipCard, targets: targetsOf(equipCard) }
     }
 
     // 2. 桃/酒：仅在受伤时使用
     if (player.isWounded) {
-      const heal = hand.find((c) => c.tags.has(CardTag.Heal))
-      if (heal) {
+      const heal = cards.find((c) => c.tags.has(CardTag.Heal))
+      if (heal && targetsOf(heal).includes(player)) {
         return { card: heal, targets: [player] }
       }
       // 酒也可以在出牌阶段对自己使用
-      const wine = hand.find((c) => c.tags.has(CardTag.Wine) && !c.tags.has(CardTag.Strike))
-      if (wine) {
+      const wine = cards.find((c) => c.tags.has(CardTag.Wine) && !c.tags.has(CardTag.Strike))
+      if (wine && targetsOf(wine).includes(player)) {
         return { card: wine, targets: [player] }
       }
     }
 
     // 3. 优先使用增益类锦囊（无中生有、五谷丰登、桃园结义）
-    const buffTrick = hand.find(
+    const buffTrick = cards.find(
       (c) =>
         c.tags.has(CardTag.SomethingFromNothing) ||
         c.tags.has(CardTag.BountifulHarvest) ||
         c.tags.has(CardTag.PeachGardenOath),
     )
     if (buffTrick) {
-      return { card: buffTrick, targets: [player] }
+      return { card: buffTrick, targets: targetsOf(buffTrick) }
     }
 
     // 4. 杀：攻击敌人
-    const strike = this.findCardByTag(player, 'strike')
+    const strike = cards.find((c) => c.tags.has(CardTag.Strike))
     if (strike && this.canPlayCard(player, strike)) {
+      const enemies = enemiesOf(strike)
       if (enemies.length > 0) {
         // 优先攻击受伤的敌人
         const woundedEnemy = enemies.find((e) => e.isWounded)
@@ -465,34 +562,39 @@ export class NormalAIStrategy extends BaseAIStrategy {
     }
 
     // 5. 控制类锦囊（顺手牵羊、过河拆桥、决斗等）——攻击敌人
-    const controlTricks = hand.filter(
+    const controlTricks = cards.filter(
       (c) =>
         c.tags.has(CardTag.Snatch) ||
         c.tags.has(CardTag.Dismantle) ||
         c.tags.has(CardTag.Duel) ||
         c.tags.has(CardTag.BorrowedBlade),
     )
-    if (controlTricks.length > 0 && enemies.length > 0) {
-      const trick = controlTricks[0]!
-      const target = this.pickRandom(enemies)
-      if (target) return { card: trick, targets: [target] }
+    const controlTarget = controlTricks
+      .map((trick) => ({ trick, enemies: enemiesOf(trick) }))
+      .find((c) => c.enemies.length > 0)
+    if (controlTarget) {
+      const target = this.pickRandom(controlTarget.enemies)
+      if (target) return { card: controlTarget.trick, targets: [target] }
     }
 
     // 6. AOE 锦囊（南蛮入侵、万箭齐发）——有多个敌人时使用
-    if (enemies.length >= 2) {
-      const aoe = hand.find(
+    if (this.enemiesAmong(player, getAlivePlayers(state)).length >= 2) {
+      const aoe = cards.find(
         (c) => c.tags.has(CardTag.BarbarianRaid) || c.tags.has(CardTag.ArrowBarrage),
       )
       if (aoe) {
-        return { card: aoe, targets: getAlivePlayers(state) }
+        return { card: aoe, targets: targetsOf(aoe) }
       }
     }
 
     // 7. 延时锦囊 → 对敌人使用
-    const delayedTrick = hand.find((c) => c.isDelayed)
-    if (delayedTrick && enemies.length > 0) {
-      const target = this.pickRandom(enemies)
-      if (target) return { card: delayedTrick, targets: [target] }
+    const delayed = cards
+      .filter((c) => c.isDelayed)
+      .map((card) => ({ card, enemies: enemiesOf(card) }))
+      .find((c) => c.enemies.length > 0)
+    if (delayed) {
+      const target = this.pickRandom(delayed.enemies)
+      if (target) return { card: delayed.card, targets: [target] }
     }
 
     return null
@@ -506,8 +608,12 @@ export class NormalAIStrategy extends BaseAIStrategy {
     const active = availableEffects.filter((e) => isManualSkill(e))
     if (active.length === 0) return null
 
-    // 按优先级排序，选择最高优先级的效果
-    const sorted = [...active].sort((a, b) => skillPriority(b) - skillPriority(a))
+    // 先按 `ai.order`（AI 的考虑顺序）排，同序再比 `priority`。
+    // `ai.order` 是「AI 先盘算谁」，`priority` 是「同时机谁先结算」——
+    // 两件事，不能互相顶替。
+    const sorted = [...active].sort(
+      (a, b) => aiOrderOf(b) - aiOrderOf(a) || skillPriority(b) - skillPriority(a),
+    )
     return sorted[0] ?? null
   }
 
@@ -580,18 +686,21 @@ export class NormalAIStrategy extends BaseAIStrategy {
  * - 判断是否值得使用 AOE
  */
 export class HardAIStrategy extends BaseAIStrategy {
-  chooseCardToPlay(player: IPlayer, state: GameStateSnapshot): AICardChoice | null {
-    const hand = this.getPlayableHandCards(player)
-    if (hand.length === 0) return null
+  chooseCardToPlay(
+    player: IPlayer,
+    state: GameStateSnapshot,
+    options?: readonly CardPlayOption[],
+  ): AICardChoice | null {
+    const { cards, targetsOf } = this.playContext(player, state, options)
+    if (cards.length === 0) return null
 
     const allAlive = this.getAlivePlayers(state)
-    const enemies = this.getOtherAlivePlayers(player, state).filter((p) =>
-      this.isEnemy(player, p),
-    )
+    // 敌人按牌算：够得着才谈得上威胁
+    const enemiesOf = (card: ICard) => this.enemiesAmong(player, targetsOf(card))
 
     // 1. 装备牌优先（立即提升战力）
-    const equipCard = hand.find((c) => c.tags.has(CardTag.Equip) || c.equipSlot)
-    if (equipCard) {
+    const equipCard = cards.find((c) => c.tags.has(CardTag.Equip) || c.equipSlot)
+    if (equipCard && targetsOf(equipCard).includes(player)) {
       // 检查是否已有同槽位装备（不重复装备低价值装备）
       const existingEquip = player.equipCards.find(
         (e) => e.equipSlot === equipCard.equipSlot,
@@ -602,36 +711,44 @@ export class HardAIStrategy extends BaseAIStrategy {
     }
 
     // 2. 桃：仅在受伤较重（hp <= maxHp - 2）或体力低时使用
-    const heal = this.findCardByTag(player, 'heal')
-    if (heal && player.hp <= player.maxHp - 2) {
+    const heal = cards.find((c) => c.tags.has(CardTag.Heal))
+    if (heal && targetsOf(heal).includes(player) && player.hp <= player.maxHp - 2) {
       return { card: heal, targets: [player] }
     }
 
     // 3. 酒：配合杀使用（本回合后续出杀伤害+1），或濒死自救
-    const wine = hand.find((c) => c.tags.has(CardTag.Wine) && !c.tags.has(CardTag.Strike))
-    const strikeForWine = this.findCardByTag(player, 'strike')
-    if (wine && strikeForWine && this.canPlayCard(player, strikeForWine) && enemies.length > 0) {
+    const wine = cards.find((c) => c.tags.has(CardTag.Wine) && !c.tags.has(CardTag.Strike))
+    const strikeForWine = cards.find((c) => c.tags.has(CardTag.Strike))
+    if (
+      wine &&
+      targetsOf(wine).includes(player) &&
+      strikeForWine &&
+      this.canPlayCard(player, strikeForWine) &&
+      enemiesOf(strikeForWine).length > 0
+    ) {
       return { card: wine, targets: [player] }
     }
 
     // 4. 增益类锦囊
-    const fromNothing = hand.find((c) => c.tags.has(CardTag.SomethingFromNothing))
+    const fromNothing = cards.find((c) => c.tags.has(CardTag.SomethingFromNothing))
     if (fromNothing) {
-      return { card: fromNothing, targets: [player] }
+      return { card: fromNothing, targets: targetsOf(fromNothing) }
     }
 
-    // 5. 优先攻击：按威胁度排序目标
-    const strike = this.findCardByTag(player, 'strike')
-    if (strike && this.canPlayCard(player, strike)) {
-      if (enemies.length > 0) {
-        const target = this.selectBestAttackTarget(player, enemies, state)
-        if (target) return { card: strike, targets: [target] }
-      }
-    }
+    // 5. 优先攻击：**牌 × 目标**一起选
+    //
+    // 先摸到哪张杀就用哪张是不够的——手里同时有火杀与普通杀时，
+    // 打一个穿藤甲的人该用火杀（火焰 +1），换一张就少一点伤害。
+    // 伤害是「这张牌打这个人」的函数，不是牌的属性也不是人的属性。
+    const strikes = cards.filter(
+      (c) => c.tags.has(CardTag.Strike) && this.canPlayCard(player, c),
+    )
+    const bestAttack = this.bestAttack(player, strikes, state, targetsOf)
+    if (bestAttack) return bestAttack
 
     // 6. 控制类锦囊 — 针对高价值目标
     const controlTricks = this.sortByValueDesc(
-      hand.filter(
+      cards.filter(
         (c) =>
           c.tags.has(CardTag.Snatch) ||
           c.tags.has(CardTag.Dismantle) ||
@@ -639,14 +756,16 @@ export class HardAIStrategy extends BaseAIStrategy {
           c.tags.has(CardTag.BorrowedBlade),
       ),
     )
-    if (controlTricks.length > 0 && enemies.length > 0) {
-      const trick = controlTricks[0]!
-      const target = this.selectBestAttackTarget(player, enemies, state)
-      if (target) return { card: trick, targets: [target] }
+    const control = controlTricks
+      .map((trick) => ({ trick, enemies: enemiesOf(trick) }))
+      .find((c) => c.enemies.length > 0)
+    if (control) {
+      const target = this.selectBestAttackTarget(player, control.enemies, state, control.trick)
+      if (target) return { card: control.trick, targets: [target] }
     }
 
     // 7. AOE：评估敌我比例
-    const aoe = hand.find(
+    const aoe = cards.find(
       (c) => c.tags.has(CardTag.BarbarianRaid) || c.tags.has(CardTag.ArrowBarrage),
     )
     if (aoe) {
@@ -654,20 +773,22 @@ export class HardAIStrategy extends BaseAIStrategy {
       const enemyCount = allAlive.filter((p) => this.isEnemy(player, p)).length
       // 敌多我寡时使用 AOE
       if (enemyCount > allyCount) {
-        return { card: aoe, targets: allAlive }
+        return { card: aoe, targets: targetsOf(aoe) }
       }
       // 盟友较多时不使用（避免误伤）
     }
 
     // 8. 延时锦囊 → 对威胁最高的敌人
-    const delayedTrick = this.sortByValueDesc(hand.filter((c) => c.isDelayed))[0]
-    if (delayedTrick && enemies.length > 0) {
-      const target = this.selectBestAttackTarget(player, enemies, state)
-      if (target) return { card: delayedTrick, targets: [target] }
+    const delayed = this.sortByValueDesc(cards.filter((c) => c.isDelayed))
+      .map((card) => ({ card, enemies: enemiesOf(card) }))
+      .find((c) => c.enemies.length > 0)
+    if (delayed) {
+      const target = this.selectBestAttackTarget(player, delayed.enemies, state, delayed.card)
+      if (target) return { card: delayed.card, targets: [target] }
     }
 
     // 9. 桃在轻度受伤时保留
-    if (heal && player.isWounded && player.hp > player.maxHp - 2) {
+    if (heal && targetsOf(heal).includes(player) && player.isWounded && player.hp > player.maxHp - 2) {
       // 如果手牌多，可以用掉
       if (player.handCards.length > player.maxHp + 2) {
         return { card: heal, targets: [player] }
@@ -685,14 +806,34 @@ export class HardAIStrategy extends BaseAIStrategy {
     const active = availableEffects.filter((e) => isManualSkill(e))
     if (active.length === 0) return null
 
-    // 评估每个效果的价值
-    const scored = active.map((e) => ({
-      effect: e,
-      score: aiValueOf(e, player),
-    }))
+    // 先按 `ai.order`（AI 的考虑顺序）排，同序再比估值。
+    // `ai.order` 不是 `skillPriority` ——后者是结算顺序，混用会让
+    // 「调 AI 先想哪个技能」的人无意中改动引擎的结算先后。
+    const scored = active
+      .map((e) => ({
+        effect: e,
+        order: aiOrderOf(e),
+        score: aiValueOf(e, player) - this.exposureCost(player, e),
+      }))
+      .sort((a, b) => b.order - a.order || b.score - a.score)
 
-    scored.sort((a, b) => b.score - a.score)
-    return scored[0]?.effect ?? null
+    // 扣完暴露代价后不划算就不发动。
+    //
+    // 门槛是 `>= 0` 而不是 `> 0`：绝大多数技能没写 `ai.result.player`，
+    // 估值退回 `priority`（通常是 0），写成 `> 0` 会让 AI 一个技能
+    // 都不发动。0 分的含义是「没有额外意见」，不是「不划算」。
+    return scored[0] && scored[0].score >= 0 ? scored[0].effect : null
+  }
+
+  /**
+   * 发动这条技能要付的「暴露身份」代价
+   *
+   * 身份已经亮了的人无所谓（藏不住了）；还没亮的——内奸、没翻面的
+   * 反贼——每发动一个一眼能认出来的技能都在自报家门。
+   */
+  private exposureCost(player: IPlayer, skill: ISkill): number {
+    if (player.roleRevealed) return 0
+    return exposeOf(skill)
   }
 
   chooseCardsToDiscard(player: IPlayer, count: number, _state: GameStateSnapshot): ICard[] {
@@ -826,16 +967,20 @@ export class HardAIStrategy extends BaseAIStrategy {
 
   chooseEffectTargets(
     player: IPlayer,
-    _effect: ISkill,
+    effect: ISkill,
     candidates: IPlayer[],
     state: GameStateSnapshot,
   ): IPlayer[] {
-    // 按威胁度排序，选择目标
+    // 按威胁度排序，选择目标。
+    //
+    // 技能自己也有发言权（`ai.result.target`）：【仁德】给谁、给谁更值，
+    // 是这条技能知道而通用威胁度不知道的事。两者相加——通用打分负责
+    // 「谁值得被针对」，技能负责「我这张牌想给谁」。
     const scored = candidates
       .filter((c) => c.alive)
       .map((c) => ({
         player: c,
-        score: this.getTargetThreatScore(player, c, state),
+        score: this.getTargetThreatScore(player, c, state) + aiTargetValueOf(effect, player, c),
       }))
 
     // 敌人得分越高（更有攻击价值），盟友得分越低
@@ -874,20 +1019,75 @@ export class HardAIStrategy extends BaseAIStrategy {
    * 4. 体力低的敌人
    * 5. 身份已公开的敌人
    */
+  /**
+   * 从「牌 × 目标」的组合里挑最好的一刀
+   *
+   * 只看目标会漏掉一半：同样一个人，用火杀打穿藤甲的他是 2 点，
+   * 用普通杀只有 1 点。因此两队变量一起比，先比伤害再比威胁度。
+   */
+  private bestAttack(
+    player: IPlayer,
+    cards: ICard[],
+    state: GameStateSnapshot,
+    targetsOf: (card: ICard) => IPlayer[],
+  ): AICardChoice | null {
+    let best: { card: ICard; target: IPlayer; damage: number; score: number } | null = null
+
+    for (const card of cards) {
+      for (const target of this.enemiesAmong(player, targetsOf(card))) {
+        const damage = this.estimateDamage(player, target, card)
+        const score = this.getTargetThreatScore(player, target, state)
+        if (
+          !best ||
+          damage > best.damage ||
+          (damage === best.damage && score > best.score)
+        ) {
+          best = { card, target, damage, score }
+        }
+      }
+    }
+
+    return best ? { card: best.card, targets: [best.target] } : null
+  }
+
   private selectBestAttackTarget(
     player: IPlayer,
     enemies: IPlayer[],
     state: GameStateSnapshot,
+    card?: ICard,
   ): IPlayer | null {
     if (enemies.length === 0) return null
 
     const scored = enemies.map((enemy) => ({
       player: enemy,
       score: this.getTargetThreatScore(player, enemy, state),
+      // 这一刀下去真的能掉几点血 —— 藤甲挨火杀是 2 点，挨普通杀是 1 点。
+      // 「这张牌打这个人值不值」问的是伤害，不是牌面。
+      damage: this.estimateDamage(player, enemy, card),
     }))
 
-    scored.sort((a, b) => b.score - a.score)
+    scored.sort((a, b) => {
+      if (b.damage !== a.damage) return b.damage - a.damage
+      return b.score - a.score
+    })
     return scored[0]?.player ?? null
+  }
+
+  /**
+   * 预估「这张牌打这个人」会造成几点伤害
+   *
+   * 走 `mods.damage` 这条总管道，于是防具易伤（藤甲：火焰 +1）、
+   * 技能加减伤全都算进来——AI 不必知道「藤甲」是什么，只要知道
+   * 这一刀下去目标会掉几点血。
+   *
+   * 没有 Mod 查询口时（纯策略单测）退回牌面值 1。
+   */
+  private estimateDamage(player: IPlayer, target: IPlayer, card?: ICard): number {
+    if (!card || !this.mods) return 1
+    // `nature` 从牌推出（火 / 雷 / 冰 / 毒），与 `damage-content` 结算
+    // 伤害时用的是同一个 `DamageResolver.damageTypeOf`——两边各推一遍
+    // 就会在「这张杀是不是火杀」上给出两个答案。
+    return this.mods.damage(1, player, target, card, DamageResolver.damageTypeOf(card))
   }
 
   /**
@@ -930,7 +1130,22 @@ export class HardAIStrategy extends BaseAIStrategy {
     // 有装备的敌人（资源多，需要压制）
     if (target.equipCards.length > 0) score += 5
 
+    // 身上带威胁技的敌人更该先处理。
+    // 威胁度写在技能定义上（`ai.threaten`），AI 只做累加——
+    // 「哪个武将厉害」不该有一份抄在 AI 里的名单。
+    score += this.threatOf(target)
+
     return score
+  }
+
+  /**
+   * 这个人身上所有技能的威胁度之和
+   *
+   * 没有台账时（纯策略单测）是 0，于是威胁评分退回纯局面判断。
+   */
+  private threatOf(player: IPlayer): number {
+    if (!this.skills) return 0
+    return this.skills.getSkills(player).reduce((sum, skill) => sum + threatenOf(skill), 0)
   }
 }
 
@@ -954,16 +1169,16 @@ import { CardTag } from '@core/contracts/card-tag'
 export function createAIStrategy(
   difficulty: AIDifficulty,
   random?: IRandomService,
-  budget?: CardBudget,
+  deps: AIStrategyDeps = {},
 ): IAIDecisionMaker {
   switch (difficulty) {
     case AIDifficulty.Beginner:
-      return new BeginnerAIStrategy(random, budget)
+      return new BeginnerAIStrategy(random, deps)
     case AIDifficulty.Normal:
-      return new NormalAIStrategy(random, budget)
+      return new NormalAIStrategy(random, deps)
     case AIDifficulty.Hard:
-      return new HardAIStrategy(random, budget)
+      return new HardAIStrategy(random, deps)
     default:
-      return new NormalAIStrategy(random, budget)
+      return new NormalAIStrategy(random, deps)
   }
 }

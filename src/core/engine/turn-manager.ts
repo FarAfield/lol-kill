@@ -11,10 +11,11 @@
 // - 自动跳过死亡玩家
 // ============================================================
 
-import { GamePhase } from '@core/contracts/enums'
+import { GamePhase, RoleType } from '@core/contracts/enums'
 import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import { PlayerSystem } from '@core/system/player-system'
+import { STANDARD_PHASE_ORDER } from '@source/base/constants'
 
 /**
  * 回合管理器
@@ -31,9 +32,6 @@ export class TurnManager {
   /** 当前轮次中已经行动过的玩家索引集合 */
   private playersActedThisRound: Set<number> = new Set()
 
-  /** 被跳过回合的玩家索引（乐不思蜀等） */
-  private skippedPlayers: Set<number> = new Set()
-
   /**
    * 玩家状态系统 —— 「每回合归零」那几笔账的写入口（Phase 19）
    *
@@ -48,22 +46,21 @@ export class TurnManager {
   /**
    * 开始新的一轮。
    *
-   * 重置回合计数器，将当前玩家设为主公（seatIndex 0 的存活玩家）。
-   * 如果主公已死亡，则选择第一个存活玩家。
+   * 先手固定给主公（欠账 D7 的另一半）。`assignRoles` 已经把主公钉在 0 号位，
+   * 这里**仍然按身份找**而不是直接写 `currentPlayerIndex = 0`：
+   * 「谁先手」的依据是身份，不是座次数字——座次只是身份今天恰好落在那儿。
+   * 主公已死（或本局没有主公）才退回第一个存活玩家。
    */
   startRound(): void {
     this.state.currentRound++
     this.playersActedThisRound.clear()
-    this.skippedPlayers.clear()
 
-    // 重置为第一个存活玩家（通常是主公）
-    const firstAlive = this.state.players.find((p) => p.alive)
-    if (firstAlive) {
-      this.state.currentPlayerIndex = firstAlive.seatIndex
-    } else {
-      this.state.currentPlayerIndex = 0
-    }
+    const lord = this.state.players.find(
+      (p) => p.alive && p.role === RoleType.Aspect,
+    )
+    const firstAlive = lord ?? this.state.players.find((p) => p.alive)
 
+    this.state.currentPlayerIndex = firstAlive?.seatIndex ?? 0
     this.state.currentPhase = GamePhase.RoundStart
   }
 
@@ -98,8 +95,7 @@ export class TurnManager {
     const currentPlayer = this.state.players[this.state.currentPlayerIndex]
     if (
       currentPlayer?.alive &&
-      !this.playersActedThisRound.has(currentPlayer.seatIndex) &&
-      !this.skippedPlayers.has(currentPlayer.seatIndex)
+      !this.playersActedThisRound.has(currentPlayer.seatIndex)
     ) {
       this.playersActedThisRound.add(currentPlayer.seatIndex)
       this.playerSystem.resetTurnState(currentPlayer)
@@ -107,23 +103,13 @@ export class TurnManager {
       return currentPlayer
     }
 
-    // 清除当前玩家曾经的跳过标记（如果它被 skipTurn 标记过但未被选中）
-    if (currentPlayer && this.skippedPlayers.has(currentPlayer.seatIndex)) {
-      this.skippedPlayers.delete(currentPlayer.seatIndex)
-    }
-
-    // ── 找到下一个存活且未行动且未被跳过的玩家 ──
+    // ── 找到下一个存活且未行动的玩家 ──
     for (let i = 1; i <= playerCount; i++) {
       const nextIndex =
         (this.state.currentPlayerIndex + i) % playerCount
       const nextPlayer = this.state.players[nextIndex]
 
       if (!nextPlayer?.alive) continue
-      if (this.skippedPlayers.has(nextIndex)) {
-        // 跳过玩家被标记后移除标记（仅跳过一回合）
-        this.skippedPlayers.delete(nextIndex)
-        continue
-      }
       if (this.playersActedThisRound.has(nextIndex)) continue
 
       // 找到下一个行动玩家
@@ -157,26 +143,30 @@ export class TurnManager {
   // ── 跳过回合 ──
 
   /**
-   * 跳过指定玩家的回合。
+   * 跳过指定玩家的整个回合。
    *
    * 在三国杀中，乐不思蜀等效果会使玩家跳过整个回合或部分阶段。
-   * 此方法标记玩家为「跳过」，在 nextTurn() 中自动跳过。
+   *
+   * **「跳过」只有一本账**（欠账 D29）：`player.shouldSkipPhases`。
+   * 以前这里还另写一份 `TurnManager.skippedPlayers`（按座次记「整回合跳过」），
+   * 于是 `nextTurn` 与 `executeTurn` 各有一份答案——前者在 `nextTurn` 里把人跳过去，
+   * 后者在阶段循环里再跳一次，而且被 `nextTurn` 跳过的玩家根本没记进
+   * `playersActedThisRound`，本轮末尾又会被重新选中，「跳过」实际是「延后」。
+   *
+   * 现在跳过整个回合 = 把六个阶段全部记进那一本账。于是：
+   * - 该玩家本轮照旧算「已行动」，不会在轮末被再捞回来；
+   * - `turnStart` / `turnEnd` 照发，「每回合一次」的额度照旧重置；
+   * - `mod.phaseSkippable` 那道否决照旧生效（跳过整个回合也能被否决掉）。
+   *
+   * **什么时候写才有效**：这一本账在 `nextTurn` 选人时会被 `resetTurnState` 清掉，
+   * 所以「跳过下一个回合」这种**跨回合预约**不成立——要跳过谁，得在他自己的
+   * 回合已经开始之后写（乐不思蜀正是这样：判定阶段写，出牌阶段读）。
+   * 真需要跨回合生效的规则，应当挂在 `turnStart` 上，而不是指望这本账活到那时。
    *
    * @param player 要跳过的玩家
    */
   skipTurn(player: IPlayer): void {
-    this.skippedPlayers.add(player.seatIndex)
-    // 同时在玩家身上标记（供 PhaseManager 查询）。
-    // 写这行标记要走 PlayerSystem——自己 `player.shouldSkipPhases = [...]`
-    // 就是绕过唯一写入口。
-    this.playerSystem.setSkipPhases(player, [
-      GamePhase.PhasePre,
-      GamePhase.PhaseJudge,
-      GamePhase.PhaseDraw,
-      GamePhase.PhaseUse,
-      GamePhase.PhaseDiscard,
-      GamePhase.PhasePost,
-    ])
+    this.playerSystem.setSkipPhases(player, [...STANDARD_PHASE_ORDER])
   }
 
   /**
@@ -193,16 +183,12 @@ export class TurnManager {
     this.playerSystem.skipPhases(player, phases)
   }
 
-  /**
-   * 当前回合玩家是否应跳过指定阶段。
-   *
-   * @param phase 要检查的阶段
-   */
-  shouldSkipPhase(phase: GamePhase): boolean {
-    const player = this.getCurrentPlayer()
-    if (!player) return false
-    return player.shouldSkipPhases.includes(phase)
-  }
+  //
+  // 这里曾经还有一个 `shouldSkipPhase(phase)`，读 `player.shouldSkipPhases.includes(phase)`
+  // —— 它是「这个阶段跳不跳」的**第二个答案**，而且零调用方：
+  // `PhaseManager.executeTurn` 自己读同一本账，并且多问一道 `mod.phaseSkippable`。
+  // 于是被 `phaseSkippable` 否决掉的阶段，在这个方法看来「还是要跳」。
+  // 随 D29 一并删除：答案只能有一个，且它得是带否决的那一个。
 
   // ── 查询 ──
 
@@ -247,6 +233,5 @@ export class TurnManager {
    */
   reset(): void {
     this.playersActedThisRound.clear()
-    this.skippedPlayers.clear()
   }
 }

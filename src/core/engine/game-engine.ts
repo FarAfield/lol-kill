@@ -6,9 +6,12 @@
 //
 // 职责：
 // - init(config)   — 初始化所有子系统，创建牌堆、分配角色、发放初始手牌
-// - start()        — 启动游戏，进入第一个回合
-// - runGameLoop()  — 运行完整游戏循环（轮次 → 回合 → 阶段）
-// - nextPhase()    — 推进到下一个阶段
+// - start()        — 开局（GameStart → 第一轮 → 先手就位），**不跑回合**
+// - runGameLoop()  — 唯一的推进者（轮次 → 回合 → 阶段）
+//
+// **推进只有一条路**（欠账 D38 形态丁）：回合一律由 `runGameLoop()` 走，
+// UI 不推进引擎，只回答引擎挂起的提问。以前「UI 逐步推进」是另一条路，
+// 而那条路上根本没人写交回合——界面上按「结束阶段」永远停在同一个人。
 //
 // 架构：
 //   GameEngine 持有所有子系统的引用，作为它们的协调者。
@@ -39,6 +42,7 @@ import { GameState } from '@core/entity/game-state'
 import { Player } from '@core/entity/player'
 import { Card } from '@core/entity/card'
 import { gameClock } from '@core/utils/clock'
+import { cardSlot } from '@core/utils/name-slot'
 
 // ── Engine ──
 import { GameStateMachine, WILDCARD } from './state-machine'
@@ -303,6 +307,13 @@ export class GameEngine {
         skillRegistry: this.skillRegistry,
         viewAs: this.viewAs,
         playerSystem: this.playerSystem,
+        // 阶段级同步：UI 现在要一格一格看到阶段走过去（形态丁下引擎是
+        // 唯一推进者，回合内没有提问的阶段不会停）。同步只能由引擎做——
+        // `PhaseManager` 不认识 Store。
+        onPhaseSync: () => this.syncState(),
+        // 出牌阶段不再自己抄一份用牌流程（欠账 D39）：
+        // 走本类那个唯一的入口，目标校验才真的在出牌这一步生效。
+        useCard: (player, card, targets) => this.useCard(player, card, targets),
       },
     )
 
@@ -418,9 +429,14 @@ export class GameEngine {
     })
   }
 
-  /** 两点实际距离（含双方的马 / 技能修正） */
-  getDistance(from: IPlayer, to: IPlayer): number {
-    return this.modQuery.distance(from, to)
+  /**
+   * 两点实际距离（含双方的马 / 技能修正）
+   *
+   * @param card 这次算距离是为了打哪张牌（可省略）。带上了，按牌型
+   *             豁免距离的技能（【奇才】）才算得进来。
+   */
+  getDistance(from: IPlayer, to: IPlayer, card?: ICard): number {
+    return this.modQuery.distance(from, to, card)
   }
 
   /** 某人的攻击范围（含武器） */
@@ -580,10 +596,19 @@ export class GameEngine {
   }
 
   /**
-   * 启动游戏——进入第一个回合。
+   * 启动游戏——**只开局，不跑回合**。
    *
    * 在 init() 之后调用。
-   * 流程：Prepare → RoundStart → 第一个玩家的 PhasePre
+   * 流程：Prepare → RoundStart → 第一轮开始（先手就位）
+   *
+   * **语义变化（欠账 D38 形态丁）**：这里曾经在末尾顺手把第一个玩家的
+   * 整个回合跑完（`phaseManager.executeTurn()`）。那一句是「界面看起来
+   * 完全死了」的一半成因：出牌阶段什么时候结束是**决策服务**说了算的
+   * （`doPhaseUse` 的 while 循环问到 `null` 才 break），于是 `start()`
+   * 返回时第一个回合已经打完，UI 面前没有任何「还没走完的东西」可推。
+   *
+   * 现在开局与推进分开：这里只把先手设好，回合交给 `runGameLoop()`。
+   * `start()` 之后再没人调循环 = 一局停在起跑线上，不会静默替谁打。
    */
   async start(): Promise<void> {
     if (!this.state.started) {
@@ -604,23 +629,27 @@ export class GameEngine {
     await this.stateMachine.transition(GamePhase.RoundStart, this.state)
     this.state.currentPhase = GamePhase.RoundStart
 
-    // ── 开始第一轮 ──
+    // ── 开始第一轮（`startRound` 顺带把先手设成主公）──
     await this.beginRound()
-
-    // ── 进入第一个玩家的回合 ──
-    const firstPlayer = this.turnManager.getCurrentPlayer()
-    if (firstPlayer) {
-      await this.phaseManager.executeTurn()
-    }
 
     this.syncState()
   }
 
   /**
-   * 运行完整的游戏循环。
+   * 运行完整的游戏循环 —— **全仓唯一的推进者**（欠账 D38 形态丁）。
    *
    * 持续循环：轮次 → 回合 → 阶段，直到游戏结束。
    * 在每步之间检查胜利条件和游戏结束标记。
+   *
+   * 回合内没有提问的阶段（准备 / 判定 / 摸牌 / 结束）不会停 ——
+   * 引擎一路跑过去，只在**决策服务被问到的那一刻**挂起等人答复。
+   * 这与无名杀的骨架一致：`game.loop()` → `phaseLoop()` → `player.phase()`，
+   * 全程一个异步流，人类的输入走 `choose*` 系列调用即挂起当前步骤。
+   *
+   * ⚠️ 它是个 `while` 循环：**`startGame()` 不能 await 到整局结束**，
+   * 否则视图里 `await startGame()` 之后的代码要等到分出胜负才跑。
+   * 开局与「等整局结束」在控制器里是两件事（见 `GameController.startGame`
+   * 与 `whenFinished`）。
    *
    * @returns 游戏结果
    */
@@ -658,7 +687,13 @@ export class GameEngine {
       const nextPlayer = this.turnManager.nextTurn()
       if (!nextPlayer) {
         // 没有可行动的玩家（异常情况）
-        if (this.state.aliveCount === 0) {
+        //
+        // 「全员死亡」这一步的判定在 `DeathSystem`（欠账 D30）：以前这里
+        // 自己数一遍存活人数，于是「什么叫没人了」在引擎里有了第二个
+        // 答案——`DeathSystem` 上那个同义方法零调用方，而两处的判据一旦
+        // 分开演进（比如将来把「离场但未死」也算进去），循环就会在
+        // 同一个局面上得出不同的结论。
+        if (this.deathSystem.checkAllDead()) {
           return this.endGame({
             winner: null,
             reason: '所有玩家已死亡',
@@ -728,7 +763,9 @@ export class GameEngine {
     const check = this.validatePlay(player, card, targets)
     if (!check.valid) {
       const reason = check.reason ?? '目标不合法'
-      this.log('warn', `useCard 被拒绝 — ${player.id} 想对 [${targets.map((t) => t.id).join(', ')}] 使用「${card.name}」: ${reason}`)
+      // 牌名写成占位符（欠账 D40）：开发日志里现在是稳定 ID，
+      // 显示名归展示层。
+      this.log('warn', `useCard 被拒绝 — ${player.id} 想对 [${targets.map((t) => t.id).join(', ')}] 使用「${cardSlot(card.id)}」: ${reason}`)
       throw new TargetValidationError(card, reason)
     }
 
@@ -761,34 +798,15 @@ export class GameEngine {
     this.syncState()
   }
 
-  /**
-   * 推进到下一个阶段（玩家主动结束当前阶段时调用）。
-   *
-   * UI 通过此方法通知引擎当前阶段结束，进入下一阶段。
-   * 例如：玩家在出牌阶段点击「结束出牌」时调用。
-   */
-  async nextPhase(): Promise<void> {
-    const currentPlayer = this.turnManager.getCurrentPlayer()
-    if (!currentPlayer) return
-
-    const currentPhase = this.state.currentPhase
-    const nextPhase = this.phaseManager.getNextPhase(currentPhase)
-
-    if (nextPhase) {
-      // 转移到下一个阶段
-      await this.stateMachine.transition(nextPhase, this.state)
-      this.state.currentPhase = nextPhase
-
-      // 执行下一阶段
-      await this.phaseManager.executePhase(nextPhase, currentPlayer)
-    } else {
-      // 最后一个阶段（PhasePost）结束，回合结束
-      this.state.currentPhase = GamePhase.PhasePost
-      await this.stateMachine.transition(GamePhase.PhasePost, this.state)
-    }
-
-    this.syncState()
-  }
+  //
+  // 这里曾经还有一个「推到下一个阶段」的公开方法（形态丁之前的
+  // 「UI 逐步推进」那条路的入口）。它的 `else` 分支在末阶段只是把
+  // `phasePost` 原地重设一遍 —— **从不调 `turnManager.nextTurn()`**，
+  // 于是那条路上交不出回合（欠账 D38）。
+  //
+  // 形态丁下它是多余的：阶段由 `runGameLoop()` 一路走下去，
+  // 「结束出牌」不再是「推引擎一步」，而是**答复一个已经挂起的提问**。
+  // 留一个兼容壳等于让两条推进路径继续并存，所以整个删掉。
 
   // ── 游戏结束 ──
 

@@ -99,17 +99,14 @@ export class Player implements IPlayer {
     return this.alive && this.hp <= 0
   }
 
-  /**
-   * 当前攻击范围（基础 1 + 武器加成）
-   *
-   * 诸葛连弩之类的**次数**加成不在这里——那是出牌阶段的 `mod.cardUsable`。
-   */
-  get attackRange(): number {
-    const weapon = this.getEquipInSlot(EquipSlot.Weapon)
-    const baseRange = 1
-    const weaponBonus = weapon?.attackRange ?? 0
-    return baseRange + weaponBonus
-  }
+  //
+  // 这里曾经还有一个「当前攻击范围」的 getter，算法是「基础 1 + 武器加成」
+  // ——它是这个问题的**第二个答案**，而且零生产调用方（`Player` 不认识
+  // `ModRegistry`，它算出来的数也确实和 Mod 那一份不一样：D41 修掉的
+  // 「每张武器都多一格」那个 bug，两份算式各错各的）。
+  //
+  // 唯一的答案是 `GameEngine.getAttackRange()` → `modQuery.attackRange()`
+  // → `mod:equip.weaponRange`。要显示范围的人去问它。
 
   /** 当前英雄（标准模式下为 heroes[0]） */
   get hero(): IHero | undefined {

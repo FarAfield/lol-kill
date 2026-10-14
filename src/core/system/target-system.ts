@@ -19,6 +19,7 @@ import type { ICard } from '@core/contracts/card.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { GameStateSnapshot } from '@core/contracts/game.interface'
 import { CardTag } from '@core/contracts/card-tag'
+import { heroSlot } from '@core/utils/name-slot'
 
 /**
  * 目标相关的 Mod 查询接口
@@ -112,7 +113,9 @@ export class TargetSystem {
       if (!availableTargets.some((t) => t.id === target.id)) {
         return {
           valid: false,
-          reason: `"${target.hero?.name ?? target.id}" 不是合法目标`,
+          // 占位符而不是姓名（欠账 D40）：拒绝原因会原样出现在日志里，
+          // 写成姓名就换不成 LOL 名。
+          reason: `"${heroSlot(target.hero?.id ?? target.id)}" 不是合法目标`,
         }
       }
     }
@@ -187,7 +190,7 @@ export class TargetSystem {
 
     // ── 杀 ──
     if (tags.has(CardTag.Strike) && tags.has(CardTag.Attack)) {
-      return this.getTargetsForAttack(source, alivePlayers, mods)
+      return this.getTargetsForAttack(source, alivePlayers, mods, card)
     }
 
     // ── 桃 ──
@@ -222,7 +225,7 @@ export class TargetSystem {
 
     // ── 过河拆桥 / 顺手牵羊 ──
     if (tags.has(CardTag.Dismantle) || tags.has(CardTag.Snatch)) {
-      return this.getTargetsForStealOrDismantle(source, alivePlayers, mods)
+      return this.getTargetsForStealOrDismantle(source, alivePlayers, mods, card)
     }
 
     // ── 决斗 ──
@@ -252,7 +255,7 @@ export class TargetSystem {
     }
 
     // ── 默认：距离为1的其他角色 ──
-    return DistanceSystem.getPlayersWithinDistance(source, 1, alivePlayers, mods)
+    return DistanceSystem.getPlayersWithinDistance(source, 1, alivePlayers, mods, true, card)
   }
 
   // ── 卡牌目标数限制 ──
@@ -331,15 +334,19 @@ export class TargetSystem {
 
   /**
    * 杀的目标筛选：攻击范围内的其他角色。
+   *
+   * 把 `card` 传进距离计算，是为了让「按牌型豁免距离」的 Mod 能看出
+   * 这一次算的是【杀】——否则【奇才】之流会把杀的范围也一起放开。
    */
   private static getTargetsForAttack(
     source: IPlayer,
     alivePlayers: IPlayer[],
     mods?: DistanceMods,
+    card?: ICard,
   ): IPlayer[] {
     return alivePlayers.filter((p) => {
       if (p.id === source.id) return false
-      return DistanceSystem.isInRange(source, p, alivePlayers, mods)
+      return DistanceSystem.isInRange(source, p, alivePlayers, mods, card)
     })
   }
 
@@ -375,11 +382,12 @@ export class TargetSystem {
     source: IPlayer,
     alivePlayers: IPlayer[],
     mods?: DistanceMods,
+    card?: ICard,
   ): IPlayer[] {
     return alivePlayers.filter((p) => {
       if (p.id === source.id) return false
       // 必须在距离 1 内
-      if (DistanceSystem.getDistance(source, p, alivePlayers, mods) > 1) return false
+      if (DistanceSystem.getDistance(source, p, alivePlayers, mods, card) > 1) return false
       // 允许目标区域内无牌（卡牌效果会空放）
       return true
     })

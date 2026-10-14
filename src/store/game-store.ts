@@ -18,6 +18,43 @@ import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
 import type { IHero } from '@core/contracts/hero.interface'
 import type { LogEntry } from '@core/contracts/types'
+import { BASE_ATTACK_RANGE } from '@core/skill'
+import { lolHeroName, lolHeroTitle } from '@source/theme/lol-mapping'
+
+/**
+ * 玩家面板上那几个**要查规则才答得上来**的数（欠账 D41）
+ *
+ * 它们都不在快照里：`hp` / `maxHp` 是状态，而「攻击范围」「手牌上限」
+ * 是 `ModRegistry` 算出来的结果 —— 装把武器、挂个技能都会变。
+ * 快照里没有，因此 Store 只能**去问**。
+ */
+export interface UIPlayerStats {
+  /** 攻击范围（含武器与技能修正） */
+  attackRange: number
+  /** 手牌上限（默认等于体力上限，可被技能改写） */
+  maxHandcard: number
+}
+
+/**
+ * 那几个数的查询口
+ *
+ * Store 自己**不认识** `ModRegistry`，也不许按装备槽位另算一份——
+ * 「攻击范围是多少」只有一个答案，在引擎那边。因此这里只接收一个
+ * 由控制器注入的查询函数；没注入就退回各自的缺省值（与「查不到
+ * 就显示原名」同一条规矩：缺一块比给个错的强）。
+ */
+export interface IPlayerStatsQuery {
+  attackRange(player: IPlayer): number
+  maxHandcard(player: IPlayer): number
+}
+
+/**
+ * 查询口缺席时退到哪里
+ *
+ * 手牌上限退回**实体上的上限**，攻击范围退回 `@core/skill` 里那个基础值——
+ * 那个常量是「赤手空拳够得着邻座」这条规则的唯一答案，这里不许再抄一份。
+ */
+const FALLBACK_MAX_HANDCARD = (player: IPlayer): number => player.maxHp
 
 /**
  * UI 可见的玩家信息（隐藏未公开身份、对手手牌内容等）。
@@ -37,6 +74,8 @@ export interface UIPlayerInfo {
   handCount: number
   equipCards: ICard[]
   judgeCards: ICard[]
+  /** Mod 算出来的那几个数（欠账 D41） */
+  stats: UIPlayerStats
   isCurrentPlayer: boolean
   isHuman: boolean
 }
@@ -83,6 +122,16 @@ export const useGameStore = defineStore('game', () => {
   // ── 原始引擎状态 ──
   const gameState = ref<GameStateSnapshot | null>(null)
 
+  /**
+   * 「要查规则才答得上来」的那几个数从哪儿问（欠账 D41）
+   *
+   * 由 `GameController` 在创建引擎之后注入。它必须在**引擎出生之后**
+   * 才有得可问，而 Store 比引擎活得早，所以只能事后补——
+   * 这与 `setCardBudget` / `setModQuery` 那三条补发是同一件事，
+   * 补发的那一行必须放在「引擎创建」那个唯一的出口上。
+   */
+  const statsQuery = ref<IPlayerStatsQuery | null>(null)
+
   // ── 派生状态 ──
 
   /** UI 友好的游戏状态 */
@@ -110,29 +159,55 @@ export const useGameStore = defineStore('game', () => {
     return gs.players[gs.currentPlayerIndex]!
   })
 
+  /**
+ * 展示用的英雄 —— **换皮只发生在这里**（欠账 D27）
+ *
+ * 引擎那份 `IHero` 的 `name` / `title` 是三国杀的名字，是数据；
+ * 界面上显示的 LOL 名字从这里查表换出来。Store 本来就是「引擎数据 → UI
+ * 显示值」的派生层，所以换皮落在这一层：座位组件、当前回合名、文本视图
+ * 读的都是同一份，不存在第二个答案。
+ */
+  function displayHero(hero: IHero | null): IHero | null {
+    if (!hero) return null
+    return {
+      ...hero,
+      name: lolHeroName(hero.id, hero.name),
+      title: lolHeroTitle(hero.id, hero.title),
+    }
+  }
+
   /** UI 可见的玩家列表 */
   const uiPlayers = computed<UIPlayerInfo[]>(() => {
     const gs = gameState.value
     if (!gs) return []
 
-    return gs.players.map((p) => ({
-      id: p.id,
-      seatIndex: p.seatIndex,
-      name: p.heroes[0]?.name ?? `玩家${p.seatIndex + 1}`,
-      role: p.roleRevealed ? (p.role ?? null) : null,
-      roleRevealed: p.roleRevealed,
-      alive: p.alive,
-      hp: p.hp,
-      maxHp: p.maxHp,
-      power: p.power,
-      maxPower: p.maxPower,
-      hero: p.heroes[0] ?? null,
-      handCount: p.handCards.length,
-      equipCards: [...p.equipCards],
-      judgeCards: [...p.judgeCards],
-      isCurrentPlayer: p.seatIndex === gs.currentPlayerIndex,
-      isHuman: false, // 默认 false，由 GameController 设置
-    }))
+    const query = statsQuery.value
+    return gs.players.map((p) => {
+      const hero = displayHero(p.heroes[0] ?? null)
+      const stats: UIPlayerStats = {
+        attackRange: query ? query.attackRange(p) : BASE_ATTACK_RANGE,
+        maxHandcard: query ? query.maxHandcard(p) : FALLBACK_MAX_HANDCARD(p),
+      }
+      return {
+        id: p.id,
+        seatIndex: p.seatIndex,
+        name: hero?.name ?? `玩家${p.seatIndex + 1}`,
+        role: p.roleRevealed ? (p.role ?? null) : null,
+        roleRevealed: p.roleRevealed,
+        alive: p.alive,
+        hp: p.hp,
+        maxHp: p.maxHp,
+        power: p.power,
+        maxPower: p.maxPower,
+        hero,
+        handCount: p.handCards.length,
+        equipCards: [...p.equipCards],
+        judgeCards: [...p.judgeCards],
+        stats,
+        isCurrentPlayer: p.seatIndex === gs.currentPlayerIndex,
+        isHuman: false, // 默认 false，由 GameController 设置
+      }
+    })
   })
 
   /** 游戏阶段标签 */
@@ -180,6 +255,16 @@ export const useGameStore = defineStore('game', () => {
   }
 
   /**
+   * 注入「要查规则才答得上来」的那几个数的查询口（欠账 D41）
+   *
+   * 由 `GameController` 调用。不注入也能跑——面板显示的是基础值，
+   * 只是看不到武器与技能带来的变化。
+   */
+  function setStatsQuery(query: IPlayerStatsQuery | null): void {
+    statsQuery.value = query
+  }
+
+  /**
    * 设置玩家为人类玩家。
    *
    * @param playerId 玩家 ID
@@ -221,6 +306,7 @@ export const useGameStore = defineStore('game', () => {
 
     // Actions
     syncFromEngine,
+    setStatsQuery,
     setHumanPlayer,
     getUIPlayerInfo,
     reset,

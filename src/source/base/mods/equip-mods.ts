@@ -40,10 +40,20 @@ function owner(ctx: { owner?: IPlayer }): IPlayer | undefined {
 // ── 武器：攻击范围 ──
 
 /**
- * 武器 — 攻击范围 = 基础 1 + 武器自身的 attackRange
+ * 武器 — 攻击范围以**武器自己写的那个数**为准
  *
  * 一张表覆盖所有武器：新增武器只要带 `equipSlot: Weapon` 和 `attackRange`
  * 就自动生效，不用改引擎也不用改这里。
+ *
+ * **为什么是取大而不是相加**（欠账 D41 顺带修掉的一个真 bug）：
+ * 武器定义里的 `attackRange` 是「装上它之后你的攻击范围」，不是「在基础
+ * 上再加多少」——诸葛连弩写着「攻击范围 1」，青釭剑写着「攻击范围 2」。
+ * 以前这里写 `value + weapon.attackRange`，于是连弩装上去变成 2、青釭剑
+ * 变成 3，每张武器都凭空多出一格。面板一旦真的显示这个数（D41），
+ * 那 1 格就摆在脸上。
+ *
+ * 取大保留了别的 Mod 往上加的余地：技能把范围抬到 3、手里拿把 2 的武器，
+ * 结果仍是 3。
  */
 export const weaponRangeMod: IModDefinition = {
   id: 'mod:equip.weaponRange',
@@ -52,7 +62,8 @@ export const weaponRangeMod: IModDefinition = {
   mods: {
     attackRange: (value, ctx) => {
       const weapon = owner(ctx) && equippedIn(owner(ctx)!, EquipSlot.Weapon)
-      return value + (weapon?.attackRange ?? 0)
+      const range = weapon?.attackRange
+      return range === undefined ? value : Math.max(value, range)
     },
   },
 }

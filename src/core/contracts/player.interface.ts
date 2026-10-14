@@ -105,8 +105,13 @@ export interface IPlayer extends PlayerState {
   readonly isWounded: boolean
   /** 是否处于濒死状态（hp <= 0 且存活） */
   readonly isDying: boolean
-  /** 当前攻击范围（基础 1 + 武器加成） */
-  readonly attackRange: number
+  //
+  // 这里曾经声明过「当前攻击范围」。它是同一个问题的**第二个答案**
+  // ——实体不认识规则层，那份「基础 1 + 武器加成」的算术与规则层给出的
+  // 数并不一致（欠账 D41 修掉的「每张武器都多一格」正是两份算式各错各的）。
+  //
+  // 唯一的答案是 `GameEngine.getAttackRange()`。要范围的人去问它。
+  //
   /** 当前英雄（标准模式下为 heroes[0]） */
   readonly hero: IHero | undefined
   // 「本回合还能不能出杀」不在实体上回答 —— 见 `CardBudget.canPlay`。

@@ -13,6 +13,7 @@ import { TargetSystem } from '@core/system/target-system'
 import { CardSuit, CardRank, ZoneType, type LogLevel } from '@core/contracts/enums'
 import type { CardDefinition, ICard } from '@core/contracts/card.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
+import type { IGameConfig } from '@core/contracts/game.interface'
 import type {
   ILoggerService,
   IRandomService,
@@ -21,6 +22,12 @@ import type {
   CardPlayResult,
 } from '@core/contracts/services.interface'
 import type { ISkill } from '@core/contracts/skill.interface'
+import { basicCards } from '@source/cards/basic'
+import { trickCards } from '@source/cards/tricks'
+import { equipCards } from '@source/cards/equips'
+import { standard5pConfig } from '@source/modes/standard-5p'
+import { LiuBei, GuanYu, ZhangFei, ZhaoYun, LvMeng } from '@source/heroes/standard'
+import type { Hero } from '@core/entity/hero'
 
 export class SilentLoggerService implements ILoggerService {
   log(): void {}
@@ -235,11 +242,41 @@ export class ScriptedDecisionService implements IUIDecisionService {
 export { SeededRandomService } from '@core/services/seeded-random'
 
 /** 构造一张卡牌定义 */
+/**
+ * 真值源：`source/cards/*` 里登记过的卡牌定义，按 id 索引
+ *
+ * 测试造牌一律先查这张表。手搓的 tag 一旦与真定义差一个，那张牌
+ * 就**不是那张牌**：南蛮入侵少 `Aoe` 会变成「要选目标的普通锦囊」，
+ * 桃少 `Basic` 会连自己都不是合法目标——而它不报错，只是静默落进
+ * `TargetSystem` 的另一个分支（欠账 D32：接 `validateTargets` 那天
+ * 一次性红了 22 条既有用例，全是这么撞上的）。
+ */
+const REAL_CARD_DEFS: ReadonlyMap<string, CardDefinition> = new Map(
+  [...basicCards, ...trickCards, ...equipCards].map((def) => [def.id, def]),
+)
+
+/**
+ * 造一张卡牌定义
+ *
+ * **只要 `id` 在真牌表里查得到，整张定义都取自真牌** —— 传进来的
+ * `tags` 在这种情况下被忽略。这不是省事，是**让漂移在结构上不可能**：
+ * 真定义改了 tag，测试跟着改，而不是各自抄一份然后慢慢走散。
+ *
+ * 查不到的（「一张红色填充牌」这类合成牌）才用 `tags` 手搓，
+ * 它们本来就没有真身可对齐。
+ *
+ * @param id    卡牌 id
+ * @param tags  仅对合成牌生效的 tag 集合
+ * @param extra 覆盖项（花色 / 名字 / 描述等），一律最后生效
+ */
 export function cardDef(
   id: string,
   tags: string | string[],
   extra: Partial<CardDefinition> = {},
 ): CardDefinition {
+  const real = REAL_CARD_DEFS.get(id)
+  if (real) return { ...real, ...extra }
+
   return {
     id,
     name: id,
@@ -264,6 +301,18 @@ export function giveCard(player: IPlayer, def: CardDefinition): ICard {
   return card
 }
 
+/**
+ * 五名**不会改判**的英雄（魏国一个都不放）
+ *
+ * 【鬼才】是全局触发：局里只要有司马懿，**任何一次**判定都会被他的手牌
+ * 顶掉，于是「翻出来的牌是什么花色」说了不算。凡是断言「判定结果决定
+ * 延时锦囊生效与否」的用例，英雄池都要钉死——否则标准池里多一个英雄
+ * （分配结果就变了），既有断言就会莫名其妙地红（D44）。
+ *
+ * 改判本身不是没人测，它另有专测：`src/__tests__/skill/guicai.test.ts`。
+ */
+export const NO_GUICAI_HEROES: Hero[] = [LiuBei, GuanYu, ZhangFei, ZhaoYun, LvMeng]
+
 export interface TestEnv<D extends IUIDecisionService = ScriptedDecisionService> {
   engine: NonNullable<ReturnType<GameBoot['getEngine']>>
   /** 传进来的那个决策服务本身——用它自己的类型，便于读它自己的观测字段 */
@@ -278,16 +327,25 @@ export interface TestEnv<D extends IUIDecisionService = ScriptedDecisionService>
  *   的测试（Phase 16 的视作窗口就是这样）自己塞一个子类进来。
  *   不传则用 `ScriptedDecisionService`，于是 `env.decisions.answers`
  *   这类字段仍然可直接读。
+ * @param overrides 覆盖标准配置的字段（英雄池、选将数、初始手牌数 …）
+ *
+ *   **英雄池要能钉死**：标准局里有没有司马懿，决定了每一次判定会不会被
+ *   【鬼才】改判——那是全局触发，谁判它都插手。断言「判定非红桃 → 跳过
+ *   出牌阶段」这种用例，只要局里多了他，结果就变成他的手牌说了算（D44）。
  */
 export async function createTestEnv<D extends IUIDecisionService = ScriptedDecisionService>(
   decisions?: D,
+  overrides?: Partial<IGameConfig>,
 ): Promise<TestEnv<D>> {
   const service = (decisions ?? new ScriptedDecisionService()) as D
-  const boot = GameBoot.createStandard5P({
+  const services = {
     loggerService: new SilentLoggerService(),
     randomService: new IdentityRandomService(),
     decisionService: service,
-  })
+  }
+  const boot = overrides
+    ? GameBoot.create({ ...standard5pConfig, ...overrides }, services)
+    : GameBoot.createStandard5P(services)
   await boot.boot()
   const engine = boot.getEngine()!
   return { engine, decisions: service, players: () => engine.state.players }

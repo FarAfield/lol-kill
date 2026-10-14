@@ -200,6 +200,9 @@ describe('D37 · 三个查询口由引擎补给决策服务', () => {
     ctrl.setDecisionService(recorder)
     ctrl.bindStore({
       syncFromEngine(): void {},
+      // 面板数值的查询口（欠账 D41）——控制器开局后一定会补发一次，
+      // Store 替身少一个方法就会在那一句上炸掉。
+      setStatsQuery(): void {},
       reset(): void {},
     })
     await ctrl.createGame({ ...standard5pConfig })
@@ -213,6 +216,7 @@ describe('D37 · 三个查询口由引擎补给决策服务', () => {
     ctrl.setDecisionService(new HumanDecisionService({ fallback: aiSide }))
     ctrl.bindStore({
       syncFromEngine(): void {},
+      setStatsQuery(): void {},
       reset(): void {},
     })
     await ctrl.createGame({ ...standard5pConfig })

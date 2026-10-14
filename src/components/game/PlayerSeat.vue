@@ -56,6 +56,31 @@
         </div>
       </div>
 
+      <!--
+        规则数值（欠账 D41）—— 攻击范围与手牌上限都是 `ModRegistry`
+        算出来的：装把武器、挂个技能都会变，而快照里根本没有它们。
+        所以这里读的是 Store 从引擎**问来**的那一份，不是实体上的算术。
+        被抬起来的那一个会高亮（基础攻击范围是 1、手牌上限默认等于体力上限）。
+      -->
+      <div class="stat-row">
+        <span
+          class="stat"
+          data-stat="attackRange"
+          :class="{ boosted: player.stats.attackRange > BASE_ATTACK_RANGE }"
+          :title="`攻击范围 ${player.stats.attackRange}`"
+        >
+          ⚔️ {{ player.stats.attackRange }}
+        </span>
+        <span
+          class="stat"
+          data-stat="maxHandcard"
+          :class="{ boosted: player.stats.maxHandcard !== player.maxHp }"
+          :title="`手牌上限 ${player.stats.maxHandcard}`"
+        >
+          🖐️ {{ player.stats.maxHandcard }}
+        </span>
+      </div>
+
       <!-- 手牌数 / 装备标记 -->
       <div class="card-indicators">
         <div class="hand-badge">
@@ -102,6 +127,7 @@
 import { computed } from 'vue'
 import { NAvatar, NTag } from 'naive-ui'
 import { RoleType, Kingdom } from '@core/contracts/enums'
+import { BASE_ATTACK_RANGE as baseAttackRange } from '@core/skill'
 import type { UIPlayerInfo } from '@/store/game-store'
 import CardEquip from '@/components/card/CardEquip.vue'
 import CardJudge from '@/components/card/CardJudge.vue'
@@ -171,6 +197,14 @@ const heroGradient = computed(() => {
       return 'linear-gradient(135deg, #546E7A, #90A4AE)'
   }
 })
+
+/**
+ * 基础攻击范围（欠账 D41）
+ *
+ * 超过它说明有武器或技能在起作用。这个数只有**一个答案**，
+ * 在 `@core/skill` 里——本组件不另写一份字面量。
+ */
+const BASE_ATTACK_RANGE = baseAttackRange
 
 // ── 目标选择方法 ──
 function handleClick(): void {
@@ -330,6 +364,32 @@ function handleMouseLeave(): void {
   font-size: 10px;
   color: #aaa;
   white-space: nowrap;
+}
+
+// ── 规则数值（欠账 D41）──
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.stat {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 8px;
+  color: #ccc;
+  background: rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+
+  // 被武器 / 技能抬起来的那一个：不给颜色语义，只给「它不是默认值」这个事实
+  &.boosted {
+    color: #ffd700;
+    background: rgba(255, 215, 0, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(255, 215, 0, 0.45);
+  }
 }
 
 // ── 卡牌指示器 ──

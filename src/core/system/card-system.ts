@@ -519,4 +519,37 @@ export class CardSystem {
   moveToProcessing(card: ICard, player: IPlayer): void {
     this.moveCard(card, ZoneType.Processing, player)
   }
+
+  /**
+   * 判定结果牌收尾 —— 判定结束时把那张「结果牌」送进弃牌堆
+   *
+   * 判定有两条发起路径（判定阶段 `PhaseManager`、内容层自己翻牌），
+   * 收尾逻辑曾经只有前一条写全了，后一条直接 `finishProcessing`——
+   * 于是改判把结果牌摸进手牌之后，后一条会抛「不在处理区」。
+   * 这里就是那个唯一的出口，两条路径都调它。
+   *
+   * 结果牌此刻在哪，取决于这一路上有没有技能动过它：
+   *   1. 处理区（正常翻出来的）—— 走 `finishProcessing`；
+   *   2. 某人手里（技能把一张手牌顶上来当结果，还没弃）—— 走 `discardCard`，
+   *      否则它会留在 `handCards` 里，弃牌阶段再扫一遍就会撞上
+   *      「弃牌堆里的牌不能再弃」；
+   *   3. 其余（技能已经替它弃过了）—— 送进弃牌堆，重复一次无害。
+   */
+  finishJudgeResult(card: ICard): void {
+    if (card.zone === ZoneType.Processing) {
+      this.finishProcessing(card)
+      return
+    }
+
+    // 判「是谁的手牌」扫 players 而不是读 `card.owner`：手牌的 owner
+    // 一般是设好的，但这里要的是**它在谁的 handCards 里**——
+    // 只有这个事实决定了它该从哪个数组里被摘掉。
+    const holder = this.state.players.find((player) => player.handCards.includes(card))
+    if (holder) {
+      this.discardCard(card, holder)
+      return
+    }
+
+    this.moveToDiscard(card)
+  }
 }

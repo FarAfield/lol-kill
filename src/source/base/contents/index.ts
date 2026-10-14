@@ -46,6 +46,11 @@ export const allCardContents: ContentEntry[] = [
 
   // 基本牌
   ['sha', shaContent],
+  // 属性杀：内容就是 `shaContent`，伤害属性由卡牌自己的 tag 决定。
+  // 键必须各自挂一条 —— 用牌事件以**卡牌 id** 为名派发，
+  // 只挂 `sha` 的话这两张牌打出去了什么都不会发生。
+  ['huoSha', shaContent],
+  ['leiSha', shaContent],
   ['shan', shanContent],
   ['tao', taoContent],
   ['jiu', jiuContent],

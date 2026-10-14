@@ -12,6 +12,7 @@
 
 import type { EventContent } from '@core/event/content-registry'
 import { helpers } from '@core/event/content-helpers'
+import { judgeResultCardOf } from '@core/event/judge-keys'
 import { CardSuit, GamePhase } from '@core/contracts/enums'
 import type { ICard } from '@core/contracts/card.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
@@ -29,7 +30,7 @@ import type { ISkillContext } from '@core/contracts/skill.interface'
  * 「Content = 这个事件本身做什么」，它不该假设调用方替它翻过牌了。
  */
 async function judgeResult(ctx: ISkillContext, owner: IPlayer): Promise<ICard> {
-  const provided = ctx.event.data['judgeResultCard'] as ICard | undefined
+  const provided = judgeResultCardOf(ctx.event)
   if (provided) return provided
   return helpers(ctx).judge(owner)
 }

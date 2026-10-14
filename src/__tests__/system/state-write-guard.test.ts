@@ -191,6 +191,48 @@ function scanAll(): Violation[] {
   return files.flatMap(scanFile)
 }
 
+// ── 实体层护栏（欠账 D28 结清后的补钉）──
+//
+// 上面那条扫描器看的是「有没有人绕过 system/ 直接改状态」，它扫的是**别处**
+// 拿实体当对象来写。而 D28 这一类是另一头：写入口**长在实体自己身上**——
+// 实体给自己开一个变更方法，谁调它都不算「别处直写」，扫描器一行也抓不到。
+// 所以这里再钉一层：实体层只允许**由数据造自己**，不允许自带改现场的入口。
+
+const ENTITY_DIR = 'src/core/entity'
+
+const ENTITY_FIELD_WRITE = new RegExp(
+  `this\\.(${[...VALUE_FIELDS, ...ARRAY_FIELDS].join('|')})\\s*=`,
+)
+
+/** 唯一放行的形状：构造函数里由传入数据灌进字段 */
+const ENTITY_HYDRATION = new RegExp(
+  `^\\s*this\\.(${[...VALUE_FIELDS, ...ARRAY_FIELDS].join('|')})\\s*=\\s*data\\.`,
+)
+
+function scanEntityLayer(): { writes: string[]; hydrations: number } {
+  const files: string[] = []
+  walk(join(PROJECT_ROOT, ENTITY_DIR), files)
+
+  const writes: string[] = []
+  let hydrations = 0
+
+  for (const abs of files) {
+    const rel = relative(PROJECT_ROOT, abs).replace(/\\/g, '/')
+    readFileSync(abs, 'utf8')
+      .split('\n')
+      .forEach((raw, i) => {
+        if (isCommentLine(raw)) return
+        if (ENTITY_HYDRATION.test(raw)) {
+          hydrations++
+          return
+        }
+        if (ENTITY_FIELD_WRITE.test(raw)) writes.push(`${rel}:${i + 1}`)
+      })
+  }
+
+  return { writes, hydrations }
+}
+
 // ── 已知漏网基线 ──
 //
 // 每消除一处，就从这里删掉一条（少删一条测试会红——这是故意的，
@@ -205,14 +247,10 @@ interface KnownLeak {
 }
 
 // D9（`game-engine.ts` 的 role / roleRevealed / maxHp / hp）已于 2026-09-30 结清并删除。
-// D10（五处阶段跳过直写）已于 2026-09-30 全部结清并删除；只剩下面新发现的一条。
-const BASELINE: KnownLeak[] = [
-  {
-    file: 'src/core/entity/card.ts',
-    fields: ['visibleTo'],
-    debt: 'D28 本轮新发现：`Card.revealTo` 是实体上的变更方法且零调用方',
-  },
-]
+// D10（五处阶段跳过直写）已于 2026-09-30 全部结清并删除。
+// D28（实体上那个改可见性的方法）已于 2026-10-09 结清并删除——
+// 实体层从此只由数据造，不再自带写入口（下面另有一条用例钉死这件事）。
+const BASELINE: KnownLeak[] = []
 
 function key(v: Violation, field: string): string {
   return `${v.file}|${field}`
@@ -277,6 +315,21 @@ describe('状态变更收口 · 结构护栏（源码级）', () => {
     // 于是护栏长期处于「既漏又噪」的状态。
     expect(matchWritable('if (card.zone === ZoneType.Hand) return')).toBe(false)
     expect(matchWritable('return player.hp === 0')).toBe(false)
+  })
+
+  it('实体层不带自己的写入口 —— 只能由数据造出自己', () => {
+    // 配合 D28 的结清：那条欠账的形态是「写入口长在实体身上」，
+    // 上面的扫描器按设计只看别人怎么改实体，这类形态它一行也抓不到。
+    const { writes, hydrations } = scanEntityLayer()
+
+    expect(
+      writes,
+      '实体层出现了非构造用途的字段自赋值 —— 请删掉它，或改由 system/ 提供该变更',
+    ).toEqual([])
+
+    // 反面：放行形状必须真的在实体层里大量存在。
+    // 少这一句，「writes 是空数组」也可能只是「整个目录一个文件都没读到」。
+    expect(hydrations, '实体层的构造灌数据行数异常 —— 扫描范围可能没读进文件').toBeGreaterThan(5)
   })
 
   it('实体由数据构造不算写入 —— 但换成别的对象也不算放行', () => {

@@ -203,35 +203,25 @@ export class TurnManager {
     )
   }
 
-  /**
-   * 获取本轮已行动过的玩家列表。
-   */
-  get playersActed(): IPlayer[] {
-    return this.state.players.filter((p) =>
-      this.playersActedThisRound.has(p.seatIndex),
-    )
-  }
-
-  /**
-   * 获取本轮尚未行动的存活玩家列表。
-   */
-  get playersRemaining(): IPlayer[] {
-    return this.state.alivePlayers.filter(
-      (p) => !this.playersActedThisRound.has(p.seatIndex),
-    )
-  }
+  //
+  // 这里曾经还有三个对外成员：一个「已行动玩家列表」、一个「未行动玩家列表」、
+  // 以及一个把「已行动」集合清空的 `reset()`（欠账 D33）——三者**零调用方**。
+  //
+  // 前两个是「谁本轮动过」的**第二个答案**：这本账真正的拥有者是
+  // `playersActedThisRound`，`isRoundComplete`（`runGameLoop` 在读）已经给出了
+  // 「本轮动完没有」这一个结论；再开两个出口，就等于允许有人拿着列表自己
+  // 推一遍轮次，而那套推法不带 `alive` 的即时性（列表是快照，有人中途死了
+  // 它不会变）。删掉，需要列表的人去问 `isRoundComplete` + `alivePlayers`。
+  //
+  // `reset()` 更该删：它清的是**跨局**的账，而本类的账每局都随实例重建
+  // （`GameEngine.init()` 不换实例，但 `startRound()` 每次都 `clear()`），
+  // 留着它就等于宣称「新的一局可以不走 startRound」，那局一开始就少了
+  // 「先手归主公」这一步。
 
   /**
    * 当前回合数（即 currentRound）。
    */
   get currentRound(): number {
     return this.state.currentRound
-  }
-
-  /**
-   * 重置管理器状态（用于新游戏）。
-   */
-  reset(): void {
-    this.playersActedThisRound.clear()
   }
 }

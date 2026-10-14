@@ -1,10 +1,15 @@
 // ============================================================
 // 联盟杀 · 标准版英雄数据
 //
-// 首批 10 名标准英雄，分布于三大势力：
+// 目前 11 名标准英雄，分布于三大势力：
 //   Demacia / 魏 (4): 曹操、司马懿、夏侯惇、张辽
-//   Noxus  / 蜀 (3): 刘备、关羽、张飞、赵云
+//   Noxus  / 蜀 (4): 刘备、关羽、张飞、赵云
 //   Ionia  / 吴 (3): 孙权、吕蒙、黄月英
+//
+// 黄月英是最后补齐的那个（她的名字早写在这段注释里，英雄本体一直没有）。
+// 【奇才】曾经表达不出来——距离 Mod 拿不到「这次用的是哪张牌」，
+// 只能无条件改距离，等于把【杀】的范围也一起放开（欠账 D43）。
+// 现在距离 Mod 的末尾带上 card，它就能如实写了。
 //
 // 实际使用三国杀武将名称作为 ID 和数据基础。
 // 技能本体在 `@source/heroes/skills/*`（按势力分文件），
@@ -120,6 +125,20 @@ export const LvMeng: Hero = Hero.create({
   effectIds: ['keji'],
 })
 
+/**
+ * 黄月英 — 归隐的杰女 · 集智 / 奇才
+ *
+ * 3 血：她的强度全在锦囊连发上（用一张摸一张），血量给多了就压不住。
+ */
+export const HuangYueYing: Hero = Hero.create({
+  id: 'huangyueying',
+  name: '黄月英',
+  title: '归隐的杰女',
+  kingdom: Kingdom.Ionia,
+  maxHp: 3,
+  effectIds: ['jizhi', 'qicai'],
+})
+
 // ── 汇总导出 ──
 
 /** 标准版全部英雄 */
@@ -137,11 +156,12 @@ export const standardHeroes: Hero[] = [
   // Ionia
   SunQuan,
   LvMeng,
+  HuangYueYing,
 ]
 
 /** 按势力分组的英雄 */
 export const heroesByKingdom: Record<Kingdom, Hero[]> = {
   [Kingdom.Demacia]: [CaoCao, SimaYi, XiahouDun, ZhangLiao],
   [Kingdom.Noxus]: [LiuBei, GuanYu, ZhangFei, ZhaoYun],
-  [Kingdom.Ionia]: [SunQuan, LvMeng],
+  [Kingdom.Ionia]: [SunQuan, LvMeng, HuangYueYing],
 }

@@ -28,10 +28,21 @@ import { standard5pConfig } from '@source/modes/standard-5p'
 import { ScriptedDecisionService } from '../helpers/game-env'
 import { useGameStore } from '@/store/game-store'
 import GameBoard from '@/components/game/GameBoard.vue'
+import type { IUIDecisionService } from '@core/contracts/services.interface'
+import type { ICard } from '@core/contracts/card.interface'
+import type { IPlayer } from '@core/contracts/player.interface'
 
 // `process.cwd()` 而不是 `fileURLToPath(import.meta.url)`：
 // vitest 里的 `import.meta.url` 不是 file: 协议，解析会直接炸。
 const PROJECT_ROOT = process.cwd()
+
+/**
+ * 有轮次上限的一局
+ *
+ * `standard5pConfig` 的 `maxRounds` 是 100 —— 形态丁下 `startGame()` 只把
+ * 循环**跑起来**就返回（欠账 D38），测试要是等整局结束，得先给这一局设个上限。
+ */
+const BOUNDED_5P = { ...standard5pConfig, maxRounds: 2 }
 
 /**
  * 起一局绑了 Store 的真游戏
@@ -40,14 +51,17 @@ const PROJECT_ROOT = process.cwd()
  * `bindStore` → `createGame` → `startGame`。
  * 不通过这两个私有字段偷看引擎——它们私有的意思是 UI 也不许看。
  */
-async function createBoundGame(): Promise<{
+async function createBoundGame(
+  makeDecisions: (controller: GameController) => IUIDecisionService = () =>
+    new ScriptedDecisionService(),
+): Promise<{
   controller: GameController
   truth: () => { deck: number; discard: number }
 }> {
   const controller = new GameController({ seed: 24 })
-  controller.setDecisionService(new ScriptedDecisionService())
+  controller.setDecisionService(makeDecisions(controller))
   controller.bindStore(store)
-  await controller.createGame({ ...standard5pConfig })
+  await controller.createGame({ ...BOUNDED_5P })
 
   return {
     controller,
@@ -55,6 +69,40 @@ async function createBoundGame(): Promise<{
       const s = controller.getGameState()!
       return { deck: s.deck.length, discard: s.discardPile.length }
     },
+  }
+}
+
+/** 等到条件成立（引擎在后台跑，断言前得让它先走到那一步） */
+async function waitFor(cond: () => boolean, label: string, ms = 5000): Promise<void> {
+  const deadline = Date.now() + ms
+  while (!cond()) {
+    if (Date.now() > deadline) throw new Error(`等不到：${label}`)
+    await new Promise((r) => setTimeout(r, 0))
+  }
+}
+
+/**
+ * 第一次被问弃牌时**挂起**，之后照旧自动弃
+ *
+ * 形态丁下弃牌是引擎问出来的（欠账 D38）：UI 不再自己动手弃，
+ * 它只是把「弃哪几张」答复回去。所以要走「UI 的弃牌入口」，
+ * 得先让引擎真的挂一个弃牌提问在那儿。
+ */
+class FirstDiscardParks extends ScriptedDecisionService {
+  private parked = false
+
+  constructor(private readonly controller: GameController) {
+    super()
+  }
+
+  override async askForDiscard(
+    player: IPlayer,
+    count: number,
+    validCards: ICard[],
+  ): Promise<ICard[]> {
+    if (this.parked) return validCards.slice(0, count)
+    this.parked = true
+    return this.controller.askDiscard(player, count, validCards)
   }
 }
 
@@ -89,7 +137,9 @@ describe('D24 · Store 里的牌堆 / 弃牌堆张数', () => {
     const { controller, truth } = await createBoundGame()
     const before = store.deckCount
 
+    // `startGame()` 只把循环跑起来就返回，整局的结果走 `whenFinished()`
     await controller.startGame()
+    await controller.whenFinished()
 
     // 先证明「这一刻真的少了一张以上」，否则下面那句可能只是两边都没动
     expect(truth().deck).toBeLessThan(before)
@@ -97,16 +147,19 @@ describe('D24 · Store 里的牌堆 / 弃牌堆张数', () => {
   })
 
   it('弃一张牌之后跟着变多 —— 走的就是 UI 的「弃牌」那个入口', async () => {
-    const { controller, truth } = await createBoundGame()
+    const { controller, truth } = await createBoundGame((ctrl) => new FirstDiscardParks(ctrl))
+    // 循环在后台跑，等它真的问出第一个弃牌提问
     await controller.startGame()
+    await waitFor(() => controller.isAwaitingDiscard, '第一个弃牌提问')
 
     const before = truth().discard
     expect(store.discardCount).toBe(before)
 
-    const card = controller.getCurrentPlayer()!.handCards[0]!
-    await controller.discardCards([card.instanceId])
+    const count = controller.getAvailableActions().discardCount
+    const hand = controller.getCurrentPlayer()!.handCards.map((c) => c.instanceId)
+    expect(await controller.discardCards(hand.slice(0, count))).toBe(true)
 
-    expect(truth().discard).toBeGreaterThan(before)
+    await waitFor(() => truth().discard > before, '弃牌堆变多')
     expect(store.discardCount).toBe(truth().discard)
   })
 })

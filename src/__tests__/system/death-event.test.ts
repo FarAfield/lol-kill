@@ -27,6 +27,8 @@
 // ============================================================
 
 import { beforeEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { GameEvent } from '@core/event'
 import { EventCompiler } from '@core/event/event-compiler'
@@ -256,5 +258,64 @@ describe('D13 · 主公误杀忠臣的惩罚', () => {
     // 奖惩是摸牌，所以手牌只会变多
     expect(lord.handCards.length).toBeGreaterThan(before)
     expect(lord.marks.get('penaltyDiscardAll') ?? 0).toBe(0)
+  })
+})
+
+// ═══════════════════════════════════════════
+// D30 · 「全员死亡」只有一个答案
+//
+// 这条兜底原先由游戏循环自己数存活人数，而 `DeathSystem` 上那个
+// 同义方法零调用方 ——「什么叫没人了」因此有两处各写一遍。
+// 现在循环统一问 `DeathSystem`。
+// ═══════════════════════════════════════════
+
+describe('D30 · 全员死亡的判定收口到 DeathSystem', () => {
+  it('全员存活 / 部分阵亡 / 全员阵亡三种局面判得清', () => {
+    const all = env.players()
+    const kill = (p: IPlayer): void => env.engine.playerSystem.setAlive(p, false)
+
+    expect(all.length).toBeGreaterThan(1)
+    expect(env.engine.deathSystem.checkAllDead()).toBe(false)
+
+    kill(all[0]!)
+    expect(env.engine.deathSystem.checkAllDead()).toBe(false)
+
+    for (const p of all) kill(p)
+    expect(env.engine.deathSystem.checkAllDead()).toBe(true)
+  })
+
+  it('全员阵亡 → 循环结束而不是原地空转', async () => {
+    for (const p of env.players()) env.engine.playerSystem.setAlive(p, false)
+
+    const result = await env.engine.runGameLoop()
+    expect(result.survivingPlayers).toHaveLength(0)
+    // 全员阵亡时胜负规则（`WinCondition` 场景一）会先给出结论，
+    // 这里只钉住「循环一定收得了尾」——兜底分支防的是 `continue` 死循环。
+    expect(result.reason).toBeTruthy()
+  })
+
+  it('胜负规则给不出结论时，兜底分支自己收尾', async () => {
+    // `WinCondition` 会在兜底之前先被问到（轮次结束就查一次），
+    // 所以想单独验这条兜底，得先把胜负规则摘掉。
+    const engine = env.engine as unknown as { checkGameOver: () => unknown }
+    const original = env.engine.checkGameOver
+    engine.checkGameOver = () => null
+    try {
+      for (const p of env.players()) env.engine.playerSystem.setAlive(p, false)
+      const result = await env.engine.runGameLoop()
+      expect(result.reason).toBe('所有玩家已死亡')
+      expect(result.winner).toBeNull()
+    } finally {
+      engine.checkGameOver = original
+    }
+  })
+
+  it('源码级：循环里不再自己数存活人数 —— 只问 DeathSystem', () => {
+    const src = readFileSync(join(process.cwd(), 'src/core/engine/game-engine.ts'), 'utf8')
+
+    // 「没人了」的答案在 `DeathSystem` 里，引擎不许再抄一份判据。
+    expect(src).not.toMatch(/aliveCount\s*===\s*0/)
+    // 也必须有真的调用方，否则上一条只是因为两边都不存在才通过的。
+    expect(src).toMatch(/deathSystem\.checkAllDead\(\)/)
   })
 })

@@ -212,12 +212,14 @@ export class Card implements ICard {
     return this.visibleTo.includes(player)
   }
 
-  /**
-   * 将卡牌设为对指定玩家或所有玩家可见。
-   */
-  revealTo(players: IPlayer[]): void {
-    this.visibleTo = players
-  }
+  //
+  // 这里曾经还有一个「把这张牌设为对某些人可见」的方法（欠账 D28），
+  // 它是实体上的**第二个写入点**，而且零调用方。
+  //
+  // 「谁看得见这张牌」这件事的唯一答案在 `CardSystem` 里：牌进入哪个区域
+  // 就同步算出可见集合（手牌只给持有者、装备与判定区给所有人、牌堆谁都不给）。
+  // 实体上再留一个入口，就等于允许有人改了可见性而区域不跟着变——
+  // 那正是 `zone` / `owner` / 可见集合必须一起改这条规矩要防的事。
 
   /**
    * 重置 ID 生成器 —— 每局开局由 `GameEngine.init()` 调用

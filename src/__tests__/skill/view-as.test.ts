@@ -391,3 +391,77 @@ describe('Phase 16 · 区域守恒', () => {
     expect(countCards()).toBe(before)
   })
 })
+
+// ═══════════════════════════════════════════
+// 武圣 · 端到端（欠账 D1）
+//
+// 上面那一组只断言「视作列表是什么样子」，从没把虚拟杀真的打出去。
+// 「列表里有」与「打出去会掉血」之间隔着三层：内容分发按 `card.id` 找
+// 杀、底牌要真的从手牌进弃牌堆、伤害要走 `damage` 事件而不是就地改 hp。
+// 这三层任何一层断了，视作列表依旧漂漂亮亮——这正是这条欠账存在的原因。
+// ═══════════════════════════════════════════
+
+describe('武圣 · 端到端（打出虚拟杀 → 目标真的掉血）', () => {
+  it('红牌当杀打出去 → 目标掉 1 血，底牌进弃牌堆', async () => {
+    const [attacker, victim] = env.players()
+    const base = redCard(attacker!)
+    attach(wusheng, attacker!)
+
+    const view = viewsFor(attacker!)! [0]!
+    const hpBefore = victim!.hp
+
+    // 受害者手里没牌，出不了闪 —— 要验的是伤害本身，不是响应窗口
+    await env.engine.useCard(attacker!, view.card, [victim!])
+
+    expect(victim!.hp).toBe(hpBefore - 1)
+    // 消耗的是底牌那张红牌，不是凭空冒出来的虚拟牌
+    expect(base.zone).toBe(ZoneType.Discard)
+    expect(attacker!.handCards.map((c) => c.instanceId)).not.toContain(base.instanceId)
+    // 虚拟牌自己从不占任何区域
+    expect(attacker!.handCards.map((c) => c.instanceId)).not.toContain(view.card.instanceId)
+  })
+
+  it('反例：没有武圣时同一张红牌打出去不掉血', async () => {
+    const [attacker, victim] = env.players()
+    const base = redCard(attacker!)
+
+    const hpBefore = victim!.hp
+    await env.engine.useCard(attacker!, base, [victim!])
+
+    // 它只是「一张红牌」，没有任何内容认得它 ——
+    // 于是牌照常进弃牌堆，可**一点伤害也没有**。
+    expect(victim!.hp).toBe(hpBefore)
+    expect(base.zone).toBe(ZoneType.Discard)
+  })
+
+  it('对方有闪时要得到闪 —— 伤害不是硬写上去的', async () => {
+    const [attacker, victim] = env.players()
+    redCard(attacker!)
+    const dodge = dodgeCard(victim!)
+    attach(wusheng, attacker!)
+
+    env.decisions.script(victim!, '是否出闪', dodge)
+    const hpBefore = victim!.hp
+
+    await env.engine.useCard(attacker!, viewsFor(attacker!)! [0]!.card, [victim!])
+
+    expect(victim!.hp).toBe(hpBefore)
+    expect(dodge.zone).toBe(ZoneType.Discard)
+  })
+
+  it('造成伤害走的是 damage 事件 —— 事件树上查得到', async () => {
+    const [attacker, victim] = env.players()
+    redCard(attacker!)
+    attach(wusheng, attacker!)
+
+    env.engine.setObservability({ trace: true })
+    await env.engine.useCard(attacker!, viewsFor(attacker!)! [0]!.card, [victim!])
+
+    // 少了这一条，「hp 少了一点」也可能只是有人就地改了个数字，
+    // 而闪、濒死、奖惩这些挂在 damage 上的东西一个都不会发生。
+    const trace = env.engine.eventTrace.flatten().map((n) => n.name)
+    expect(trace).toContain('damage')
+    // 对照：事件树不是空的，`toContain` 才有意义
+    expect(trace.length).toBeGreaterThan(1)
+  })
+})

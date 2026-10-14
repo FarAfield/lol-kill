@@ -10,7 +10,6 @@
         :current-player-name="currentPlayerName"
       />
       <ActionButtons
-        :phase="gamePhase"
         :is-my-turn="isMyTurn"
         :can-end-phase="availableActions.canEndPhase"
         :can-play-card="cardPlay.canConfirm.value"
@@ -23,7 +22,7 @@
         @confirm-play="handleConfirmPlay"
         @confirm-discard="handleConfirmDiscard"
         @cancel-selection="handleCancelAll"
-        @end-phase="handleEndPhase"
+        @end-play="handleEndPlay"
       />
       <div class="top-right-actions">
         <n-button size="tiny" type="error" secondary @click="handleLeave">
@@ -225,9 +224,21 @@ const currentPlayerName = computed(() => {
   return cp.hero?.name ?? `玩家 ${cp.seatIndex + 1}`
 })
 
-/** 人类玩家信息 */
+/**
+ * 人类玩家信息。
+ *
+ * **依赖必须进门就挂**（欠账 D45）：引擎出生前这个 computed 也算过一次，
+ * 那一次在 `if (!state) return null` 就早退了，**根本没碰到 Store**——
+ * 于是它的依赖里只剩下 `session`，之后 Store 怎么变它都不重算，
+ * 手牌区就永远是一块空白（`v-if="humanPlayer"` 一假到底）。
+ *
+ * 「早退的那一次没注册上依赖」是最难看出来的一种冻住：
+ * 代码里明明读着 Store，读的那一行却从来没被执行过。
+ */
 const humanPlayer = computed(() => {
-  const state = getController()?.getGameState()
+  const ctrl = getController()
+  void ctrl?.revision
+  const state = ctrl?.getGameState()
   if (!state) return null
   const human = state.players[HUMAN_SEAT]
   if (!human) return null
@@ -240,8 +251,24 @@ const isMyTurn = computed(() => {
   return humanPlayer.value?.isCurrentPlayer ?? false
 })
 
+/**
+ * 此刻我能做什么。
+ *
+ * **响应式依赖挂在控制器的版本号上**（欠账 D45）——不是 `uiState`。
+ *
+ * 「引擎此刻是不是在问我」住在控制器里，是普通字段，Vue 看不见它。
+ * 而引擎**提问时不推状态**：阶段入口那次同步发生在提问之前
+ * （`executeTurn` 先写 `currentPhase` 再 `onPhaseSync`，提问是
+ * `doPhaseUse` 里问出的）。所以靠 Store 同步去触发重算，
+ * 界面就永远停在最后一次同步时的样子——没有按钮、没有可点的牌，
+ * 只有一句「等待其他玩家操作…」，而引擎正悬着等这一位答复。
+ *
+ * 控制器在「提问挂起 / 答复 / 状态同步」三个时刻各报一次变更
+ * （见 `GameController.revision`），这里读它，才算真的跟上了引擎。
+ */
 const availableActions = computed(() => {
   const ctrl = getController()
+  void ctrl?.revision
   if (!ctrl) {
     return {
       phase: GamePhase.NotStarted,
@@ -333,8 +360,8 @@ async function askHumanResponse(req: ResponseRequest): Promise<ICard | null> {
  */
 function createSession(): GameSession {
   const ctrl = new GameController()
-  // gameStore 满足 IGameStore 接口（syncFromEngine / reset），直接绑定
-  ctrl.bindStore(gameStore as unknown as { syncFromEngine: (s: never) => void; reset: () => void })
+  // gameStore 满足 IGameStore 接口（同步 / 查询口 / 重置），直接绑定
+  ctrl.bindStore(gameStore)
 
   const ai = new AIController({ defaultDifficulty: AIDifficulty.Normal })
 
@@ -344,10 +371,23 @@ function createSession(): GameSession {
       fallback: ai,
       channel: {
         askForResponse: askHumanResponse,
-        // 其余四种提问此刻**刻意不登记**，走 `HumanDecisionService` 的缺省答案：
-        // 出牌、弃牌由下方的按钮直接驱动（`handleConfirmPlay` / `handleConfirmDiscard`），
-        // 再给它开一条 await 手指的路，就是同一件事的第二本账——
-        // 而且那条 await 永远等不到界面上的第二个入口。
+        //
+        // **出牌与弃牌必须登记**（欠账 D38 形态丁）。
+        //
+        // 以前这两条**没有登记**，理由写的是「由按钮直接驱动」——
+        // 那个理由只在旧的推进模型下才成立：那时 `start()` 会把第一个回合
+        // 整轮跑完，UI 再拿一个「推一步」的接口去推。而那条路上根本没人
+        // 写交回合，于是「按结束阶段永远停在同一个人」。
+        //
+        // 形态丁下引擎是唯一推进者：它在出牌阶段**挂起**等人答复，
+        // 不登记 = 人的出牌阶段被静默跳过（缺省答案就是 `null`），
+        // 他一张牌都打不出去，回合却被算作「已行动」。
+        //
+        // 登记之后按钮也不再「驱动」：它们只是把答案递回给这个挂起的提问
+        // （`ctrl.playCard` / `ctrl.endCardPlay` / `ctrl.discardCards`）。
+        askForCardPlay: (req) => ctrl.askCardPlay(req.player, req.options),
+        askForDiscard: (req) =>
+          ctrl.askDiscard(req.player, req.count, req.validCards),
       },
     }),
   )
@@ -375,8 +415,8 @@ function registerAIPlayers(ctrl: GameController, ai: AIController): void {
 // ── 卡牌选择处理 ──
 
 function handleSelectCard(cardId: string): void {
-  // 弃牌阶段特殊处理
-  if (gamePhase.value === GamePhase.PhaseDiscard && isMyTurn.value && availableActions.value.needDiscard) {
+  // 挂着一个弃牌提问时，点手牌是「选要弃的那几张」
+  if (isMyTurn.value && availableActions.value.needDiscard) {
     handleDiscardSelect(cardId)
     return
   }
@@ -396,10 +436,16 @@ async function handleConfirmPlay(): Promise<void> {
   checkGameOverStatus()
 }
 
-async function handleEndPhase(): Promise<void> {
+/**
+ * 「结束出牌」按钮 —— 给挂起的出牌提问答复 `null`。
+ *
+ * 它**不推进引擎**：引擎在出牌阶段的循环里问到 `null` 就自己结束这个阶段，
+ * 然后一路走下去、把回合交给下一位（欠账 D38）。
+ */
+async function handleEndPlay(): Promise<void> {
   cardPlay.cancelSelection()
   discardSelectedIds.value = []
-  await getController()?.endPhase()
+  getController()?.endCardPlay()
   checkGameOverStatus()
 }
 
@@ -422,6 +468,12 @@ function handleDiscardSelect(cardId: string): void {
   }
 }
 
+/**
+ * 「确认弃牌」—— 答复挂起的弃牌提问。
+ *
+ * 与「结束出牌」同理：**它不执行弃牌、也不推进引擎**（欠账 D38）。
+ * 弃哪几张由人点，弃这个动作由引擎在收到答复后做一次。
+ */
 async function handleConfirmDiscard(): Promise<void> {
   await getController()?.discardCards([...discardSelectedIds.value])
   discardSelectedIds.value = []
@@ -528,11 +580,30 @@ async function handleStartGame(): Promise<void> {
   }
 }
 
-function handleLeave(): void {
+/**
+ * 收掉一局的全部执行者。
+ *
+ * **卸载 / 路由离开 / 「再来一局」/ 重置会话 全部走这一个出口**——
+ * 这几处以前各写一遍，第二遍漏掉某句就会留下半新半旧的组合
+ * （D34 就是这么来的：开局装了决策服务，第二局忘了装）。
+ *
+ * 次序有讲究：**先把挂起的提问答复掉，再拆控制器**。
+ * 一条永不 resolve 的 Promise 是一次事件栈死锁——不报错、不红测试，
+ * 只是整局静静地卡住（欠账 D38 的死锁纪律）。
+ * 答复由两端各自负责：控制器那两个（`askCardPlay` / `askDiscard`）在
+ * `destroy()` 里按缺省交回，响应弹窗那个在这里按「不出」交回。
+ */
+function resetSession(): void {
+  response.close()
   getController()?.destroy()
   session.value = null
   gameStore.reset()
   logStore.clear()
+  animation.clearHistory()
+}
+
+function handleLeave(): void {
+  resetSession()
   router.push('/')
 }
 
@@ -541,11 +612,7 @@ async function handlePlayAgain(): Promise<void> {
   showGameOver.value = false
   gameResult.value = null
   gameOverPlayers.value = []
-  logStore.clear()
-  animation.clearHistory()
-  // 清理上一局状态并重新初始化
-  getController()?.destroy()
-  gameStore.reset()
+  resetSession()
   // 连同 AI 兜底方一起重建，走的是开局那一套唯一的出口
   session.value = createSession()
   await handleStartGame()
@@ -554,11 +621,7 @@ async function handlePlayAgain(): Promise<void> {
 /** 返回大厅 */
 function handleGoLobby(): void {
   showGameOver.value = false
-  getController()?.destroy()
-  session.value = null
-  gameStore.reset()
-  logStore.clear()
-  animation.clearHistory()
+  resetSession()
   router.push('/')
 }
 
@@ -568,8 +631,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  getController()?.destroy()
-  session.value = null
+  resetSession()
 })
 </script>
 

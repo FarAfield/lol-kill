@@ -179,7 +179,7 @@ src/
 | 2   | ✅  | 测试脚手架修复与基线固化（**已跳过**）                  | 789 测试回到可控状态                              | 1      | 1d   |
 |     |    | **组 B · 让引擎活起来**                       |                                           |        |      |
 | 3   | ✅  | 建立装配根                                  | Effect/Skill 第一次真正生效                      | 2      | 1d   |
-| 4   | 🟡 | 单一真值源                                  | 消灭 `rebindState` 依赖失效                     | 3      | 0.5d |
+| 4   | ✅ | 单一真值源                                  | 消灭 `rebindState` 依赖失效                     | 3      | 0.5d |
 | 4B  | ✅  | 卡牌实例身份                                 | 卡牌总数守恒 + `instanceId` 全局唯一                | 4      | 插入   |
 |     |    | **组 C · 事件内核 noname 化**                |                                           |        |      |
 | 5   | ✅  | 事件命名体系改造                               | `TriggerTiming` → 事件名 + 阶段后缀              | 4      | 1d   |
@@ -209,14 +209,16 @@ src/
 | 25  | ✅  | 胜负判定                                   | 四种身份胜利条件                                  | 23     | 1d   |
 |     |    | **组 G · AI 与 UI**                      |                                           |        |      |
 | 26  | ✅  | AI 适配新契约                               | `ai.order` / `threaten` / AI 认识 Mod       | 15, 21 | 2d   |
-| 27  | 🟡 | UI 接线与 LOL 换皮                          | 界面反映真实状态 + 主题映射                           | 25     | 3d   |
+| 27  | ✅ | UI 接线与 LOL 换皮                          | 界面反映真实状态 + 主题映射                           | 25     | 3d   |
 
 
 > ⬜ 未开始 ｜ 🟡 进行中 ｜ ✅ 完成
 
 **合计 29 个执行单元**（编号 1–27，加执行中新插入的 **4B** 与 **12B**）：  
-**✅ 27 ｜ 🟡 2 ｜ ⬜ 0**（2026-09-30 欠账清偿后：24、25 转 ✅；2026-10-08：21、22、23、26 转 ✅；
-2026-10-09：27 开工——D24 / D25 / D34 / D35 / D36 / D37 结清、D26 核毕，剩 4 与 27）。
+**✅ 29 ｜ 🟡 0 ｜ ⬜ 0**（2026-09-30 欠账清偿后：24、25 转 ✅；2026-10-08：21、22、23、26 转 ✅；
+2026-10-09：27 开工并转 ✅——D24 / D25 / D34 / D35 / D36 / D37 / D38 / D27 结清、D26 核毕；
+2026-10-14：**4 转 ✅**——它🟡只因欠一条测试（D2：`init()` 两次后无幽灵玩家），
+D2 已于 2026-10-10 结清，这一格当时没跟着改）。
 
 > **数量口径（三处曾互不一致，现统一）**
 >
@@ -224,16 +226,19 @@ src/
 > - **28** = §2「扩展能力验收清单」的条目数，与 Phase 数**无关**，不要混用。
 > - 4B 与 12B 是执行中发现的阻断项/整理项，没有占用新编号，因此编号仍止于 27。
 
-**🟡 的两项，欠的是什么**（详见各组正文与 §3.1 欠账登记）：
+**🟡 已归零**（最后一项详见各组正文与 §3.1 欠账登记）：
 
 | #  | 卡在哪                                                                 |
 | -- | ------------------------------------------------------------------- |
-| 4  | 只欠一条测试：`init()` 两次后无幽灵玩家、无重复卡牌（欠账 D2）                              |
+| 4  | ~~只欠一条测试：`init()` 两次后无幽灵玩家、无重复卡牌（欠账 D2）~~ —— **2026-10-14 随 D2 结清转 ✅** |
 | 22 | ~~主公 0 号位~~ ~~两套跳过账本~~ —— **2026-10-08 随 D7 / D29 结清，转 ✅**          |
 | 23 | ~~主公误杀忠臣弃牌（D13）~~ ~~濒死求桃成功路径无断言（D14）~~ —— **2026-10-08 结清，转 ✅**     |
 | 26 | ~~三档难度从未标定~~ ~~AI 不认识 Mod~~ ~~不会用 `viewAs`~~ ~~无 `ai.order` / `threaten`~~ —— **2026-10-08 随 D19–D23 结清，转 ✅**（另 **2026-10-09 补 D37**：查询口此前只在 `GameBoot` 那条路上补发） |
-| 27 | ~~人类决策通道（D34）~~ ~~响应弹窗无人问（D35）~~ ~~技能面板数据占位（D36）~~ ~~对手手牌卡背（D25）~~ —— **2026-10-09 结清**。
-      **仍欠**：**D38**（回合交接 —— 现在是新的总插头，需先裁决推进模型）/ D27（LOL 换皮） |
+| 27 | ~~人类决策通道（D34）~~ ~~响应弹窗无人问（D35）~~ ~~技能面板数据占位（D36）~~ ~~对手手牌卡背（D25）~~ ~~回合交接（D38）~~ ~~LOL 换皮（D27）~~ —— **2026-10-09 全部结清，Phase 27 转 ✅**。
+      ~~**D40**（引擎自己写的日志文案仍是三国杀名）~~ —— **2026-10-10 结清**：
+      引擎改记带 ID 的占位符，名字由展示层在边界上补，欠账**清零**。
+      ~~**D41**（面板不显示 Mod 带来的数值变化）~~ —— **2026-10-10 结清**：面板收 `stats`，
+      数值由 `GameController` 注入的查询口现问，顺手修掉「每张武器都多一格」那个真 bug |
 
 ### 3.0 Phase 21 还剩什么（D3 / D4 结清后重新评估）
 
@@ -285,8 +290,8 @@ src/
 
 | 编号  | 归属 | 欠什么                                                                 | 性质           | 证据                                                                                                                   |
 | --- | -- | ------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| D1  | 16 | 武圣「打出 → 真的造成伤害」的端到端用例                                               | 测试欠账         | `view-as.test.ts:148` 只断言视作列表；同路径端到端由龙胆用例覆盖（`:246`）                                                                  |
-| D2  | 4  | `init()` 连续两次后无幽灵玩家、无重复卡牌的断言                                        | 测试欠账         | `game-loop.test.ts:69` 只校验单次 boot；`determinism.test.ts:225` 只测生成器本身                                                  |
+| ~D1~ ✅ **2026-10-10 结清** | 16 | 武圣「打出 → 真的造成伤害」的端到端用例 | 测试欠账 → 已补 | `view-as.test.ts:148` 只断言视作列表，**没有一条走到「目标真的掉血」**。补 4 条端到端（红牌当杀打出去 → 目标掉 1 血且底牌进弃牌堆；**无武圣时同一张红牌不掉血**的反例；对方有闪时要得到闪；伤害走 `damage` 事件）。查事件名的办法是 `setObservability({ trace: true })` + `eventTrace.flatten()`——`eventDispatcher.on` 不存在。每条都配「**事件链长度 > 1**」这类对照，否则「没查到 damage」可能只是链上空空如也。**变异检验**：把武圣的 `viewAs` 摘掉 → 红 4 条 |
+| ~D2~ ✅ **2026-10-10 结清** | 4 | `init()` 连续两次后无幽灵玩家、无重复卡牌的断言 | 测试欠账 → 已补 | 补 4 条（`game-loop.test.ts` 的 `describe('重开一局')`）：第二次 `init()` 之后没有幽灵玩家（比的是**对象**而不是 instanceId——id 每局归零必然重号）、重开之后每人一名英雄且场上无残留、技能台账与重开后的英雄对齐、重开之后这一局还能正常跑完。**踩到的坑**：`p.heroes` 是**落座的那一个**（1 名）而不是 `config.heroSelectCount`（3 是候选数），按后者写会红；台账那条要同时断言「不多」**（多出的就是上一局留下的）**与「不少」**（否则上一条只是两边都空）。**变异检验**：让重开不重新分英雄 → 红 1 条 |
 | ~D3~ ✅ **2026-09-30 结清** | 21 | `TargetSystem` **零生产调用方** | 接线缺失 | 副本已除：`PhaseManager.getValidTargetsForCard` 原先是一份按牌型 if-else 堆出来的**平行实现**，与 `TargetSystem` 各写各的规则；现在它直接调 `TargetSystem.getAvailableTargets(player, card, state, modQuery)`。顺带把 `IModQuery` 补上 `attackRangeOf` / `distanceFromOf` / `distanceToOf` / `selectTargetOf` / `targetEnabledOf` / `targetInRangeOf` —— 实现早就在 `ModQuery` 上，接口没声明，于是类型上「看不出」它能当 `DistanceMods & TargetMods`，两个系统只能被测试单独喂具体类。`GameEngine` 里两个零读取的实例字段（`distanceSystem` / `targetSystem`）一并删除。断言见 `src/__tests__/system/target-wiring.test.ts` |
 | ~D4~ ✅ **2026-09-30 结清** | 21 | 出牌候选目标不计算距离与攻击范围 | 接线缺失 | 那句「简化处理，不计算距离」随副本一起删除。现在【杀】的目标由 `DistanceSystem.isInRange` 决定，武器 `attackRange` 经 `equip-mods.ts` 的 Mod 进入计算——**装刀前后目标列表会变**（这是本次新增的断言，也是此前唯一能证明武器有效的证据）。另补 `TargetSystem` 缺的装备分支：原先装备牌会落到「默认：距离 1 的其他角色」，即把武器装到别人身上 |
 | ~D5~ ✅ **2026-09-30 结清** | 21 | `tags.has(CardTag.Heal) && tags.has(CardTag.Heal)` 重复条件 | 疑似笔误 | **原意已判定：第二个 tag 本该是 `CardTag.Basic`**。依据：项目 tag 约定是「具体牌 tag + 类别 tag」（杀 `Strike+Attack`、闪 `Dodge+Defense`、酒 `Wine+Boost`），桃是 `[Heal, Basic, Dying]`；且 `Heal` 并非桃独有——【桃园结义】是 `[PeachGardenOath, Trick, Heal, Aoe]`，只判 `Heal` 会把群体牌塞进桃的目标规则。已改为 `Heal && Basic`，断言见 `src/__tests__/system/target-system.test.ts` |
@@ -307,43 +312,65 @@ src/
 | ~D20~ ✅ **2026-10-08 结清** | 26 | AI 不会用 `viewAs` | 未实现 → 已修（**原诊断有一半是错的**） | **响应窗口本来就通**——`basic-contents.ts:37`、`trick-contents.ts:54,75` 已经把 `cardViews` 混进 `validCards`。真正断的是**出牌阶段**：策略只翻 `handCards`，而虚拟牌是 `viewAs` 造出的**视图**，不属于任何区域，翻手牌永远翻不到它。修法不是「让 AI 自己再问一遍 `getViews`」（那是同一件事的第二个答案），而是让 `chooseCardToPlay` 多收 `options?: readonly CardPlayOption[]`，由 `AIController` 把引擎算好的候选递下去。断言 6 条，含端到端「底牌被消耗、反贼掉血」与「不递候选 → `null`」这条接线守卫 |
 | ~D21~ ✅ **2026-10-08 结清** | 26 | `ai.order` / `ai.result` / `threaten` / `expose` | 未实现 → 已修 | 典型的「契约在、读取方不在」——四个字段此前一个都没人读。补 `aiTargetValueOf` / `aiOrderOf` / `threatenOf` / `exposeOf`（`skill-utils.ts:154-186`），接进三处：`chooseEffectToUse`（先比 `ai.order`，再比 `aiValue − 暴露代价`）、`chooseEffectTargets`（`ai.result.target`）、`getTargetThreatScore`（`threaten`）。**两个坑**：① 门槛必须是 `>= 0` 而不是 `> 0`——多数技能没写 `ai.result.player`，估值退回 `priority`（常为 0），写成 `> 0` 的结果是 AI 一个技能都不发动；② `ai.order` **不是** `skillPriority`，前者是 AI 脑内的盘算顺序，后者是同一时机上钩子的结算顺序，混用会让调 AI 手感的人改掉引擎结算顺序。另给仁德补 `expose: 2`（给牌是一眼能看懂的站队动作）。断言 6 条 |
 | D22 | 26 | 三档难度**从未标定**                                                        | 未实现          | `:329` / `:568` 在位，`createAIStrategy` 于 `:951` 分派；无标定数据                                                              |
-| D23 | 26 | 8 人局 AI 对战 100 局无死锁、无异常                                             | 测试欠账         | 验收项仍 `[ ]`                                                                                                           |
+| ~D23~ ✅ **已结清（压力测试单独跑）** | 26 | 8 人局 AI 对战 100 局无死锁、无异常                                             | 测试欠账         | 覆盖在 `src/__tests__/stress/ai-marathon.test.ts`，但**不在日常门禁里**：一局 8 人全 AI 实测约 52 秒，100 局一次要 80 分钟，因此挪进 `npm run test:stress`（`vitest.stress.config.ts`，`timeout` 放到 900s）。日常默认只跑 8 局（`STRESS_GAMES = 8`），**要跑满验收里写的 100 局，改这个常量单独跑**——文件头已注明。日常门禁里因此看不到它，别误判成「没人测」                                                                                                           |
 | ~D24~ ✅ **2026-10-09 结清** | 27 | `GameBoard` 牌堆 / 弃牌堆计数硬编码 `0` | 未实现 → 已修 | 原状是两处 `<span class="pile-count">0</span>` 字面量（`GameBoard.vue:11,17`）——不是「显示不准」，是**从不显示**，打一整局两个数字都不动。`game-store.ts` 加 `deckCount` / `discardCount` 两个 derived（给**张数**不给 `ICard[]`：把整个数组递下去，组件就会顺手派生别的东西，等于给同一件事开了第二个答案）；`GameBoard` 收 props，全仓唯一调用方 `views/game/index.vue` 传下去。**顺带删掉两个「传进来但没人读」的必填 props**（当前阶段 / 当前行动玩家座次）——「轮到谁」由 `UIPlayerInfo.isCurrentPlayer` 回答即可，与 D29 的 `skippedPlayers` 同属第二本账。断言 8 条见 `src/__tests__/ui/game-board.test.ts`：Store 层「等于引擎真值 + **牌堆不为空** + 发牌后变小 + 弃牌后变多」（`0 === 0` 也能绿，这正是原状，所以每层都配了「它会动」的对照），组件层「DOM 里的数字 === 传进去的数」而不是「有个数字」，源码级盯住模板里不许再有写死的 0 |
 | ~D25~ ✅ **2026-10-09 结清** | 27 | `CardBack.vue` 未重建                                                  | 未实现 → 已修 | 原状：Phase 0 删掉后一直没重建，全仓无 `CardBack` 引用，对手的手牌只是 `PlayerSeat.vue:63` 一个写着「N 张」的标签——**一张牌都看不见**。新建 `src/components/card/CardBack.vue`，接进 `PlayerSeat`（仅 `!isHuman` 那一支，自己的手牌是明牌，走 `CardHand`）。**只收一个张数 `count`，不收整叠真牌**：把一叠真的卡牌对象递到卡背组件里，组件就有了「顺便显示一下花色」的余地，那等于给「对手有什么」开了第二个答案。手牌多过 `max`（默认 10）时折成「+N」——但 `title` 里报的仍是真张数，折起来的那几张不许就这么消失。断言 6 条见 `src/__tests__/ui/card-back.test.ts`：张数 === 传进去的数、0 张一张不画、改 props 跟着变、超量折成「+N」且真张数报得出来、源码级盯住 props 里没有卡牌类型、以及**座位组件真的用上了**（写了不用等于没写）。变异检验：把张数写死成 3 → 红 4 条 |
 | ~D26~ **2026-10-09 已核** | 27 | `ResponseDialog` / `SkillPanel` 数据来源待核 | 待核 → **已核，结论比「没接好」严重** | 逐条核完发现不是「线接错了」，而是**两个面板都没有驱动方**，拆成三条独立缺口登记为 D34 / D35 / D36：① 没有人类版 `IUIDecisionService` → 引擎对一切响应式询问一律「不响应」；② `useResponse.open()` 零调用方 → 弹窗从不打开；③ 技能面板读的是裸 `effectIds`，`usable` 恒真、名字就是 id |
 | ~D34~ ✅ **2026-10-09 结清** | 27 | **人类玩家没有决策通道** —— 全仓四个 `IUIDecisionService` 实现（`AutoDecisionService` / `DecisionRecorder` / `AIController` / 测试替身）里**没有一个是人类**；`GameController.setDecisionService` 全仓零调用方 | 未实现 → 已修 | 原状：`EffectContext.waitForResponse`（`effect-context.ts:289`）首行就是 `if (!this.deps.decisionService) return { confirmed: false }`，于是**每一次【闪】【桃】【无懈可击】都一律拒绝**：攻击必中、濒死必死。新增 `src/services/human-decision.ts` —— **它唯一的正事是按座位分流**，不是「把 UI 当决策服务」：引擎对**所有座位**提问，把 UI 直接塞进去等于让人替 AI 打牌。`isHuman(player)` 判的是 `seatIndex === humanSeatIndex`（**座位**，不是「是不是当前行动者」——【杀】打过来时，被问的人往往不是回合归属者）。**铁律：每个方法都必须有答案**——这些问题是在事件流水线被 pause 挂起时问出的，一个永不 resolve 的 Promise 就是一次事件栈死锁，所以 UI 通道全可选，没登记就回落到缺省（拒绝 / 不出 / 自动弃前 N 张）。三个查询口 `setCardBudget` / `setModQuery` / `setSkillRegistry` **必须转发给兜底**，不转就是蒙上 AI 的眼睛。视图收口成一个 `createSession()`（开局与「再来一局」共用——以前这两处各写一遍构造，第二遍漏了这一句）。**顺带挖出 D37**。断言 7 条见 `src/__tests__/ui/human-decision.test.ts`（六种提问逐个各问一遍 + `mustResolve` 200ms 超时并说出「事件流水线会死锁在这里」）+ 12 条见 `human-decision-wiring.test.ts` / `use-response.test.ts`。**变异检验**：`isHuman` 改 `return false`、撤掉引擎的三句查询口补发、`open()` 改成直接 `resolve(null)` —— 共红 9 条 |
 | ~D35~ ✅ **2026-10-09 随 D34 结清** | 27 | `useResponse.open()` **零调用方** —— 响应弹窗从不打开 | 接线缺失 → 已修 | `hooks/useResponse.ts:109`。**问它的人就是 D34**：`HumanDecisionService.askForResponse` → 视图的 `askHumanResponse()` → `response.open(config)`。**同时把这个 hook 从「单向命令」改成了「能带回答案的询问」**：`open()` 原来返回 `void`，`confirm()` 里那句 `ctrl.respondToWindow(...)` 实测（`game-controller.ts:275-295`）只做了一句 `syncToStore()`、**什么也没真答复**——这就是它「没人问」的根因之一（问了也拿不回答案）。现在 `open(): Promise<string | null>`，`confirm()` / `cancel()` / `close()` / 超时一律走 `settleWith(...)`。`controllerGetter` 形参随之删除（留着就是一句谎话）。**顶掉旧问题时必须答复旧的那一个**（`discardStalePromise`）：悬着的 resolve 不报错、不红测试，只是那条 `await` 永远不返回。**候选牌不过滤**：引擎给的 `validCards` 里混着 `viewAs` 造出的**虚拟牌**，它们不在 `handCards` 里，滤一遍就把「明明有闪却一张都点不到」滤没了（`response-inquiry.ts:70` 记的就是这件事）。断言见 `use-response.test.ts`（含「开窗之后人家还在想 —— 立刻返回的话这条会红」这条对照） |
 | ~D37~ ✅ **2026-10-09 结清（D34 挖出）** | 26 / 27 | `setCardBudget` / `setModQuery` / `setSkillRegistry` 三个查询口**只在 `GameBoot` 那条启动路径上补发** | 接线缺失 → 已修 | AI 必须先于引擎出生（它要被当成决策服务传进去），所以查询口只能事后补。补发原先写在 `core/boot/game-boot.ts:268`，而 `GameController` 是**另一条启动路径**——图形界面走的是这条，于是那一路上的 AI 一直看不见连弩（额度）、藤甲（加减伤）与 `ai.threaten`（技能台账）。`GameBoot` 里那三句已删除，改在 `GameEngine` 构造函数末尾（`game-engine.ts:320-322`）补发：**放在引擎里而不是各自的启动器里，才不会有人第二次漏掉**。D19 / D21 的诊断当时默认了「只有 `GameBoot` 一条路」，这个默认从没被验证过 |
-| ~D36~ ✅ **2026-10-09 结清** | 27 | 技能面板的数据不是引擎给的：`usable` 恒真、`name` 就是 effectId | 未实现 → 已修 | 原状：`useSkill` 读英雄牌上那串裸 id，于是 `name` = id、`description` = 空串、`type` 一律 `Passive`——`activeSkills`（只收 Active / Limited）**恒为空数组**，面板永远是空白的。真值源是 **`SkillRegistry.getSkills(player)`**（`ctrl.getPlayerSkills()`）：它才含装备技与临时技能，也才有真名、真描述与类型位（注：`IPlayer` 上没有 `_skills`，技能本来就住在注册表里，早先那句「私有字段拿不到」的诊断是错的）。**`usable` 改由技能自己写的 `enable: SkillEnableContext[]` 与当前上下文取交集判定**，不再是「出牌阶段就全部可用」：反例是【咆哮】（锁定技、无 `enable`）——它**看得见但点不了**，旧实现会给它 `usable: true`。类型由 `ISkill` 的布尔矩阵推导，优先序必须有且只有一条：**限定 > 觉醒 > 主动 > 锁定 > 被动**（限定技压过锁定技，否则它再也点不到）。**顺带收口第二答案**：`GameController.useEffect` 原来拿 `hero.effectIds` 校验技能存在，装上装备技会被判「找不到效果」。断言 10 条见 `src/__tests__/ui/skill-panel.test.ts`。**两个坑**：① 断言要落在**面板**（`useSkill`）上而不是 `getPlayerSkills()` 上——原状坏的就是面板那一层，只测后者时把 `name` 改坏居然还是绿的；② `GameEngine.start()` 会把第一个玩家的整个回合一次跑完，UI 那条 `endPhase()` 又交不出回合（见 **D38**），所以「出牌阶段此刻的答案」只能在**决策服务被问出牌的那一刻**取样 |
-| **D38** | 27 / 引擎 | **UI 逐步推进这条路上，回合交不出去** —— 界面上按「结束阶段」永远停在同一个人 | 设计未定（只登记，不动手） | 实测：一局 `startGame()` 之后停在 `phasePost`，连按 12 次 `controller.endPhase()`，阶段与行动玩家**一次都没变**（始终 `phasePost` / `player_0`）。根因有两处，且互相掩盖：① `GameEngine.nextPhase()`（`game-engine.ts:770`）在 `getNextPhase()` 返回 `null`（已是最后阶段）时只是**重新 transition 到 `PhasePost`**，从不调 `turnManager.nextTurn()`——回合交接只写在 `runGameLoop()`（AI 自动模式）里，UI 那条路根本没有；② `GameEngine.start()`（`:613`）直接调 `phaseManager.executeTurn()`，**把第一个玩家的整个回合一口气跑完**（出牌、弃牌一并替他打完），UI 等它跑完已经没有可推进的东西了。于是第二个后果更严重：`HumanDecisionService` 刻意没登记 `askForCardPlay`（出牌由按钮驱动），而 `start()` 那次 `executeTurn` 会去问出牌 → 落到 AI 兜底 —— **人类的第一个回合是 AI 替他打的**。修之前必须先裁决「逐步推进」到底是什么模型（候选：甲 = 交回合后把下一位的整个回合跑完，回到人类再停下；乙 = 交回合后只跑到出牌阶段停下，由 UI 判断座次决定要不要自己接着跑；丙 = 引擎增加「哪些座位由 UI 驱动」的概念）。**本轮只登记** —— 这个裁决会改到引擎的回合结构，不该在结清 D36 的同一轮里顺手拍 |
-| D27 | 27 | `source/theme/lol-mapping.ts` 未建                                    | 未实现          | `src/source/theme/` 不存在                                                                                              |
-| **D28** | 19 | `Card.revealTo()` 是**实体上的状态变更方法**，且零调用方                        | 接线缺失         | `src/core/entity/card.ts:218`。Phase 19 的判定标准是「零引用的写入方法一律删」，这条当时没被扫到——旧 grep 模式里没有 `visibleTo`。**本轮只登记，不动手** |
+| ~D36~ ✅ **2026-10-09 结清** | 27 | 技能面板的数据不是引擎给的：`usable` 恒真、`name` 就是 effectId | 未实现 → 已修 | 原状：`useSkill` 读英雄牌上那串裸 id，于是 `name` = id、`description` = 空串、`type` 一律 `Passive`——`activeSkills`（只收 Active / Limited）**恒为空数组**，面板永远是空白的。真值源是 **`SkillRegistry.getSkills(player)`**（`ctrl.getPlayerSkills()`）：它才含装备技与临时技能，也才有真名、真描述与类型位（注：`IPlayer` 上没有 `_skills`，技能本来就住在注册表里，早先那句「私有字段拿不到」的诊断是错的）。**`usable` 改由技能自己写的 `enable: SkillEnableContext[]` 与当前上下文取交集判定**，不再是「出牌阶段就全部可用」：反例是【咆哮】（锁定技、无 `enable`）——它**看得见但点不了**，旧实现会给它 `usable: true`。类型由 `ISkill` 的布尔矩阵推导，优先序必须有且只有一条：**限定 > 觉醒 > 主动 > 锁定 > 被动**（限定技压过锁定技，否则它再也点不到）。**顺带收口第二答案**：`GameController.useEffect` 原来拿 `hero.effectIds` 校验技能存在，装上装备技会被判「找不到效果」。断言 10 条见 `src/__tests__/ui/skill-panel.test.ts`。**两个坑**：① 断言要落在**面板**（`useSkill`）上而不是 `getPlayerSkills()` 上——原状坏的就是面板那一层，只测后者时把 `name` 改坏居然还是绿的；② 取样时 `GameEngine.start()` 会把第一个玩家的整个回合一次跑完，而 UI 那条形同虚设的「推一步」又交不出回合（见 **D38**，2026-10-09 已结清为形态丁），所以「出牌阶段此刻的答案」只能在**决策服务被问出牌的那一刻**取样 |
+| ~D38~ ✅ **2026-10-09 结清（形态丁：引擎唯一驱动）** | 27 / 引擎 | **UI 逐步推进这条路上，回合交不出去** —— 界面上按「结束阶段」永远停在同一个人 | 设计未定 → **已裁决并结清** | 原状：一局 `startGame()` 之后停在 `phasePost`，连按 12 次 `controller.endPhase()`，阶段与行动玩家**一次都没变**（始终 `phasePost` / `player_0`）。根因有两处，且互相掩盖：① 引擎上那个「推一步」的公开接口（`game-engine.ts:770`）在已是最后阶段时只是**重新 transition 到 `PhasePost`**，从不调 `turnManager.nextTurn()`——回合交接只写在 `runGameLoop()`（AI 自动模式）里，UI 那条路根本没有；② `GameEngine.start()`（`:613`）直接调 `phaseManager.executeTurn()`，**把第一个玩家的整个回合一口气跑完**。**裁决：形态丁 —— 引擎唯一驱动**（参照无名杀：`game.loop()` → `phaseLoop()` → `player.phase()`，全程一个异步流，人类输入走 `choose*` 系列、调用即挂起当前步骤；无名杀没有「下一个阶段」这种 UI 接口，推进与交互在那里是同一件事）。四条落地：① `runGameLoop()` 成为**唯一**推进者；② **删掉**引擎那个「推一步」的接口与 `GameController.endPhase()`（`grep -rn "nextPhase" src` 零结果，注释里也不留）；③ UI **不推进**、只**回答**引擎挂起的提问；④ 「结束出牌」按钮 = 给一个**已经挂起**的提问答复 `null`。**同时纠正一处诊断**：原登记写「人类的第一个回合是 AI 替他打的」——按代码**不是**。`HumanDecisionService.askForCardPlay` 的兜底只对**非人类座位**成立（`isHuman(player)` 判座位），人走的是「没登记通道 → 返回 `null`」那一行，而 `HUMAN_SEAT = 0`、D7 之后主公就钉在 `players[0]` —— **人就是第一个玩家**。于是真实行为是**出牌阶段被静默跳过**：一张牌都没出，弃牌阶段由缺省实现替他弃前 N 张，整个回合静默走完。这个区别决定了解法（不是把按钮接到决策服务上，而是让引擎在该停的地方停）。**带来的可见变化**：回合内没有提问的阶段（准备 / 判定 / 摸牌 / 结束）不再停，引擎一路跑过去——因此「结束阶段」按钮在非出牌阶段失去意义，`canEndPhase` 的含义从「现在是某个阶段」变成「现在正挂着一个提问」，弃牌阶段只在手牌超上限时才停；这是丁的必然结果，**不许为了保住按钮而在每个阶段插一个假的提问**。**顺带收口三处第二答案**：`GameController.playCard` / `discardCards` 从「执行」改成「答复」（出牌、弃牌在整局里各只由引擎做一次，`executeCardUse` 一并删除）；界面上「能打什么牌」只认挂起提问的 `options`（`computePlayableCards` 那份按阶段另算的已删除，目标数上下限也随之来自 `CardPlayOption`，不再在 `useCardPlay` 里猜）；`PhaseManager.getNextPhase` 零调用方，随推进模型一并删除。**死锁纪律**：`destroy()` / 卸载 / 「再来一局」/ 重置会话一律先 `settleAllPending()`（出牌 → `null`、弃牌 → 前 N 张），视图收口成一个 `resetSession()`。断言 12 条见 `src/__tests__/ui/turn-handoff.test.ts`。**变异检验**：把 `askForCardPlay` 从 channel 摘掉 → 红 8 条；撤掉 `cleanup()` 里的 `settleAllPending()` → 红 1 条（正是死锁那条） |
+| ~D27~ ✅ **2026-10-09 结清** | 27 | `source/theme/lol-mapping.ts` 未建 —— 引擎与界面都还是三国杀的名字 | 未实现 → 已修 | 新增 `src/source/theme/lol-mapping.ts`：**稳定 ID → LOL 名称 / 称号 / 描述**的唯一答案。规矩是**引擎内部一律用稳定 ID（`sha` / `caocao` / `jianxiong`），只在展示层换名字**——卡牌 / 英雄 / 技能三个定义文件的 `name` 一个字都没动（它们是引擎的数据，改了就等于让规则层背上皮肤）。落点四处，都在「引擎数据 → UI 显示值」那道边界上：`CardFace.vue`（全仓唯一画牌名的地方，手牌 / 装备 / 判定 / 响应弹窗都走它）、`game-store.ts` 派生 `UIPlayerInfo` 时的英雄名与称号（座位、当前回合名、文本视图因此全都是换过的，不必各写一遍）、`useSkill.ts` 的 `ISkill` → `SkillUIInfo`（面板与触发通知共用一份）、`useResponse.open()` 的提问文案。**提问文案的换法分两级**：先整句查表（「万箭齐发：是否出闪？」→「箭雨：是否打出【闪现】？」），再把剩下的【××】按**原牌名反查**换掉（`${label}：是否使用【无懈可击】？` 这类带前缀的就是这么换的）——反查用的是表里的 `sgs` 字段，不是在展示层另抄一份牌名对照。**每条映射都留着 `sgs`（原名）**，于是这张表自己就是「谁换成了谁」的对照；它与定义文件里的 `name` 必须一致，一致性由用例盯着：定义里改了名而 `sgs` 没跟上，反查就会**静默失效**。断言 16 条见 `src/__tests__/ui/lol-theme.test.ts`：覆盖（每张牌 / 每个英雄 / 每个技能都有映射且 `sgs` 与定义一致、换皮名 ≠ 原名）、卡面（杀 → 致命打击且页面上不再出现「杀」、换牌名字跟着变、描述里引用的牌也是新名）、**同一时刻两边都取一次值**（Store 派生出「德莱厄斯」而引擎真值仍是「关羽」——换皮没倒流）、技能面板（id 仍是 `wusheng`、名字是「诺克萨斯断头台」）、文案两级替换、以及源码级边界（`src/core` / `src/services` / 定义层都不 import 换皮表）。**变异检验**：`CardFace` 改回读原名 → 红 2；Store 去掉换皮 → 红 3；`useSkill` 去掉换皮 → 红 2（含 D36 那条）；`lolPromptText` 不换 → 红 2；删掉 `sha` 那条映射 → 红 4 |
+| ~D40~ ✅ **2026-10-10 结清** | 27 / 展示 | **引擎自己写的日志文案仍是三国杀的名字** | 未实现 → 已修 | 换皮只管「查表换名字」，管不到引擎**已经拼好的整句**：`effect-context.ts:350` 直接写 `${target.hero?.name ?? target.id} 回复了 N 点体力`，这类文案进 `GameLog` 时已经是成品字符串，里面既有英雄名也有牌名。要换就得在日志出口做一遍文本替换，而「杀 / 闪 / 桃 / 酒」这种单字牌名做子串替换**必然误伤**（「击杀」里的「杀」）。**2026-10-10 动手，用的正是这条正解**：新增 `src/core/utils/name-slot.ts`
+      （`heroSlot` / `cardSlot` —— 引擎侧只产**带 ID 的占位符**），引擎四处文案
+      （回复体力日志、濒死求桃提问、目标非法原因、用牌被拒的开发日志）改记占位符；
+      展示层的唯一出口 `resolveNameSlots()` 落在换皮表那个文件里，由
+      `log-store`（日志进 Store 那一刻）与 `lolPromptText`（提问进窗口那一刻）
+      各调一次。**没有做任何子串替换**——「杀 / 闪 / 桃 / 酒」的误伤问题
+      从结构上消失了：引擎文本里压根没有单字牌名。
+      **踩到的坑**：写源码级断言时，注释里不能出现被匹配的模式——`name-slot.ts`
+      的注释里写了换皮表的路径，当场把 D27 那条「引擎不认识换皮表」打红
+      （这是本仓第三次栽在这上面）。
+      断言 18 条见 `src/__tests__/ui/engine-text-theme.test.ts`，**变异检验 5 处共红 19 条** |
+| ~D41~ ✅ **2026-10-10 结清** | 27 / UI | **面板上看不到 Mod 带来的数值变化**（如攻击范围 1 → 3） | 未实现 → 已修 | 开一个查询口而不是把规则搬进 Store：`game-store.ts` 加 `IPlayerStatsQuery { attackRange, maxHandcard }` 与 `UIPlayerStats`，`UIPlayerInfo` 多一个 `stats`；由 `GameController.pushStatsQuery()` 在**引擎出生之后**补发（与 D37 同一个教训：`bindStore` 与 `createGame` 两条顺序各测一遍），`cleanup()` 里先置 `null` 再 `reset()`（查询口闭包抓着**这一局**的引擎，不清就是一条指向已弃对象的活引用）。面板（`PlayerSeat`）只**显示**，不按装备槽位另算——`BASE_ATTACK_RANGE` 全仓只有 `core/skill/mod-query.ts` 一处定义，Store 与组件一律去引它。**顺手修掉一个真 bug**：`weaponRangeMod` 原写 `value + weapon.attackRange`，而武器定义里的 `attackRange` 是「装上它之后你的攻击范围」——连弩写着 1 却变成 2、青釭剑写着 2 却变成 3，**每张武器凭空多一格**；改 `Math.max(value, range)`。同时删除 `Player.attackRange` getter（第二个答案且零生产调用方）。断言 14 条见 `src/__tests__/ui/player-stats.test.ts`：Store 派生（一人一个数、换查询口跟着变、没人注入时退回缺省）、接线（两条启动顺序 + 重开时先收走旧的）、**「装上武器，面板上的数真的动了」**（牌堆里只放 12 张青釭剑，于是谁手上有武器不靠运气——这一条是整套断言的牙齿：`1 === 1` 也绿，而「永远是 1」正是原状）、组件层（DOM 里就是传进去的数 + 被抬起来的那个高亮）、源码级（Store 不 import 规则层也不做规则查询、组件不认装备槽位、基础值只有一处定义）。**变异检验**：`Math.max` 改回相加 + Store 不读查询口 → 红 4 条；撤掉 `createGame` 里的补发 + 面板写死 → 红 5 条 |
+| ~D43~ ✅ **2026-10-14 结清** | 内容 / 引擎 | **「按牌型豁免距离」这类技能表达不出来**（如黄月英的【奇才】：锦囊无距离限制） | 未实现 → 已修 | 距离的两个 Mod 口子（`distanceFrom` / `distanceTo`）只收 `(value, ctx, to)`，**拿不到「这次用的是哪张牌」**；而 `isInRange` 是「距离 ≤ 攻击范围」，动距离就等于把【杀】的范围也一起放开——那是【奇才】没有的效果。`targetInRangeOf` 又只是**否决器**（只能摘目标，不能加）。**正解就是让距离 Mod 带上 card**（一次真正的接口改动，当初因此只登记未动手）：`NumericModArgsMap` 的距离两项末尾加 `card?: ICard`，`DistanceMods` 的两个 `*Of` 与 `DistanceSystem` 的 `getDistance` / `isInRange` / `getPlayersInRange` / `getPlayersWithinDistance` 一并收下它，`TargetSystem` 的三处距离调用把**当前这张牌**递进去（杀 / 牵 / 默认分支各一处），`ModQuery.distance` / `inRange` / `GameEngine.getDistance` 各多一个可选末参。【奇才】于是写得出来：`mod.distanceFrom = (value, ctx, to, card) => 是锦囊 ? 1 : value`（距离下限本来就是 1，压到 1 即「全场都在距离 1 内」）。**顺手删掉一对零调用方的第二答案**：`ModQuery.distanceFrom` / `distanceTo`（带 `event` 那两个）与 `distanceFromOf` / `distanceToOf` 只差一个参数却全仓无人调用，留着就要各自跟一次接口演进。断言 8 条见 `src/__tests__/skill/qicai.test.ts`，分三层且**每层都必须同时证明「锦囊被豁免」与「杀没被豁免」**：距离本身（不带牌 = 2 / 带锦囊 = 1 / 带杀 = 2，**同一时刻同一对人，只因算距离为了打哪张牌而结果不同**）、可选目标列表（牵得到远处、**杀**够不到、换成吕蒙同牌够不到）、端到端（真的把远处的牌牵过来了；没有奇才的人打同一张被判「不是合法目标」，牌留在手里）。**只写「锦囊距离变 1」是不够的**——把奇才写成无条件改距离那条也会绿，真正会红的只有「杀的距离没变」。**变异检验 3 处共红 7 条** |
+| ~D44~ ✅ **2026-10-14 结清** | 22 / 引擎 | **改判改错了对象** —— 判定事件里两个键**同名不同义**，【鬼才】换掉的不是判定结果牌 | 未实现 → 已修 | 一次判定里有两张牌：延时锦囊自己（挂在判定区等待）与翻出来的那张结果牌。判定有**两条发起路径**，而它们往事件里放的键含义相反：判定阶段（`PhaseManager.doPhaseJudge`）把延时牌放 `judgeCard`、结果牌放 `judgeResultCard`；内容层自己翻牌（`EffectContext.judge`）却把**结果牌**放在 `judgeCard` 上。【鬼才】读 `judgeCard` 取「判定牌」，于是**在真实判定流程里它换掉的是延时锦囊**——改判从未生效过，还顺手把乐不思蜀摸进了司马懿手里。**症状是被英雄池掩盖的**：标准 5 人局原先分不到司马懿（10 名英雄 + `heroSelectCount: 3`），谁也没发现；补黄月英凑成 11 名，`startIdx = (i * 3) % 11` 一变，司马懿进局，`EffectContext.judge` 那条路当场抛 `finishProcessing: card "乐不思蜀" is not in processing zone`（原结果牌已被改判摸进手牌）。**修法照一贯的规矩**：① 只留一个键，含义固定为「本次判定结果牌」，常量与读写函数收在 `src/core/event/judge-keys.ts`（`JUDGE_RESULT_CARD_KEY` / `judgeResultCardOf` / `setJudgeResultCard`）——生产者与消费者不各抄字符串；② 收尾逻辑判阶段有一份三分支、内容层只有一行不完整的，合成 `CardSystem.finishJudgeResult()` 一个出口，两条路径都调它。**顺带**：测试脚手架新增 `NO_GUICAI_HEROES` 与 `createTestEnv(decisions, overrides)` 的覆盖参数——【鬼才】是**全局**触发，局里只要有司马懿，每一次判定都换成他的手牌，凡断言「翻出来的花色决定延时锦囊生效与否」的用例，英雄池必须钉死（这是本轮四条例外红的同一根因）。断言 6 条见 `src/__tests__/skill/guicai.test.ts`：红桃手牌 → 不跳过 / 黑桃手牌 → 跳过（同一张顶牌，只因手牌不同结果相反）、**真实判定阶段那条路同样生效**（`executeTurn` 而不是直接 dispatch，两条路径各有一份收尾逻辑）、换下来的原结果牌进了司马懿手里且与被顶上来的不是同一张、无手牌时不改判且结果由**顶牌**给出期望值（写死 `true` 会在顶牌恰好红桃那天假绿）。**变异检验 4 处共红 9 条** |
+| ~D45~ ✅ **2026-10-14 结清** | 27 / UI | **图文版卡死在第一回合** —— 引擎挂起的提问，界面看不见 | 接线缺失 → 已修 | 症状：文字版整局跑完，图文版开局就停在「等待其他玩家操作…」，没有按钮、没有可点的牌、手牌区空白。文字版多跑得动是因为全员 AI，没有「人要回答」这一环。**根因**：形态丁（D38）下引擎是唯一推进者，出牌阶段 `doPhaseUse` 里 `await askForCardPlay(...)` 挂起等人；而 `PhaseManager.executeTurn` 对每个阶段是**先** `currentPhase = phase; onPhaseSync?.()` **再** `await executePhase(...)`——**最后一次状态同步发生在提问之前**，提问挂起后直到被答复前没有任何 `syncState()`。视图 `availableActions` 的响应式依赖挂在 `void uiState.value`（Store 同步）上，提问那一刻 Store 没变 → computed 不重算 → **引擎等人、人等按钮，两边互等**。**正解：控制器自己报变更**——控制器给 UI 的那几个答案（`pendingCardPlay` / `pendingDiscard` / 可打列表 / 技能面板）**全是普通字段**，Vue 看不见，而唯一能推出去的路（Store 同步）恰好盖不住提问时刻。于是 `GameController` 新增 `revisionRef = ref(0)` 与 getter `revision`，在**提问挂起 / 答复 / 状态同步**三处 `markChanged()`；三份 UI computed 的依赖一律改挂 `ctrl.revision`。**没有**让引擎在提问时多推一次状态——那是往引擎里塞 UI 的心思。**同一根因的第二处冻住**：`humanPlayer` 在引擎出生前就 `if (!state) return null` 早退，**早退的那一次根本没读到 Store**，注册的依赖只有 `session`（shallowRef）；开局后 `session.value` 是同一个对象再没变过 → computed 永不重算 → 恒为 null → `<CardHand v-if="humanPlayer">` 一假到底，**手牌区整块空白**（按钮修好了也点不到牌）。修法是依赖**进门就挂**，不许放在早退之后。断言 11 条：`src/__tests__/ui/pending-ask-visible.test.ts`（8 条：4 条端到端用 `watchEffect` 模拟渲染 effect + 4 条源码护栏盯住三处依赖挂点）、`src/__tests__/ui/game-view-first-turn.test.ts`（3 条：**挂载真实 `GameView`**，点「开始游戏」→ 手牌摆上桌面 → 点「结束出牌」→ 处理弃牌提问 → 牌堆张数真的变少）。**两条测试纪律**：① 端到端断言 UI 必须用 `watchEffect` 把值写进一个 `ref` 来**模拟渲染 effect**——直接读一次 `ctrl.getAvailableActions()` 永远拿得到新值（computed 一读就重算），掩盖 bug，只有挂在 effect 上才测得到「依赖变了没有」；② 「回合交出去了」不能只断言 `currentPlayerIndex !== HUMAN_SEAT`，AI 那几位跑得快会绕回来又轮到人，那样断言照样绿——改成记录界面上**出现过的所有当前玩家**（`seenSeats`）+ 牌堆张数减少，双证据。**变异检验的坑**：`askCardPlay` / `askDiscard` 进门第一句是 `settleAllPending()`，而它末尾也有 `markChanged()`，于是**单独**注释掉 ask 里那句并不红（被补偿）。逐个单点变异 7 处**全绿**，差点误判断言没牙齿；改**组合**变异才现形：去掉 ask 路径三处 → 红 3 条，再加 `syncToStore` → 红 4 条；hook 侧各去掉 → 各红 1 条；视图 `humanPlayer` / `availableActions` 的依赖行各去掉 → 分别红 3 条 / 2 条 |
+| ~D28~ ✅ **2026-10-10 结清** | 19 | `Card.revealTo()` 是**实体上的状态变更方法**，且零调用方 | 接线缺失 → 已删 | `src/core/entity/card.ts:218`。Phase 19 的判定标准是「零引用的写入方法一律删」，这条当时没被扫到——旧 grep 模式里没有 `visibleTo`。**删掉**，原位留注释说明「谁看得见这张牌」的唯一答案在 `CardSystem`（牌进哪个区域就同步算可见集合）。**补了一层护栏**（`state-write-guard.test.ts`）：`src/core/entity` 下除 `this.x = data.x` 这种由数据造自己的 hydration 之外，不许出现任何字段自赋值——并配一条「放行形状必须真的存在」的反面断言（`hydrations > 5`），否则「零个写入」可能只是这层压根没扫到。**变异检验**：给 `Card` 加回一个写方法 → 红 2 条 |
+| ~D39~ ✅ **2026-10-10 结清** | 21 / 引擎 | `TargetSystem.validateTargets` 在**出牌阶段那条路**上仍然零调用方 —— `PhaseManager.doPhaseUse` 自己抄了一份「移入处理区 → `useCard` 事件 → 结算入弃牌堆」，绕过了 `GameEngine.useCard` | 接线缺失 → 已统一 | D31 当年接的是 `GameEngine.useCard`（`:728`），而 `doPhaseUse`（`phase-manager.ts:456-478`）另有一份内联的执行体：**不校验目标、不计入 `TargetValidationError`**。形态丁之后人类的出牌也走这一条（UI 只答复、引擎执行），于是「出牌时非法目标被拒绝」这条验收在出牌阶段依旧落空——只是此刻的候选来自引擎自己算的 `options`，非法目标递不进来，因此**症状被掩盖**。**统一办法是把用牌入口注入进去**：`PhaseManagerOptions` 新增**必填** `useCard`（必填而不是可选，就是为了不让「抄一份」这个选项继续存在——它一旦可选，下一个调用方就会挑那条容易的），由 `GameEngine` 传 `this.useCard`。**被拒的牌必须摘出候选**：候选每轮现算，不摘的话决策方下一次拿到的仍是同一组选项，同一张牌会被无限次选中、无限次被拒；摘法是把它的额度记成 `Infinity`，而**不**把它算进已用次数、更不结束阶段。**顺带修掉一个真 bug**：那份内联实现无条件调 `finishProcessing`，而它对**不在处理区**的牌是抛错的——装上武器的那一刻牌已经在装备区，于是抛错 → 被 `catch { phaseEnded = true }` 吞掉 → **出牌阶段当场结束，装完刀这一回合再也打不出牌**。断言 6 条见 `src/__tests__/engine/phase-use-unified.test.ts`：非法目标（牌留在手牌 + 那人没掉血 + **阶段没有结束，还会再问一次** + 摘出候选所以不会死循环）、**对照**（用合法目标时它真的打出去了——否则「还在手上」可能只是压根没被选中）、装刀之后还能出杀（原状必红的两条：刀在装备区、杀也真打出去）、源码级（出牌阶段不再自己建那个事件、引擎确实把入口递了下去）。**变异检验**：绕过目标校验 → 红 2；`finishProcessing` 改回无条件 → 红 1 |
 | ~D31~ ✅ **2026-10-08 结清** | 21 | `TargetSystem.validateTargets` **零调用方** —— 出牌时非法目标不会被拒绝 | 接线缺失 | 生产入口是 `GameEngine.useCard`：在**移入处理区之前**先校验（先挪牌再校验，被拒的牌就卡在处理区回不去了），非法即抛 `TargetValidationError`（带 reason），牌留在手牌、事件一次不发。新增 `validatePlay`（事前问，UI 拿它告诉玩家为什么）与 `targetCountRange`。`CardPlayOption` 补 `minTargets` / `maxTargets`，AIController / `AutoDecisionService` / 测试脚手架统一走 `TargetSystem.pickTargets` 收敛——此前各处各写一句 `slice(0, 1)`，于是 AOE 被塞 1 个目标（上限是 0）、借刀杀人只给 1 个（下限是 2）。**修 `getMinTargets` 的一个真洞**：只对自己生效的牌（装备/酒/无中生有）原本被算成「至少 1 个目标」，而调用方一律传 `[]`，照搬原判据会把每一次正常出牌都拒掉。**接线一开立刻暴露 22 条既有用例的 fixture 不是真牌**（见 D32）。断言见 `src/__tests__/system/target-validation.test.ts`（11 条） |
-| **D32** | 21 / 测试 | 测试里的卡牌是**手搓的 tag 集合**，没有真值源护栏 | 测试欠账 | `cardDef(id, tags)` 随手列的 tag 一旦与真牌不同，那张牌就落进 `TargetSystem` 的**另一个分支**：南蛮入侵少 `Aoe` → 变成「要选目标的普通锦囊」；桃少 `Basic` → 进不了桃的目标规则，自己反而不是合法目标；无中生有少 `Draw` → 同上。D31 接线后一次性红了 22 条，已逐条对齐 `src/source/cards/*.ts`。**缺的是护栏**：应当有一条用例断言「测试里用到的牌与真牌定义一致」（或让 helper 直接从真牌定义构造），否则下次新增用例还会再撞一次。**本轮只登记，不动手** |
-| **D30** | 25 | `DeathSystem.checkAllDead()` **零调用方** | 接线缺失 | `death-system.ts:188`。D17 搬迁时顺带发现：它与胜负判定同住一处，却没有任何生产调用方——「全员死亡」这条兜底分支写在 `GameEngine.runGameLoop`（`aliveCount === 0`）里，自己算的。**只登记，不动手** |
+| ~D32~ ✅ **2026-10-10 结清** | 21 / 测试 | 测试里的卡牌是**手搓的 tag 集合**，没有真值源护栏 | 测试欠账 → 已收口 | `cardDef(id, tags)` 随手列的 tag 一旦与真牌不同，那张牌就落进 `TargetSystem` 的**另一个分支**：南蛮入侵少 `Aoe` → 变成「要选目标的普通锦囊」；桃少 `Basic` → 进不了桃的目标规则，自己反而不是合法目标；无中生有少 `Draw` → 同上。D31 接线后一次性红了 22 条，已逐条对齐 `src/source/cards/*.ts`。**护栏的做法不是「再把 tag 抄对一遍」，而是让漂移在结构上不可能**：`helpers/game-env.ts` 里建一张真牌表（`basicCards + trickCards + equipCards` 按 id 索引），`cardDef` **只要 id 查得到就整张取自真定义**，传进来的 `tags` 一概不算数；只有合成牌才走手搓分支。护栏用例（`card-fixture-guard.test.ts`）故意喂一串**错的** tag 进去，真牌仍必须整张取自真定义——「写错了也通过」才叫收口。**改完立刻红 5 条**（藤甲 + 火杀那条拿到的 `sha` 根本没有 `Fire` tag），顺带补出**属性杀从来不存在于真实牌堆**这个洞：新增 `HuoSha` / `leiSha`（含配比、内容注册与换皮映射）——此前 `CardTag.Fire` / `Thunder` 与藤甲 Mod 都写好了，却没有任何一张牌带这两个 tag，永远触发不到。**变异检验**：让 `cardDef` 重新相信传进来的 tag → 红 2 条 |
+| ~D30~ ✅ **2026-10-10 结清** | 25 | `DeathSystem.checkAllDead()` **零调用方** | 接线缺失 → 已接 | `death-system.ts:188`。D17 搬迁时顺带发现：它与胜负判定同住一处，却没有任何生产调用方——「全员死亡」这条兜底分支写在 `GameEngine.runGameLoop` 里自己算（`aliveCount === 0`）。**接上**：兜底分支改问 `this.deathSystem.checkAllDead()`——两处判据若分开演进，会在同一个局面下给出两个结论。断言 3 条见 `death-event.test.ts`：**「胜负规则给不出结论时，兜底分支自己收尾」**这条要把 `checkGameOver` 临时换成 `() => null` 才测得出来（`WinCondition` 会先被问到，它的结论盖住了兜底），外加一条源码级盯住兜底分支不再自己数存活人数。**变异检验**：把兜底分支改回自己数 → 红 1 条 |
 | ~D29~ ✅ **2026-10-08 结清（形态甲）** | 19 / 22 | 「跳过」这件事有两套账本 | 设计未定 → 已裁决 | **只留 `player.shouldSkipPhases` 一本**。`TurnManager.skippedPlayers` 删除，`nextTurn` 的跳过分支随之消失；`skipTurn` 退化为 `setSkipPhases(player, STANDARD_PHASE_ORDER)`；`shouldSkipPhase()` 一并删除——它是同一本账的**第二个读法**（不问 `mod.phaseSkippable`，被否决的阶段在它看来「还是要跳」）且零调用方。**顺带修掉一个真 bug**：被旧 `skippedPlayers` 跳过的玩家没记进 `playersActedThisRound`，本轮末尾又会被捞回来补一个回合，一轮顺序 `[0,2,3,4,1]` —— **「跳过」实为「延后」**，现在回到 `[0,1,2,3,4]`。代价已写进 `skipTurn` 的注释：账本在 `nextTurn` 选人时被 `resetTurnState` 清掉，因此**跨回合预约的跳过不成立**。断言见 `turn-phase.test.ts`（行为 3 条 + 源码级 1 条） |
-| **D33** | 22 | `TurnManager` 上三个成员**零调用方**：`reset()`（`:234`）、`playersActed`（`:209`）、`playersRemaining`（`:218`） | 接线缺失 | 与 D28（`Card.revealTo`）同一类：API 在、调用方不在。同一类里的 `isRoundComplete`（`game-engine.ts:615` 在读）、`startRound` / `nextTurn` / `getCurrentPlayer` / `skipTurn` 都有人调，就这三个没有。**只登记，不动手**——等 Phase 27 接线 UI 时一并决定是接上还是删掉 |
+| ~D33~ ✅ **2026-10-10 结清** | 22 | `TurnManager` 上三个成员**零调用方**：`reset()`（`:234`）、`playersActed`（`:209`）、`playersRemaining`（`:218`） | 接线缺失 → 已删 | 与 D28（`Card.revealTo`）同一类：API 在、调用方不在。同一类里的 `isRoundComplete`（`game-engine.ts:615` 在读）、`startRound` / `nextTurn` / `getCurrentPlayer` / `skipTurn` 都有人调，就这三个没有。**三个都删**：前两个是「谁本轮动过」的**第二个答案**（列表是快照，有人中途死了它不会变），`reset()` 更该删——本类账本每局随 `startRound()` 的 `clear()` 归零，留它等于宣称「新的一局可以不走 `startRound`」。原位各留注释说明答案在哪、为什么不该有第二份 |
 
-**按性质汇总**（截至 2026-10-09 D36 结清后）：
+**按性质汇总**（截至 2026-10-10 欠账清尾：D1 / D2 / D28 / D30 / D32 / D33 / D39 / D41 结清后）：
 
 | 性质          | 条数    | 编号                                                                             |
 | ----------- | ----- | ------------------------------------------------------------------------------ |
-| 接线缺失        | 3     | **D28**, **D30**, **D33**（D3 / D4 / D11 / D12 / D15 / D16 / D31 / **D35** / **D37** 已结清） |
-| 未实现         | 1     | D27（~~D24~~ ~~D25~~ ~~D34~~ ~~D36~~ ~~D7~~ ~~D13~~ ~~D19~~ ~~D20~~ ~~D21~~ ~~D22~~ 已结清） |
-| 测试欠账        | 3     | D1, D2, **D32**（~~D14~~ ~~D18~~ ~~D23~~ 已结清）                                     |
-| 设计未定        | 1     | **D38**（~~D8~~ ~~D17~~ ~~D29~~ 已结清）                                            |
+| 接线缺失        | 0     | D3 / D4 / D11 / D12 / D15 / D16 / D31 / D35 / D37 / **D30** / **D39** / **D45**（响应式接线：控制器报变更 `revision`）已结清 |
+| 未实现         | 0     | ~~**D43**~~ **2026-10-14 结清**（按牌型豁免距离）；~~**D44**~~ **2026-10-14 结清**（改判改错对象）；~~**D40**~~ **2026-10-10 结清**（~~D27~~ **2026-10-09 结清**；~~D41~~ **2026-10-10 结清**；~~D24~~ ~~D25~~ ~~D34~~ ~~D36~~ ~~D7~~ ~~D13~~ ~~D19~~ ~~D20~~ ~~D21~~ ~~D22~~ 已结清） |
+| 测试欠账        | 0     | **D1 / D2 / D32 均于 2026-10-10 结清**（~~D14~~ ~~D18~~ ~~D23~~ 已结清）                 |
+| 设计未定        | 0     | ~~D38~~ **2026-10-09 结清（形态丁）**（~~D8~~ ~~D17~~ ~~D29~~ 已结清）                       |
 | Phase 19 漏网 | 0     | ~~D9~~ ~~D10~~ 已结清                                                           |
 | 疑似笔误        | 0     | ~~D5~~ ~~D6~~ 已结清                                                            |
 | 待核          | 0     | ~~D26~~ 2026-10-09 核毕，拆为 D34 / D35 / D36                                      |
-| **合计**      | **8** | 上一版 11 − 结清 4（**D34 / D35 / D36 / D25**）+ 新挖出 2（**D37** 当天结清、**D38** 待裁决）    |
+| **合计**      | **0** | 上一版 1 − 本轮结清 1（**D40**）+ 本轮新登记 1（**D43**）；2026-10-14 再结清 **D44**（改判）与 **D43**（按牌型豁免距离）—— **欠账清零**。清零后又由**用户实测**（图文版卡在第一回合）新登记并结清 **D45**（引擎挂起的提问界面看不见）—— **仍在零位** |
 
 > 合计那格的 **18 是此前的一处算错**：性质各行加起来一直是 16，
 > 公式 `27 − 17 + 6` 也算得 16，只是写上了 18。本轮顺手改正。
-> 剩下的 8 条里，**两条属于 Phase 27 的活**（D27 换皮 / **D38** 回合交接），
-> 其中 **D38 是新的总插头**——它不通，人类连一个回合都打不到，
-> 上面四条（D34 / D35 / D36 / D25）接得再好也只是「看得到、点不到」。
-> 另六条是别处的旧账：**D28 / D30 / D33**（零调用方）
-> 与 **D1 / D2 / D32**（测试与台账）。
+> **2026-10-09 更新：D27（LOL 换皮）已结清，Phase 27 转 ✅。**
+> **2026-10-10 更新：欠账清尾，一口气结清 8 条**；同日再结清 **D40**
+> （引擎日志文案换皮），**D1–D41 全部结清**。
+> 补黄月英时**新登记 D43**（按牌型豁免距离表达不出来），
+> 那条是「引擎的接口给不出这个答案」，不是「内容没写」。
+> 八条里五条是「API 在、调用方不在」的同一类（D28 / D30 / D33 删或接、
+> D39 合并两条用牌路径、D41 开查询口），三条是测试与台账（D1 / D2 / D32）。
+> 总插头已经拔掉：人现在能打完自己的回合，回合也能交出去
+> （`turn-handoff.test.ts` 里那一条「走完一圈」的断言就是它）；
+> 界面上也不再是三国杀的名字（`lol-theme.test.ts` 里那一条
+> 「Store 派生出德莱厄斯、同一时刻引擎真值仍是关羽」钉的就是换皮的边界）。
 
 **2026-10-09 这次核对本身值得记一笔**：D26 原写「数据来源**待核**」，
 听起来像是「线可能接错了」。核完才知道是「**压根没有接线**」——
@@ -351,7 +378,7 @@ src/
 技能面板的数据来自一句自承「待完善」的 `flatMap`。
 **「待核」和「未实现」之间只差一次 grep**，把它留着不查，就会一直算作低风险。
 
-**已结清 29 条**：
+**已结清 30 条**：
 
 - **2026-09-30（12 条）**：D3、D4、D5、D6、D8、D9、D10、D11、D12、D15、D16、D17。
   新增 **44 条**断言、7 个测试文件：
@@ -410,6 +437,141 @@ src/
   实为「压根没有接线」——见上）。
   **D32 那条护栏欠账在本轮第一次显形**：写 `game-board.test.ts` 时
   差点断言出一个 `0 === 0`，于是给「等于真值」一律配了「它会动」的对照。
+- **2026-10-09（Phase 27，1 条）**：**D38**（回合交接 —— **形态丁：引擎唯一驱动**）。
+  新增 **16 条**断言、1 个测试文件 `src/__tests__/ui/turn-handoff.test.ts`
+  （其中 5 条是同一条源码护栏按文件展开的）。
+  全量用例 **508 → 524**（40 → 41 个文件）。
+  推进模型裁决落地为四条：`runGameLoop()` 是唯一推进者；引擎那个「推一步」的
+  公开接口与 `GameController.endPhase()` 一并删除；UI 只答复挂起的提问；
+  「结束出牌」= 答复 `null`。**顺带纠正一处诊断**（原写「AI 替人打」，
+  实为「出牌阶段被静默跳过」）——这是「诊断写错一半」的第三个实例。
+  **可见变化**：非出牌阶段不再停，按钮的开关从「现在是某个阶段」
+  换成「现在正挂着一个提问」。
+  另**收口三处第二答案**（`playCard` / `discardCards` 改答复、`playableCards`
+  只认挂起提问、`getNextPhase` 随推进模型删除），
+  另**新登记 D39**（`doPhaseUse` 那份内联出牌绕过了 `validateTargets`，只登记）。
+- **2026-10-09（Phase 27，1 条）**：**D27**（LOL 换皮）。
+  新增 **16 条**断言、1 个测试文件 `src/__tests__/ui/lol-theme.test.ts`，
+  另新增 `src/source/theme/lol-mapping.ts`（换皮表的唯一答案）。
+  全量用例 **524 → 540**（41 → 42 个文件）。
+  **换皮的规矩**：引擎内部一律用稳定 ID，只在展示层换名字；
+  卡牌 / 英雄 / 技能三个定义文件的 `name` **一个字未动**。
+  落点四处，都在「引擎数据 → UI 显示值」那道边界上（卡面 / Store 派生 /
+  `ISkill` → `SkillUIInfo` / 响应文案）；提问文案分整句查表与【××】反查两级，
+  反查靠表里的 `sgs`，因此 `sgs` 与定义里的 `name` 必须一致（有用例盯着）。
+  **变异检验 5 处**（改回原名 / 去掉换皮 / 不换文案 / 删一条映射）——
+  共红 13 条，全部还原后复跑绿。
+  另**新登记两条**：~~**D40**（引擎自己写的日志文案仍是三国杀名——
+  要换就得让引擎日志只记 ID，是一次重构而不是换皮）~~ **2026-10-10 结清**、
+  ~~**D41**（面板上看不到 Mod 带来的数值变化，Phase 27 清单里最后一条没勾的）~~
+  **2026-10-10 结清**。
+
+- **2026-10-10（1 条 + 1 名英雄）**：**D40**（引擎自己拼的整句也要换皮），
+  另补齐**黄月英**（她的名字早写在 `standard.ts` 的文件头里，本体一直没有）。
+  新增 **25 条**断言、2 个测试文件
+  （`src/__tests__/ui/engine-text-theme.test.ts` 18、
+  `src/__tests__/skill/jizhi.test.ts` 7），
+  另新增 `src/core/utils/name-slot.ts`（引擎侧占位符的唯一出口）。
+  黄月英只登记了【集智】——【奇才】在本引擎里如实表达不了，
+  已登记为 **D43**（距离 Mod 拿不到「这次用的是哪张牌」）。
+  全量用例 **576 → 601**（45 → 47 个文件）。
+  **变异检验 7 处**（D40 五处 + 集智两处）—— 共红 22 条，全部还原后复跑绿。
+  新增 **18 条**断言、1 个测试文件 `src/__tests__/ui/engine-text-theme.test.ts`，
+  另新增 `src/core/utils/name-slot.ts`（引擎侧占位符的唯一出口）。
+  全量用例 **576 → 594**（45 → 46 个文件）。
+  **规矩**：引擎文案（日志 / 提问 / 拒绝原因）一律只记**稳定 ID 的占位符**，
+  名字由展示层在「引擎数据 → 屏幕文字」那道边界上补——换皮表在展示层，
+  引擎不该认识它。落点两处：`log-store` 的 `addLog` / `addLogs`、
+  `lolPromptText`（后者顺带把濒死那句的【桃】换成【治疗术】）。
+  **没有做子串替换**：当初担心的「『击杀』里的『杀』被误伤」，
+  因为引擎文本里不再出现单字牌名而自动消失。
+  **变异检验 5 处**（解析器空转 / Store 不换 / 提问不换 / 日志改回姓名 /
+  提问改回姓名）—— 共红 19 条，全部还原后复跑绿。
+
+- **2026-10-10（内容）**：**黄月英**（Ionia / 吴，3 血，【集智】）。
+  文件头那句「吴 (3): 孙权、吕蒙、黄月英」承诺了三年，名单里只有两个——
+  顺手把「蜀 (3)」那个数也改对了（其实是 4 个）。
+  【集智】挂在 `useCardAfter` 而不是 `useCard`：空后缀是**内容阶段**，
+  那一刻牌自己的内容正在跑，而且被【无懈可击】抵消的那张同样会走到它。
+  「非延时锦囊」按**标签**判，不按牌名。
+  **变异检验 2 处**（不摸牌 / 不过滤非锦囊）—— 共红 3 条。
+
+- **2026-10-14（1 条）**：**D44**（改判改错了对象）。
+  起因是补完黄月英之后全量回归里**唯一那条红**：
+  `content-registry.test.ts` 的「乐不思蜀判定非红桃 → 跳过出牌阶段」抛
+  `finishProcessing: card "乐不思蜀" is not in processing zone`。
+  顺藤摸下去发现的不是这条用例的问题，而是**改判从来没生效过**——
+  判定事件里两个键同名不同义，两条发起路径各给一套含义，
+  【鬼才】在真实判定流程里换掉的是**延时锦囊**，不是结果牌。
+  它一直没被看见，是因为标准 5 人局原先**分不到司马懿**
+  （10 名英雄 × `heroSelectCount: 3`）；凑成 11 名后分配一变，他就进局了。
+  正解两条：判定结果牌**只留一个键**（`src/core/event/judge-keys.ts`
+  的常量与读写函数，生产者消费者共用），收尾**只留一个出口**
+  （`CardSystem.finishJudgeResult()`，判定阶段与内容层共用）。
+  新增 **6 条**断言、1 个测试文件 `src/__tests__/skill/guicai.test.ts`；
+  判定类既有用例的英雄池改为钉死（`NO_GUICAI_HEROES`）。
+  全量用例 **601 → 607**（47 → 48 个文件）。
+  **变异检验 4 处**（改判仍写旧键 / 收尾退化成硬 `finishProcessing` /
+  判定不读回改判结果 / 内容层用旧键）—— 共红 9 条，全部还原后复跑绿。
+  **一条测试纪律**：【鬼才】是**全局**触发，任何断言「翻出来的花色 →
+  延时锦囊生效与否」的用例都必须先钉死英雄池，否则标准池里多一个英雄
+  就会让既有断言莫名其妙地红——这次一口气红了 4 条，全是这一个原因。
+
+- **2026-10-14（1 条）**：**D43**（按牌型豁免距离表达不出来）——
+  **欠账清零的最后一条**。
+  当初只登记不动手，是因为它要的是一次真正的接口改动：
+  距离 Mod 只收 `(value, ctx, to)`，拿不到「这次用的是哪张牌」。
+  改法就是把 `card` 一路递到 Mod 手里——
+  `NumericModArgsMap` 的距离两项、`DistanceMods` 的两个 `*Of`、
+  `DistanceSystem` 的四个距离方法、`TargetSystem` 的三处调用、
+  `ModQuery` / `GameEngine` 的查询口，各多一个可选末参。
+  【奇才】随后才写得出：`是锦囊 ? 1 : value`。
+  **顺手删掉一对零调用方的第二答案**：`ModQuery.distanceFrom` / `distanceTo`
+  （带 `event` 那两个）与 `distanceFromOf` / `distanceToOf` 只差一个参数，
+  留着就要各自跟一次接口演进。
+  新增 **8 条**断言、1 个测试文件 `src/__tests__/skill/qicai.test.ts`。
+  全量用例 **607 → 615**（48 → 49 个文件）。
+  **变异检验 3 处**（奇才无条件改距离 / 目标筛选不递 card /
+  距离系统不把 card 传给 Mod）—— 共红 7 条，全部还原后复跑绿。
+  **一条断言纪律**：这类「按牌型豁免」的断言必须**成对**写——
+  只写「锦囊够得到远处」，把技能写成无条件改距离那条居然也是绿的；
+  真正会红的永远是「【杀】够不到」那一半。
+
+- **2026-10-14（1 条）**：**D45**（图文版卡死在第一回合 —— 引擎挂起的提问，界面看不见）。
+  起因是用户实测的一句话：**文字版能跑，图文版一开局就死**。
+  文字版能跑是因为全员 AI、没有「人要回答」这一环；图文版多出来的正好就是这一环。
+  形态丁（D38）下引擎是唯一推进者，出牌阶段 `doPhaseUse` 里
+  `await askForCardPlay(...)` 挂起等人——而**引擎提问时不推状态**：
+  `PhaseManager.executeTurn` 对每个阶段先同步一次状态、再 `await executePhase(...)`，
+  **最后一次状态同步发生在提问之前**，提问挂起之后直到被答复前没有任何 `syncState()`。
+  视图的 `availableActions` 把响应式依赖挂在 `void uiState.value`（Store 同步）上，
+  于是提问那一刻 Store 没变 → computed 不重算 → 界面停在
+  「没有按钮、没有可点的牌、只显示等待其他玩家操作…」——
+  **引擎等人、人等按钮，两边互等，第一回合死锁**。
+  正解不是「让引擎提问时多推一次状态」（那是往引擎里塞 UI 的心思），
+  而是**控制器自己报变更**：`GameController` 新增 `revisionRef` 与 getter `revision`，
+  在**提问挂起 / 答复 / 状态同步**三处 `markChanged()`；
+  UI 那三份 computed（`views/game/index.vue` 的 `availableActions` 与 `humanPlayer`、
+  `useCardPlay.playableCards`、`useSkill.availableSkills`）的依赖一律改挂 `ctrl.revision`。
+  **同一根因还有第二处冻住**：`humanPlayer` 在引擎出生前就 `if (!state) return null` 早退，
+  **早退的那一次根本没读到 Store**，注册的依赖只有 `session`（shallowRef）；
+  开局后 `session.value` 是同一个对象、再没变过 → computed 永不重算 →
+  `humanPlayer` 恒为 null → `<CardHand v-if="humanPlayer">` 一假到底，**手牌区整块空白**
+  （就算按钮修好了也点不到牌）。修法是依赖**进门就挂**，不许放在早退之后。
+  新增 **11 条**断言、2 个测试文件 `src/__tests__/ui/pending-ask-visible.test.ts`（8 条）
+  与 `src/__tests__/ui/game-view-first-turn.test.ts`（3 条，挂载**真实** `GameView`）。
+  全量用例 **615 → 626**（49 → 51 个文件）。
+  **两条测试纪律**：① 端到端断言 UI 必须用 `watchEffect` 把值写进一个 `ref`
+  来**模拟渲染 effect** —— 直接读一次 `ctrl.getAvailableActions()` 永远拿得到新值
+  （computed 一读就重算），掩盖 bug，只有挂在 effect 上才测得到「依赖变了没有」；
+  ② 「回合交出去了」不能只断言 `currentPlayerIndex !== HUMAN_SEAT`，
+  AI 那几位跑得快会绕回来又轮到人，那样断言照样绿——
+  改成记录界面上**出现过的所有当前玩家**（`seenSeats`）+ 牌堆张数减少，双证据。
+  **变异检验的坑（值得单列）**：`askCardPlay` / `askDiscard` 进门第一句就是
+  `settleAllPending()`，而 `settleAllPending` 末尾也有 `markChanged()`——
+  因此**单独**注释掉 ask 里那句显式 `markChanged()` 并不红，被补偿掉了。
+  逐个单点变异跑了 7 处**全绿**，一度以为断言没有牙齿；
+  改成**组合**变异才现形：去掉 ask 路径三处 → 红 3 条，再加上 `syncToStore` → 红 4 条。
 
 ### 3.2 Phase 19 那条验收为什么没抓到 D9 / D10（追因）
 
@@ -2223,7 +2385,23 @@ export interface AIStrategyDeps { budget?: CardBudget; mods?: IModQuery; skills?
 
 ---
 
-## Phase 27 — UI 接线与 LOL 换皮
+## Phase 27 — UI 接线与 LOL 换皮 ✅
+
+> **2026-10-09 收尾：D27（LOL 换皮）结清，本 Phase 转 ✅。**
+> 界面现在显示的是 LOL 的名字（卡牌 / 英雄 / 技能 / 提问文案），
+> 而引擎与三个定义文件里仍是三国杀的稳定 ID 与名字——这条边界由
+> `src/__tests__/ui/lol-theme.test.ts` 盯住（16 条）。
+> 换皮做完后顺手登记两条不阻塞的欠账：**D40**（引擎自己写的日志文案）
+> 与 **D41**（面板上看不到 Mod 带来的数值变化）——
+> **两条均于 2026-10-10 结清**，至此 D1–D41 全部结清。
+>
+> **2026-10-14 补充（D45）**：D1–D44 全部结清、全量 615 条全绿之后，
+> 用户实测仍报**「图文版卡在第一回合」**——这是本 Phase 唯一一条
+> **由真人在真界面上发现**的缺陷，也是「全绿 ≠ 能用」最直白的一次证据：
+> 615 条断言里没有一条挂载真实视图点过按钮（D45 之后才有了
+> `game-view-first-turn.test.ts` 那 3 条）。
+> 根因是引擎挂起提问时不推状态，而界面的响应式依赖挂在 Store 同步上——
+> 详见 §3.1 的 D45 与 §6.2 的 #17。
 
 **现状（2026-10-09 实测 —— 推翻了 2026-09-30 的三条，见下）**
 
@@ -2231,27 +2409,43 @@ export interface AIStrategyDeps { budget?: CardBudget; mods?: IModQuery; skills?
 | --------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | `GameBoard` 牌堆/弃牌堆数量硬编码 `0` | 成立（`:11` `:17` 字面量）                                | ✅ **2026-10-09 已修**（欠账 D24）。读 `gameStore.deckCount` / `discardCount`，断言见 `src/__tests__/ui/game-board.test.ts` |
 | `CardBack.vue`              | 成立，全仓无引用                                         | ✅ **2026-10-09 重建**（欠账 D25）。对手手牌画成卡背，只收张数不收整叠真牌 |
-| 响应弹窗 / 技能面板由结算点驱动           | ⚠️ 存在，**本轮未逐条核对其数据来源，列为待核**                     | ❌ **比「待核」严重得多**：不是没接好，是**两个都没有驱动方**。核完拆出三条独立缺口 D34 / D35 / D36，其中 **D34 / D35 已于 2026-10-09 结清**，只剩 D36（技能面板） |
+| 响应弹窗 / 技能面板由结算点驱动           | ⚠️ 存在，**本轮未逐条核对其数据来源，列为待核**                     | ❌ **比「待核」严重得多**：不是没接好，是**两个都没有驱动方**。核完拆出三条独立缺口 D34 / D35 / D36，**三条已于 2026-10-09 全部结清** |
 
 ### 一件先看清楚的事：今天的 UI 到底「通」到哪儿（2026-10-09 D34 前后对比）
 
 | 动作                    | D34 之前                                                                 | **D34 之后**                                                                          |
 | --------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | 开局、看得到状态               | ✅ 通                                                                     | ✅ 通（不变）                                                                              |
-| **出牌 / 弃牌 / 结束阶段**     | ✅ 通，但绕过决策服务                                                            | ✅ 通（不变）。**刻意不改**：按钮直调 controller 已经是这条路唯一的答案，再开一条 await 手指的路就是第二本账         |
+| **出牌 / 弃牌 / 结束阶段**     | ✅ 通，但绕过决策服务                                                            | ✅ **通，且不再绕过决策服务**（**D38**）。按钮改成**答复引擎挂起的提问**，出牌 / 弃牌在整局里各只由引擎做一次 |
 | **出【闪】/ 出【桃】/ 无懈可击**   | ❌ **一律被拒**（`waitForResponse` 首行短路）                                      | ✅ **会问了**。人类座位 → `HumanDecisionService` → 视图 `askHumanResponse()` → 弹窗；其余座位 → AI |
 | **被问「是否出闪」**            | ❌ 不可能发生（`useResponse.open()` 零调用方）                                     | ✅ `open(): Promise<string \| null>` 有调用方，也能把答案带回去了                               |
 | **技能面板**              | ❌ `activeSkills` 恒为空数组；名字就是 id、描述是空串                                     | ✅ 真名 / 真描述 / 真类型；`usable` 由技能自己写的 `enable` 判定（**D36**）                          |
 | **AI 那几个座位的眼睛**        | ❌ 图形界面这条路上看不见连弩 / 藤甲 / 威胁度                                              | ✅ 三个查询口改在 `GameEngine` 里补发（**D37**），两条启动路径都覆盖                                      |
-| **轮到下一个玩家**            | ❌ 不可能——`endPhase()` 停在 `PhasePost` 原地打转                                  | ❌ **未变**（**D38**，新的总插头）。`start()` 还先把第一个回合整轮跑完，那一轮是 AI 替人打的        |
+| **轮到下一个玩家**            | ❌ 不可能——「推一步」那条路停在 `PhasePost` 原地打转                                  | ✅ **2026-10-09 已通**（**D38** 形态丁：引擎唯一驱动）。`start()` 只开局，回合由 `runGameLoop()` 推进；人在出牌阶段被**挂起**等答案，答完交到下一位 |
 
 > 症状此前不是「点不动」，而是**一个不会防守的单机**：自己爱怎么出牌都行，
-> 别人打过来永远打不回来——问都不问你。现在**会问了，面板也亮了**，
-> 但**回合还交不出去**（D38）——人类的第一个回合甚至是被 AI 替着打完的。
-> 这条不裁决，前面三条只是「看得到、点不到」。
+> 别人打过来永远打不回来——问都不问你。**中间那一版**（D34 之后、D38 之前）
+> 会问了、面板也亮了，但回合交不出去，人的第一个回合被静默跳过。
+>
+> **2026-10-09 D38 结清之后**：上面每一行都是 ✅。人是真的能打完自己的回合、
+> 并把回合交出去的（`turn-handoff.test.ts` 里那条「走完一圈」的断言钉的就是它）。
 >
 > 换皮排在最后是对的（「规则尚未正确时换皮，只会得到一堆漂亮的错」），
-> 而现在规则没错、**面板也通了**；卡在回合交接（D38）与换皮本身。
+> 而现在规则没错、面板也通了、回合也交得出去——Phase 27 只剩换皮本身。
+
+### D38 的那个「可见变化」（自觉执行，不是意外）
+
+引擎变成唯一驱动者之后，**回合内没有提问的阶段不会停**：
+准备 / 判定 / 摸牌 / 结束本来就没有玩家决策，引擎一路跑过去。于是：
+
+| 变化                                    | 落地方式                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 「结束阶段」按钮在非出牌阶段失去意义                    | `canEndPhase` 的含义从「现在是某个阶段」改成「**现在正挂着一个出牌提问**」；`ActionButtons` 里那三个按阶段分支的出口删掉两个，只剩「挂着提问」与「挂着弃牌提问」两支 |
+| 弃牌阶段只在**手牌超上限**时才停                    | `needDiscard` / `discardCount` 直接读挂起的弃牌提问，不再由「当前阶段 = 弃牌阶段」推算                              |
+| 界面要一格一格看到阶段走过去                        | `PhaseManager` 新增 `onPhaseSync`，进阶段 / 出阶段 / 打完一张牌各同步一次（引擎持有 `StoreService`，同步只能由它做）        |
+
+这是无名杀的行为，也是丁的必然结果。
+**没有为了保住按钮而在每个阶段插一个假的提问** —— 那等于把引擎又改回逐步推进。
 
 **UI 接线**
 
@@ -2262,20 +2456,45 @@ export interface AIStrategyDeps { budget?: CardBudget; mods?: IModQuery; skills?
       因为一个永不 resolve 的 Promise 就是一次事件栈死锁
 - [x] 响应弹窗由结算点驱动（`useResponse.open` 需要问它的人）（**D35，随 D34 结清**）
 - [x] 技能面板的数据来自 `SkillRegistry`，`usable` 由 `enable` 判定（**D36，2026-10-09 结清**）
-- [ ] **「逐步推进」的回合交接：UI 这条路交不出回合（D38）—— 新的总插头**
-      `start()` 会把第一个回合一次跑完，`endPhase()` 又停在 `PhasePost` 原地打转。
-      先裁决推进模型（见 §3.1），再动手
+- [x] **回合交接 / 推进模型（D38 —— 形态丁：引擎唯一驱动，2026-10-09 结清）**
+      `start()` 只开局；`runGameLoop()` 是全仓唯一的推进者；引擎那个「推一步」的
+      公开接口与 `GameController.endPhase()` **一并删除**（`grep -rn "nextPhase" src` 零结果，
+      注释里也不留）；UI **不推进**、只**答复挂起的提问**（`askCardPlay` / `askDiscard`
+      登记到 channel），「结束出牌」= 答复 `null`。
+      **死锁纪律**：`destroy()` / 卸载 / 「再来一局」/ 重置会话一律先 `settleAllPending()`。
+      断言 12 条见 `src/__tests__/ui/turn-handoff.test.ts`
 - [x] 对手手牌渲染卡背（`CardBack.vue` 在 Phase 0 已删，**D25，2026-10-09 重建**）
-- [ ] 技能面板展示 Mod 带来的数值变化（如攻击范围 1 → 3）
+- [x] 面板展示 Mod 带来的数值变化（⚔️ 攻击范围 / 🖐️ 手牌上限）—— **欠账 D41，2026-10-10 结清**：
+      查询口 `IPlayerStatsQuery` 由 `GameController.pushStatsQuery()` 补发，`PlayerSeat` 只显示不算；
+      断言 14 条见 `src/__tests__/ui/player-stats.test.ts`（含「装上武器，面板上的数真的动了」）
 
-**换皮**
+**换皮（D27，2026-10-09 结清）**
 
-- 建立 `source/theme/lol-mapping.ts`：三国杀 ID → LOL 名称/称号/描述
-- 引擎内部继续用稳定 ID（`sha` / `caocao`），只在展示层替换
-- 武将：曹操→? 关羽→? 等 16 个标准武将逐一映射
-- 卡牌：杀/闪/桃/酒/锦囊/装备逐一映射
+- [x] 建立 `source/theme/lol-mapping.ts`：三国杀 ID → LOL 名称/称号/描述
+      （27 张牌 + 10 名英雄 + 12 个技能，每条都留着原名 `sgs` 供反查）
+- [x] 引擎内部继续用稳定 ID（`sha` / `caocao`），只在展示层替换
+      —— 三个定义文件的 `name` 一个字未动，有用例盯着这条边界
+- [x] 武将映射：**当前 10 名标准英雄**逐一映射（不是 16 名：
+      `standard.ts` 里就这 10 个，计划写 16 是当初的预估）
+      曹操→盖伦（德玛西亚之力）、司马懿→拉克丝（光辉女郎）、
+      夏侯惇→菲奥娜（无双剑姬）、张辽→赵信（德邦总管）、
+      刘备→斯维因（诺克萨斯统领）、关羽→德莱厄斯（诺克萨斯之手）、
+      张飞→德莱文（荣耀行刑官）、赵云→锐雯（放逐之刃）、
+      孙权→艾瑞莉娅（刀锋舞者）、吕蒙→慎（暮光之眼）
+- [x] 卡牌映射：杀→致命打击、闪→闪现、桃→治疗术、酒→狂怒药剂；
+      锦囊 13 张、装备 10 张逐一映射（南蛮入侵→军团冲锋、万箭齐发→箭雨、
+      无懈可击→法术护盾、诸葛连弩→疾射火炮、八卦阵→守护天使……）
+- [x] 技能：三国杀技能名 → LOL 英雄的技能名（奸雄→德玛西亚正义、
+      武圣→诺克萨斯断头台、龙胆→剑刃护壁、克己→气合盾……）
+- [x] 提问文案也换（整句查表 + 【××】按原牌名反查两级）
 
 > 换皮放在最后。规则尚未正确时换皮，只会得到一堆漂亮的错。
+> —— 现在规则没错、面板也通了、回合也交得出去，换皮是这一轮最后的一块。
+>
+> ~~**换皮只管「查表换名字」**，管不到引擎**已经拼好的整句**：
+> 引擎日志里的英雄名与牌名仍是三国杀的~~ —— 欠账 **D40** 已于
+> **2026-10-10 结清**：引擎改记带 ID 的占位符，名字由展示层在边界上补，
+> 于是「换皮」与「引擎拼的整句」用的是同一张表、同一个出口。
 
 ---
 
@@ -2332,9 +2551,15 @@ M4 的判据是「§2 的 28 条能否在 `source/` 里用 ≤15 行、零引擎
 
 **定义**：实现写好了、也注册/装配了，但**没有任何生产调用方会走到它**。  
 它不会编译报错、不会测试失败，只会安静地不生效——直到有人去读代码才发现。  
-2026-09-30 全仓清点 **11 处**；此后又陆续查出 5 处（**D28** / **D30** / **D31** / **D33** / 本轮 #16），
-现共 **16 处**：**已修 13**（#1–#13 全部结清，加 2026-10-08 的 D31 与本轮的 #16），
-**仍开着 3**（D28 / D30 / D33 —— 三条都是「API 在、调用方不在」，登记时明确不动手）。
+2026-09-30 全仓清点 **11 处**；此后又陆续查出 6 处（**D28** / **D30** / **D31** / **D33** / #16 / **D45** 即 #17），
+现共 **17 处**：**已修 17**（#1–#13 全部结清，加 2026-10-08 的 D31、本轮的 #16，
+以及 D28 / D30 / D33 三条「登记时明确不动手」的后来也都结清了；#17 是 **D45**）—— **仍开着 0**。
+
+> #17（D45）是这一类里**第二个不涉及调用方**的变体：调用方一直在，
+> 每次都老老实实地来问，问到的答案也是对的——**只是没人告诉界面「答案变了」**。
+> 写代码的人看得见（`ctrl.getAvailableActions()` 一调用就有值），
+> 界面看不见（Vue 只认响应式依赖）。**排查这类问题时，「我直接读一下是对的」
+> 不能作为证据**——要挂着读（`watchEffect`），才复现得出界面看到的那一份。
 
 > #16 是这一类里**唯一不涉及调用方**的变体：AI 契约上的四个字段
 > （`ai.order` / `ai.result` / `threaten` / `expose`）一个读取方都没有，
@@ -2358,6 +2583,7 @@ M4 的判据是「§2 的 28 条能否在 `source/` 里用 ≤15 行、零引擎
 | 14 | 25  | `DeathSystem.checkAllDead()` 零调用方 —— 「全员死亡」那条兜底在 `runGameLoop` 里自己算                                                     | D17 搬迁时顺带发现                                 | 未修 → **D30**                              |
 | 15 | 22  | `TurnManager` 上 `reset()` / `playersActed` / `playersRemaining` 三个成员零调用方                                                  | 反查 `turnManager.` 的全部调用点                     | 未修 → **D33**                              |
 | 16 | 26  | 技能契约上的 `ai.order` / `ai.result.player` / `ai.result.target` / `threaten` / `expose` **五个字段一个读取方都没有**                      | 反查 `skill.ai` 的全部读取点                        | **已修**（2026-10-08，D21）                    |
+| 17 | 27  | 控制器给 UI 的答案（`pendingCardPlay` / 可打列表 / 技能面板）**全是普通字段**，Vue 看不见；唯一能推出去的路（Store 同步）盖不住「引擎提问挂起」那一刻                        | **用户实测**：图文版卡死在第一回合（文字版正常）                  | **已修**（2026-10-14，D45）                    |
 
 **应对（可执行，不靠记忆力）**：每新增一个**登记点**或**装配点**，合入前必须做一次  
 **反向查找**——拿新注册的事件名 / 内容键 / 系统方法名去 `src` 里 grep，  
@@ -2377,7 +2603,7 @@ M4 的判据是「§2 的 28 条能否在 `source/` 里用 ≤15 行、零引擎
 | 奖惩 / 惩罚隔着一层（system 记账 → 内容层执行），标记名拼错会**静默消失**                           | 中  | 已用 `REWARD_DRAW_MARK` / `PENALTY_DISCARD_ALL_MARK` 两个常量把两边钉在一起。新增奖惩时**必须**沿用常量，不要手写字符串 |
 | ~~Phase 22 两套出杀额度并存~~                                                        | —  | ✅ **已消化**：随 D8 结清（判定收口到 `CardBudget.canPlay`）。Phase 22 已于 2026-10-08 转 ✅      |
 | ~~Phase 19 的收口有漏网~~                                                           | —  | ✅ **已消化**：D9 / D10 结清，「跳过」的写入与账本一并归一（D29）。护栏在 `state-write-guard.test.ts`  |
-| UI 与引擎长期脱节（Phase 27 零进展，牌堆计数仍是硬编码 `0`）                                   | 中  | 刻意排在最后——规则尚未正确时接线 UI，只会得到一堆漂亮的错。组 F 收口后一并做                            |
+| ~~UI 与引擎长期脱节（Phase 27 零进展，牌堆计数仍是硬编码 `0`）~~                                   | 中  | ✅ **已消化**：Phase 27 于 2026-10-09 转 ✅，牌堆计数与手牌区均已接真值。**残余风险由 D45 收口**（2026-10-14）：引擎挂起提问时界面看不见 → 控制器 `revision` 报变更，UI 的 computed 依赖一律挂在它上面。**长期纪律**：控制器给 UI 的任何答案若是普通字段，必须在「它变了」的那几处报变更；早退的 computed 依赖必须进门就挂 |
 | 被跳过的阶段连 Begin / End 都不发（Phase 22 决议「维持现状」）                               | 低  | 这不是终局设计，改它是**行为变更**。现由 `turn-phase.test.ts` 钉住：决议变了断言会红，改的人必须显式改它   |
 | 「计划说 X 没做」与「X 没做」是两件事                                                    | 低  | 本轮已按此原则复核全文：被证伪的断言就地更正（见组 F 与 Phase 26 各表），不再沿用旧结论                      |
 | **单局成本 ≈ 50s，任何「跑 N 局」的验收都进不了日常门禁**                                     | 中  | 已隔离成 `npm run test:stress`（`vitest.stress.config.ts`）。**根因未修**：慢的是引擎的事件分发与技能钩子遍历，不是 AI（一局只问 20–35 次牌）。谈「难度显著更强」这类结论前，先得解决这个成本 |

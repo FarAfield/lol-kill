@@ -308,6 +308,7 @@ describe('状态变更收口 · 结构护栏', () => {
     expect(typeof p.getMark).toBe('function')
     expect(typeof p.getEquipInSlot).toBe('function')
     expect(typeof p.isDying).toBe('boolean')
-    expect(typeof p.attackRange).toBe('number')
+    // 「攻击范围」不在这里 —— 它要查 Mod 注册表，`Player` 不认识那东西。
+    // 答案在 `GameEngine.getAttackRange()`，实体上那一份已随 D41 删除。
   })
 })

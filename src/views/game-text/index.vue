@@ -117,6 +117,20 @@ import { AIController } from '@core/services/ai-controller'
 import { AIDifficulty } from '@core/contracts/ai.interface'
 import { GamePhase, LogLevel, RoleType } from '@core/contracts/enums'
 import { standard5pConfig } from '@source/modes/standard-5p'
+import { lolHeroName } from '@source/theme/lol-mapping'
+import type { IPlayer } from '@core/contracts/player.interface'
+
+/**
+ * 英雄的显示名 —— 换皮（欠账 D27）
+ *
+ * 这一路的日志直接读引擎的 `IPlayer`，没走 Store 那道派生，
+ * 所以在这里查表；查的还是同一张表，换的名字因此与座位上的一致。
+ */
+function heroDisplayName(player: IPlayer): string {
+  const hero = player.heroes[0]
+  if (!hero) return `玩家${player.seatIndex + 1}`
+  return lolHeroName(hero.id, hero.name)
+}
 
 // ── Router / Store ──
 const router = useRouter()
@@ -242,7 +256,10 @@ async function startGame(): Promise<void> {
         lastPlayerIdx = state.currentPlayerIndex
         const player = state.players[state.currentPlayerIndex]
         if (player) {
-          const heroName = player.heroes[0]?.name ?? `玩家${player.seatIndex + 1}`
+          const hero = player.heroes[0]
+          const heroName = hero
+            ? lolHeroName(hero.id, hero.name)
+            : `玩家${player.seatIndex + 1}`
           logStore.addLog({
             id: `log_turn_${Date.now()}`,
             round: state.currentRound,
@@ -264,7 +281,7 @@ async function startGame(): Promise<void> {
               id: `log_death_${Date.now()}_${dp.id}`,
               round: state.currentRound,
               phase: state.currentPhase,
-              message: `💀 ${dp.heroes[0]?.name ?? dp.id} 已阵亡`,
+              message: `💀 ${heroDisplayName(dp)} 已阵亡`,
               level: LogLevel.Warn,
             })
           }
@@ -291,12 +308,11 @@ async function startGame(): Promise<void> {
       level: LogLevel.Info,
     })
     for (const p of initState.players) {
-      const hero = p.heroes[0]
       logStore.addLog({
         id: `log_hero_${p.id}_${Date.now()}`,
         round: 0,
         phase: GamePhase.Prepare,
-        message: `  #${p.seatIndex + 1} ${hero?.name ?? '?'} (${p.roleRevealed ? roleLabel(p.role) : '身份隐藏'}) ❤️${p.hp}/${p.maxHp} 🃏${p.handCards.length}张`,
+        message: `  #${p.seatIndex + 1} ${heroDisplayName(p)} (${p.roleRevealed ? roleLabel(p.role) : '身份隐藏'}) ❤️${p.hp}/${p.maxHp} 🃏${p.handCards.length}张`,
         level: LogLevel.Debug,
       })
     }

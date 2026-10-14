@@ -12,6 +12,7 @@
 
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
+import { lolPromptText } from '@source/theme/lol-mapping'
 
 /** 响应窗口配置 */
 export interface ResponseWindowConfig {
@@ -159,7 +160,10 @@ export function useResponse(): UseResponseReturn {
       settle = resolve
 
       isOpen.value = true
-      prompt.value = config.prompt
+      // 换皮只发生在这里（欠账 D27）：引擎递来的是一整句中文文案，
+      // 界面上显示的是换过皮的那句。`prompt` 是窗口的**显示**状态，
+      // 与「问的是哪个问题」（`settle`）无关，换它不影响答案。
+      prompt.value = lolPromptText(config.prompt)
       description.value = config.description ?? ''
       validCardIds.value = config.validCardIds
       selectedCardId.value = null

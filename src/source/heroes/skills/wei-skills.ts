@@ -17,6 +17,7 @@ import { CardSuit, ZoneType } from '@core/contracts/enums'
 import type { ISkill, ISkillContext } from '@core/contracts/skill.interface'
 import type { ICard } from '@core/contracts/card.interface'
 import { CardTag } from '@core/contracts/card-tag'
+import { judgeResultCardOf, setJudgeResultCard } from '@core/event/judge-keys'
 
 /**
  * 取伤害事件里那张「造成伤害的牌」
@@ -159,17 +160,19 @@ export const guicai: ISkill = {
   filter: (ctx) => {
     if (!ctx.player.alive) return false
     if (ctx.player.handCards.length === 0) return false
-    return Boolean(ctx.event.data?.['judgeCard'])
+    // 换的是**判定结果牌**。判定事件里还有另一张牌（延时锦囊自己），
+    // 它挂在另一个键上——改到它头上，改判就变成了「把乐不思蜀摸进手牌」。
+    return Boolean(judgeResultCardOf(ctx.event))
   },
 
   /**
-   * 用一张手牌换掉判定牌
+   * 用一张手牌换掉判定结果牌
    *
-   * 换下来的原判定牌进自己手里——这是「换」而不是「改」：
+   * 换下来的原结果牌进自己手里——这是「换」而不是「改」：
    * 场上没有牌消失，只是位置变了。
    */
   content: async (ctx) => {
-    const original = ctx.event.data?.['judgeCard'] as ICard | undefined
+    const original = judgeResultCardOf(ctx.event)
     if (!original) return
 
     const replacement = ctx.player.handCards[0]
@@ -178,7 +181,7 @@ export const guicai: ISkill = {
     await ctx.discardCards([replacement])
     await ctx.obtainCards(ctx.player, [original])
 
-    ;(ctx.event.data as Record<string, unknown>)['judgeCard'] = replacement
+    setJudgeResultCard(ctx.event, replacement)
   },
 
   ai: { order: 7 },

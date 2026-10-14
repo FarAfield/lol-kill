@@ -22,6 +22,15 @@ import { CardTag } from '@core/contracts/card-tag'
 export interface CardTargetInfo {
   cardId: string
   validTargetIds: string[]
+  /**
+   * 至少 / 至多选几个目标 —— **随挂起提问的 options 一起过来**。
+   *
+   * 以前这两个数是这里**猜**出来的（`validTargetIds.length === 1 ? 0 : 1`
+   * 与 `Math.min(len, 3)`）。猜的后果是：AOE（要 0 个）永远点不了「确认」，
+   * 借刀杀人（要 2 个）只能选一个。目标数的规则只有一处：`TargetSystem`。
+   */
+  minTargets: number
+  maxTargets: number
 }
 
 /** useCardPlay 返回类型 */
@@ -92,10 +101,21 @@ export function useCardPlay(
   const availableActions = computed(() => {
     const ctrl = controllerGetter()
     if (!ctrl) return null
+    // 依赖挂在控制器的版本号上（欠账 D45）：「挂着哪个提问」是控制器里的
+    // 普通字段，而引擎提问时**不推状态**——不挂它，这一列就冻在
+    // 「上一次算出来的那份」，手牌点了没反应、「出牌」按钮永远不亮。
+    void ctrl.revision
     return ctrl.getAvailableActions()
   })
 
-  /** 当前可打出的卡牌及合法目标 */
+  /**
+   * 当前可打出的卡牌及合法目标。
+   *
+   * 数据源是**引擎当前挂起的那一个出牌提问**（欠账 D38）：
+   * 引擎在出牌阶段停下问「打哪张」，那一刻算好的候选连同目标数一起递过来。
+   * 以前这一列是控制器按「当前阶段 = 出牌阶段」另算的一份，
+   * 于是「我能打什么」有两个答案，而且那份在引擎没问的时候也会亮。
+   */
   const playableCards = computed<CardTargetInfo[]>(() => {
     return availableActions.value?.playableCards ?? []
   })
@@ -121,30 +141,16 @@ export function useCardPlay(
     return info.validTargetIds.length > 0
   })
 
-  /** 最少目标数 */
+  /** 最少目标数 —— 引擎在选项里给的那个下限，不是这里猜的 */
   const minTargets = computed(() => {
     const info = playableCards.value.find((c) => c.cardId === selectedCardId.value)
-    // 桃通常需要 0 个外部目标（自动对自己使用）
-    // 杀需要 1 个目标
-    // 锦囊可能需要 1+ 个目标
-    // 这里简化为：至少选择 0 个（桃等）或 1 个（杀、锦囊）
-    if (!info) return 0
-    // 检查是否只有自己可选（桃）
-    const ctrl = controllerGetter()
-    const humanPlayer = ctrl?.getCurrentPlayer()
-    const isSelfOnly =
-      info.validTargetIds.length === 1 &&
-      humanPlayer &&
-      info.validTargetIds[0] === humanPlayer.id
-    return isSelfOnly ? 0 : 1
+    return info?.minTargets ?? 0
   })
 
-  /** 最多目标数 */
+  /** 最多目标数 —— 同上：AOE 是 0、借刀杀人是 2，「取一个」只是多数牌的巧合 */
   const maxTargets = computed(() => {
     const info = playableCards.value.find((c) => c.cardId === selectedCardId.value)
-    if (!info) return 1
-    // 杀和大部分锦囊通常选择 1 个目标
-    return Math.min(info.validTargetIds.length, 3)
+    return info?.maxTargets ?? 0
   })
 
   /** 是否可以确认 */
@@ -189,10 +195,13 @@ export function useCardPlay(
     selectedCardId.value = cardId
     selectedTargetIds.value = []
 
-    // 桃（仅自己可选）自动添加自己为目标
+    // 桃（仅自己可选）自动添加自己为目标。
+    // 前提是这张牌**真的要一个目标**——写着「可以不选」的牌（minTargets = 0）
+    // 替它选上，等于替玩家做了「对谁用」这个决定。
     const ctrl = controllerGetter()
     const player = ctrl?.getCurrentPlayer()
-    if (player) {
+    const info = playableCards.value.find((c) => c.cardId === cardId)
+    if (player && (info?.minTargets ?? 0) > 0) {
       const card = player.handCards.find((c) => c.instanceId === cardId)
       if (card?.tags.has(CardTag.Heal) && card.zone === ZoneType.Hand) {
         selectedTargetIds.value = [player.id]

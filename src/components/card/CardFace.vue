@@ -19,8 +19,8 @@
         <span class="type-emoji">{{ typeIcon }}</span>
       </div>
 
-      <!-- 卡牌名称 -->
-      <div class="card-name">{{ card.name }}</div>
+      <!-- 卡牌名称（换皮后的名字，欠账 D27） -->
+      <div class="card-name">{{ displayName }}</div>
 
       <!-- 装备槽位标识 -->
       <div v-if="card.equipSlot" class="equip-slot-tag">
@@ -34,8 +34,8 @@
     </div>
 
     <!-- 底部描述 -->
-    <div class="card-description" v-if="card.description">
-      {{ card.description }}
+    <div class="card-description" v-if="displayDescription">
+      {{ displayDescription }}
     </div>
 
     <!-- 延时标记 -->
@@ -51,6 +51,7 @@ import { NTag } from 'naive-ui'
 import { CardSuit, CardType, EquipSlot } from '@core/contracts/enums'
 import type { ICard } from '@core/contracts/card.interface'
 import { CardTag } from '@core/contracts/card-tag'
+import { lolCardDescription, lolCardName } from '@source/theme/lol-mapping'
 
 const props = defineProps<{
   card: ICard
@@ -58,6 +59,18 @@ const props = defineProps<{
   playable?: boolean
   size?: 'small' | 'normal' | 'large'
 }>()
+
+// ── 换皮（欠账 D27）──
+//
+// 卡面是**全仓唯一画牌名的地方**（手牌 / 装备 / 判定 / 响应弹窗都走这个组件），
+// 所以换皮只准发生在这里：引擎那张牌的 `id` 是稳定 ID，`name` 是三国杀原名，
+// 界面上显示的是查表换出来的 LOL 名。查不到就显示原名——皮肤缺一块，
+// 也比显示空白强。
+const displayName = computed(() => lolCardName(props.card.id, props.card.name))
+
+const displayDescription = computed(() =>
+  lolCardDescription(props.card.id, props.card.description),
+)
 
 // ── 花色符号 ──
 const SUIT_SYMBOLS: Record<CardSuit, string> = {

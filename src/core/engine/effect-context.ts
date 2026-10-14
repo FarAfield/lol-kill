@@ -24,10 +24,18 @@ import type { IGameState } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import type { ICard } from '@core/contracts/card.interface'
 import { GameEvent } from '@core/event/game-event'
-import { handOptions, cardOptions, seatOrderFrom, settle } from '@core/event'
+import {
+  handOptions,
+  cardOptions,
+  seatOrderFrom,
+  settle,
+  JUDGE_RESULT_CARD_KEY,
+  judgeResultCardOf,
+} from '@core/event'
 import { whenOf } from '@core/event/when'
 import { CardTag } from '@core/contracts/card-tag'
 import { DamageResolver } from '@core/system/damage-resolver'
+import { cardSlot, heroSlot } from '@core/utils/name-slot'
 import type { EffectContextDeps } from '@core/contracts/effect-context-deps'
 
 /**
@@ -188,8 +196,12 @@ export class EffectContext implements ISkillContext {
         ),
       ],
 
+      // 姓名与牌名一律写成**占位符**（欠账 D40）：换皮表在展示层，
+      // 引擎拼的是 ID，名字由 `resolveNameSlots` 在边界上补。
+      // 「是否出桃」里的桃写成它的定义 id——引擎认识的是稳定 ID，
+      // 不是「桃」这两个字。
       prompt: () =>
-        `濒死：是否出桃救 ${player.hero?.name ?? player.id}（当前 ${player.hp} 体力）？`,
+        `濒死：是否打出【${cardSlot('tao')}】救 ${heroSlot(player.hero?.id ?? player.id)}（当前 ${player.hp} 体力）？`,
 
       stopOnFirstResponse: true,
 
@@ -347,7 +359,10 @@ export class EffectContext implements ISkillContext {
       id: this.game.nextLogId('heal'),
       round: this.game.currentRound,
       phase: this.game.currentPhase,
-      message: `${target.hero?.name ?? target.id} 回复了 ${actualRecovered} 点体力`,
+      // 占位符而不是姓名（欠账 D40）——这条日志进的是游戏状态，
+      // 换皮表在展示层；写成姓名就成了「关羽回复了 2 点体力」，
+      // 界面上换不掉。
+      message: `${heroSlot(target.hero?.id ?? target.id)} 回复了 ${actualRecovered} 点体力`,
       level: LogLevel.Info,
       sourcePlayerId: this.player.id,
       targetPlayerIds: [target.id],
@@ -427,18 +442,18 @@ export class EffectContext implements ISkillContext {
       phase: this.game.currentPhase,
       round: this.game.currentRound,
       turn: this.player.seatIndex,
-      data: { judgeCard },
+      data: { [JUDGE_RESULT_CARD_KEY]: judgeCard },
     })
 
     await this.deps.eventDispatcher.dispatch(judgeEvent, this.deps.eventChain)
 
-    // 结果读回来而不是用上面的局部变量：技能可以在 `judgeBegin` 上换掉它
-    // （改判，如【鬼才】）。D16 给的时机就是这个。
-    const judged =
-      (judgeEvent.data['judgeResultCard'] as ICard | undefined) ?? judgeCard
+    // 结果读回来而不是用上面的局部变量：技能可以在改判时机上换掉它。
+    // 键一律走共用的读写函数——两个判定发起方各抄一份字符串的那套，
+    // 曾让改判改到延时牌头上去（D44）。
+    const judged = judgeResultCardOf(judgeEvent) ?? judgeCard
 
-    // 判定牌进入弃牌堆
-    this.deps.cardSystem.finishProcessing(judged)
+    // 判定牌进入弃牌堆（此刻它可能已经不在处理区了——改判会挪它）
+    this.deps.cardSystem.finishJudgeResult(judged)
 
     return judged
   }

@@ -21,6 +21,7 @@
 // ============================================================
 
 import type { IPlayer } from '@core/contracts/player.interface'
+import type { ICard } from '@core/contracts/card.interface'
 
 /**
  * 距离 / 攻击范围的 Mod 查询接口
@@ -31,10 +32,16 @@ import type { IPlayer } from '@core/contracts/player.interface'
 export interface DistanceMods {
   /** 攻击范围：base 通常是 1 */
   attackRangeOf(player: IPlayer, base: number): number
-  /** 我算到他人的距离修正（主体是 from） */
-  distanceFromOf(from: IPlayer, to: IPlayer, base: number): number
+  /**
+   * 我算到他人的距离修正（主体是 from）
+   *
+   * `card` 是**这次为什么要算距离**的那张牌。没有它，「这张锦囊不受
+   * 距离限制」这类技能表达不出来——Mod 只能无条件改距离，
+   * 于是【杀】的攻击范围被一起放开（欠账 D43）。
+   */
+  distanceFromOf(from: IPlayer, to: IPlayer, base: number, card?: ICard): number
   /** 他人算到我的距离修正（主体是 to） */
-  distanceToOf(to: IPlayer, from: IPlayer, base: number): number
+  distanceToOf(to: IPlayer, from: IPlayer, base: number, card?: ICard): number
 }
 
 /**
@@ -83,6 +90,8 @@ export class DistanceSystem {
    * @param to      终点玩家（目标）
    * @param players 全部玩家列表
    * @param mods    Mod 查询口（省略则等于裸座次距离）
+   * @param card    这次为什么要算距离（为了打哪张牌）；按牌型豁免距离的
+   *                技能靠它区分【杀】与【锦囊】
    * @returns 实际距离
    */
   static getDistance(
@@ -90,6 +99,7 @@ export class DistanceSystem {
     to: IPlayer,
     players: IPlayer[],
     mods?: DistanceMods,
+    card?: ICard,
   ): number {
     if (from.id === to.id) return 0
 
@@ -98,8 +108,8 @@ export class DistanceSystem {
 
     let distance = seatDistance
     if (mods) {
-      distance = mods.distanceFromOf(from, to, distance)
-      distance = mods.distanceToOf(to, from, distance)
+      distance = mods.distanceFromOf(from, to, distance, card)
+      distance = mods.distanceToOf(to, from, distance, card)
     }
 
     // 距离不能小于 1（除非是自己）
@@ -132,9 +142,10 @@ export class DistanceSystem {
     target: IPlayer,
     players: IPlayer[],
     mods?: DistanceMods,
+    card?: ICard,
   ): boolean {
     if (source.id === target.id) return false // 不能攻击自己（基础规则）
-    const distance = this.getDistance(source, target, players, mods)
+    const distance = this.getDistance(source, target, players, mods, card)
     const attackRange = this.getAttackRange(source, mods)
     return distance <= attackRange
   }
@@ -151,9 +162,10 @@ export class DistanceSystem {
     source: IPlayer,
     players: IPlayer[],
     mods?: DistanceMods,
+    card?: ICard,
   ): IPlayer[] {
     return players.filter(
-      (p) => p.alive && p.id !== source.id && this.isInRange(source, p, players, mods),
+      (p) => p.alive && p.id !== source.id && this.isInRange(source, p, players, mods, card),
     )
   }
 
@@ -173,11 +185,12 @@ export class DistanceSystem {
     players: IPlayer[],
     mods?: DistanceMods,
     excludeSelf: boolean = true,
+    card?: ICard,
   ): IPlayer[] {
     return players.filter((p) => {
       if (!p.alive) return false
       if (excludeSelf && p.id === source.id) return false
-      return this.getDistance(source, p, players, mods) <= maxDist
+      return this.getDistance(source, p, players, mods, card) <= maxDist
     })
   }
 }

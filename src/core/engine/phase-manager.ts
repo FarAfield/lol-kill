@@ -10,8 +10,10 @@
 // 职责：
 // - executeTurn()   — 执行当前玩家的完整回合
 // - executePhase()  — 执行单个阶段
-// - getNextPhase()  — 获取下一个阶段
 // - 处理阶段跳过逻辑
+//
+// 阶段**只由这一个方向推进**：`executeTurn` 按固定顺序走完六个阶段，
+// 没有「外部推一步」的接口（欠账 D38 形态丁）。
 // ============================================================
 
 import { GamePhase, ZoneType } from '@core/contracts/enums'
@@ -23,13 +25,17 @@ import type { ICard } from '@core/contracts/card.interface'
 import { GameEvent } from '@core/event/game-event'
 import { EventChain } from '@core/event/event-chain'
 import { EventDispatcher } from '@core/event/event-dispatcher'
+import { JUDGE_RESULT_CARD_KEY, judgeResultCardOf } from '@core/event/judge-keys'
 import { DeckManager } from '@core/system/deck-manager'
 import { CardSystem } from '@core/system/card-system'
 import { PlayerSystem } from '@core/system/player-system'
-import { TargetSystem } from '@core/system/target-system'
+import { TargetSystem, TargetValidationError } from '@core/system/target-system'
 import { CardBudget } from '@core/skill/card-budget'
 import type { TurnManager } from './turn-manager'
-import type { IUIDecisionService } from '@core/contracts/services.interface'
+import type {
+  CardPlayResult,
+  IUIDecisionService,
+} from '@core/contracts/services.interface'
 import type { IModQuery } from '@core/contracts/mod.interface'
 import type { ICardView, ISkillRegistry, IViewAsService } from '@core/contracts/skill.interface'
 import { viewsToCards } from '@core/skill/view-as'
@@ -80,6 +86,25 @@ export interface PhaseManagerOptions {
    * `player.usedAttackThisTurn = true`，绕过了唯一的写入口。
    */
   playerSystem?: PlayerSystem
+  /**
+   * 阶段级同步回调（可选）
+   *
+   * 形态丁下引擎是唯一推进者，回合内没有提问的阶段不会停，
+   * 于是阶段必须**一格一格同步给 UI**，否则界面上「轮到谁、现在什么阶段」
+   * 会停在上一回合。同步这件事归引擎（`StoreService` 在它手上），
+   * 这里只负责在正确的时刻喊一声。
+   */
+  onPhaseSync?: () => void
+  /**
+   * 用牌入口 —— **必填**
+   *
+   * 出牌阶段不再自己抄一份「移入处理区 → 发 useCard 事件 → 结算入弃牌堆」
+   * （欠账 D39）。那份内联实现**不过目标校验**：`TargetSystem.validateTargets`
+   * 写得再完整，从这条路走过去的人一个字都不读它。必填而不是可选，
+   * 就是为了不让「抄一份」这个选项继续存在——它一旦可选，
+   * 下一个调用方就会挑那条容易的。
+   */
+  useCard: (player: IPlayer, card: ICard, targets: IPlayer[]) => Promise<void>
 }
 
 /**
@@ -97,6 +122,8 @@ export class PhaseManager {
   private skillRegistry: ISkillRegistry
   private viewAs?: IViewAsService
   private playerSystem: PlayerSystem
+  private onPhaseSync?: () => void
+  private useCard: (player: IPlayer, card: ICard, targets: IPlayer[]) => Promise<void>
 
   constructor(
     private state: GameStateSnapshot,
@@ -116,6 +143,8 @@ export class PhaseManager {
     this.viewAs = options.viewAs
     // 缺省自建一份：PlayerSystem 是无状态的，多建一份不会不一致
     this.playerSystem = options.playerSystem ?? new PlayerSystem()
+    this.onPhaseSync = options.onPhaseSync
+    this.useCard = options.useCard
   }
 
   // ── 完整回合执行 ──
@@ -175,8 +204,17 @@ export class PhaseManager {
       }
 
       // 执行阶段
+      //
+      // 进阶段之前先同步一次：出牌提问是在**阶段内**问出的，
+      // 那一刻 UI 必须已经看到「现在是出牌阶段、轮到的是这个人」。
+      // 阶段走完再同步一次：摸牌、弃牌这些没有提问的阶段，
+      // 它俩是唯一能让界面动起来的时刻。
       this.state.currentPhase = phase
+      this.onPhaseSync?.()
+
       const phaseCompleted = await this.executePhase(phase, player)
+
+      this.onPhaseSync?.()
       if (!phaseCompleted) return false
     }
 
@@ -307,7 +345,7 @@ export class PhaseManager {
       //
       // 技能可以在 `judgeBegin` 上换掉 `data.judgeResultCard`（改判，如【鬼才】），
       // 因此这里必须读事件的终值，而不是上面那个局部变量。
-      const judged = (judgeEvent.data['judgeResultCard'] as ICard | undefined) ?? judgeResultCard
+      const judged = judgeResultCardOf(judgeEvent) ?? judgeResultCard
 
       // ── 延时牌先离开判定区、进处理区 ──
       //
@@ -332,29 +370,15 @@ export class PhaseManager {
           phase: GamePhase.PhaseJudge,
           round: this.state.currentRound,
           turn: player.seatIndex,
-          data: { judgeCard, judgeResultCard: judged },
+          data: { judgeCard, [JUDGE_RESULT_CARD_KEY]: judged },
         })
         judgeEvent.addChild(delayedEvent)
         await this.eventDispatcher.dispatch(delayedEvent, this.eventChain)
       }
 
-      // 判定结果牌收尾。三种来路：
-      //   1. 正常翻出来的 —— 此刻在处理区；
-      //   2. 被改判顶掉的原始那张 —— 也还在处理区；
-      //   3. 改判顶上来的那张 —— 它来自手牌，必须走 `discardCard`
-      //      （而不是只改 zone），否则它会留在 `handCards` 里，
-      //      弃牌阶段再扫一遍就会撞上「弃牌堆里的牌不能再弃」。
-      // 判「是谁的手牌」用扫 players 而不是读 `judged.owner`：
-      // 手牌的 owner 一般是设好的，但这里要的是**它在谁的 handCards 里**——
-      // 只有这个事实决定了它该从哪个数组里被摘掉。
-      const judgedHolder = this.state.players.find((p) => p.handCards.includes(judged))
-      if (judged.zone === ZoneType.Processing) {
-        this.cardSystem.finishProcessing(judged)
-      } else if (judgedHolder) {
-        this.cardSystem.discardCard(judged, judgedHolder)
-      } else {
-        this.cardSystem.moveToDiscard(judged)
-      }
+      // 判定结果牌收尾——三种来路的分支写在唯一的那个出口里
+      // （`CardSystem.finishJudgeResult`），判定阶段与内容层共用一份。
+      this.cardSystem.finishJudgeResult(judged)
 
       // 被改判顶掉的那张（如果有）：它还留在处理区。
       const replaced = judgeResultCard !== judged && judgeResultCard.zone === ZoneType.Processing
@@ -431,6 +455,10 @@ export class PhaseManager {
           break
         }
 
+        // 本轮选中的那张牌。`catch` 里也要读它（被规则拒掉的牌要从候选里摘掉），
+        // 所以它必须活在 try 之外。
+        let chosen: CardPlayResult | null = null
+
         // 询问玩家出牌决策
         try {
           // 目标数与合法目标同一处算出，一并递给决策方——
@@ -443,10 +471,8 @@ export class PhaseManager {
             maxTargets: TargetSystem.getMaxTargets(card, player, this.modQuery),
           }))
 
-          const result = await this.decisionService.askForCardPlay(
-            player,
-            options,
-          )
+          chosen = await this.decisionService!.askForCardPlay(player, options)
+          const result = chosen
 
           if (result === null) {
             // 玩家选择结束出牌阶段
@@ -454,34 +480,39 @@ export class PhaseManager {
             break
           }
 
-          // 执行完整出牌流程：移入处理区 → 事件分发 → 结算完成
-          this.cardSystem.useCard(result.card, player)
-
-          const cardUseEvent = new GameEvent({
-            name: 'useCard',
-            source: player,
-            player,
-            targets: result.targets,
-            cards: [result.card],
-            phase: GamePhase.PhaseUse,
-            round: this.state.currentRound,
-            turn: player.seatIndex,
-          })
-
-          await this.eventDispatcher.dispatch(cardUseEvent, this.eventChain)
+          // 用牌只有一条路（欠账 D39）：移入处理区 → 发事件 → 结算入弃牌堆
+          // 全在引擎那个入口里，目标校验也在那里。这里不再另写一遍——
+          // 抄一份就等于让「出牌阶段的牌」绕过 `validateTargets`。
+          await this.useCard(player, result.card, result.targets)
 
           usedThisTurn.set(
             cardUsageKey(result.card),
             (usedThisTurn.get(cardUsageKey(result.card)) ?? 0) + 1,
           )
 
-          this.cardSystem.finishProcessing(result.card)
-
           // 标记攻击（杀、万箭等）
           if (result.card.tags.has(CardTag.Strike)) {
             this.playerSystem.markAttackUsed(player)
           }
-        } catch {
+
+          // 一张牌打完就同步一次：出牌阶段是一个 while 循环，
+          // 一回合内可能连打好几张，只靠阶段边界那两次，
+          // 界面上会看到「手牌没少、牌堆没动」直到整个阶段结束。
+          this.onPhaseSync?.()
+        } catch (error) {
+          if (error instanceof TargetValidationError) {
+            // 目标被规则拒了。牌还在他手上、事件一次都没发，
+            // 所以这里既不能把它算进已用额度，更不能结束整个阶段。
+            //
+            // 但**必须把它从候选里摘掉**：候选是每轮现算的，
+            // 摘掉它之前，决策方下一次被问到的仍是同一组选项，
+            // 于是同一张牌会被无限次选中、无限次被拒。
+            if (chosen) {
+              usedThisTurn.set(cardUsageKey(chosen.card), Number.POSITIVE_INFINITY)
+            }
+            continue
+          }
+
           // 决策服务不可用时，自动结束出牌阶段
           phaseEnded = true
         }
@@ -546,6 +577,7 @@ export class PhaseManager {
       this.autoDiscard(player, actualCount)
     }
 
+    this.onPhaseSync?.()
     return true
   }
 
@@ -679,17 +711,11 @@ export class PhaseManager {
     return this.viewAs.getViews({ player, usage: GamePhase.PhaseUse })
   }
 
-  /**
-   * 获取下一个阶段。
-   *
-   * @param current 当前阶段
-   * @returns 下一个阶段，如果是最后一个阶段则返回 null
-   */
-  getNextPhase(current: GamePhase): GamePhase | null {
-    const idx = STANDARD_PHASE_ORDER.indexOf(current)
-    if (idx === -1 || idx >= STANDARD_PHASE_ORDER.length - 1) return null
-    return STANDARD_PHASE_ORDER[idx + 1]!
-  }
+  //
+  // 这里曾经还有一个 `getNextPhase(current)` —— 「下一个阶段是什么」。
+  // 它唯一的调用方是那个已被删除的「推一步」接口（欠账 D38），
+  // 而阶段顺序本身住在 `STANDARD_PHASE_ORDER` 里（`executeTurn` 直接遍历它）。
+  // 留着它只会让人以为「阶段可以由外面算出来」，于是又去推引擎。
 
 /**
  * 更新决策服务（用于游戏运行中切换）。

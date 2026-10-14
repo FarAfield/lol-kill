@@ -29,6 +29,7 @@ import {
   giveCard,
   cardDef,
   ScriptedDecisionService,
+  NO_GUICAI_HEROES,
   type TestEnv,
 } from '../helpers/game-env'
 
@@ -383,8 +384,19 @@ describe('装备与延时锦囊', () => {
     expect(victim.hp).toBe(beforeHp)
   })
 
+  /**
+   * 判定结果取决于**这一局里有没有人能改判**
+   *
+   * 【鬼才】是全局触发——局里只要有司马懿，任何一次判定都会被他的手牌
+   * 顶掉，于是「翻出来的是什么花色」说了不算。这条用例要断言的是
+   * 「乐不思蜀的内容按判定结果生效」，因此英雄池钉死为没有他的五个人；
+   * 改判本身另有专测（`src/__tests__/skill/guicai.test.ts`）。
+   */
   it('【乐不思蜀】判定非红桃 → 目标跳过出牌阶段', async () => {
-    const player = players()[1]!
+    const pinned = await createTestEnv<ScriptedDecisionService>(undefined, {
+      heroes: NO_GUICAI_HEROES,
+    })
+    const player = pinned.players()[1]!
     const event = new GameEvent({
       name: 'leBuSiShu',
       source: player,
@@ -392,7 +404,7 @@ describe('装备与延时锦囊', () => {
       targets: [player],
     })
 
-    await engine.eventDispatcher.dispatch(event, new EventChain())
+    await pinned.engine.eventDispatcher.dispatch(event, new EventChain())
 
     expect(player.shouldSkipPhases).toContain('phaseUse')
   })

@@ -120,30 +120,21 @@ export class ModQuery implements IModQuery {
     )
   }
 
-  /** `mod.distanceFrom` —— 主体是 `from`（我算到别人有多远） */
-  distanceFrom(from: IPlayer, to: IPlayer, base: number, event?: IGameEvent): number {
-    return this.registry.queryNumeric('distanceFrom', base, this.context(from, event), to)
-  }
-
-  /** `mod.distanceTo` —— 主体是 `to`（别人算到我有 多远） */
-  distanceTo(to: IPlayer, from: IPlayer, base: number, event?: IGameEvent): number {
-    return this.registry.queryNumeric('distanceTo', base, this.context(to, event), from)
-  }
-
   /**
    * 两点实际距离 —— 座次距离经两侧 Mod 修正后的结果
    *
-   * 不收 `event`：`DistanceSystem` 的回调链（`distanceFrom` / `distanceTo` /
-   * `attackRangeOf`）没有事件上下文可传，硬塞一个参数进去只会让人误以为
-   * 距离改写能读到当前事件。需要按事件区分的距离规则，请走 `selectTarget`。
+   * `card` 是「这次为什么要算距离」的那张牌：**只有带着它**，
+   * 「使用锦囊无距离限制」这类技能才写得出来（否则 Mod 只能无条件改距离，
+   * 把【杀】的范围也一起放开）。不带牌的场合（问「两人隔多远」）
+   * 就是裸距离，Mod 收到的 `card` 为 undefined。
    */
-  distance(from: IPlayer, to: IPlayer): number {
-    return DistanceSystem.getDistance(from, to, this.state.players, this)
+  distance(from: IPlayer, to: IPlayer, card?: ICard): number {
+    return DistanceSystem.getDistance(from, to, this.state.players, this, card)
   }
 
-  /** 目标是否在我的攻击范围内 */
-  inRange(from: IPlayer, to: IPlayer): boolean {
-    return DistanceSystem.isInRange(from, to, this.state.players, this)
+  /** 目标是否在我的攻击范围内（`card` 同上，给按牌型改范围的技能用） */
+  inRange(from: IPlayer, to: IPlayer, card?: ICard): boolean {
+    return DistanceSystem.isInRange(from, to, this.state.players, this, card)
   }
 
   // ── DistanceSystem 的回调入口 ──
@@ -152,6 +143,9 @@ export class ModQuery implements IModQuery {
   // `attackRange(player, event?)` 语义相同，只是不收 `event`。
   // 分开命名是为了保住调用方可读性：人写 SDK 时想着「范围」，
   // 系统回调时想着「把 Mod 结果给我」。
+  //
+  // 距离这两个额外收 `card`：它是「这次算距离为了打哪张牌」，
+  // 【奇才】这类按牌型豁免距离的技能就靠它（欠账 D43）。
 
   /** @see DistanceMods.attackRangeOf */
   attackRangeOf(player: IPlayer, base: number): number {
@@ -159,13 +153,13 @@ export class ModQuery implements IModQuery {
   }
 
   /** @see DistanceMods.distanceFromOf */
-  distanceFromOf(from: IPlayer, to: IPlayer, base: number): number {
-    return this.registry.queryNumeric('distanceFrom', base, this.context(from), to)
+  distanceFromOf(from: IPlayer, to: IPlayer, base: number, card?: ICard): number {
+    return this.registry.queryNumeric('distanceFrom', base, this.context(from), to, card)
   }
 
   /** @see DistanceMods.distanceToOf */
-  distanceToOf(to: IPlayer, from: IPlayer, base: number): number {
-    return this.registry.queryNumeric('distanceTo', base, this.context(to), from)
+  distanceToOf(to: IPlayer, from: IPlayer, base: number, card?: ICard): number {
+    return this.registry.queryNumeric('distanceTo', base, this.context(to), from, card)
   }
 
   // ── 回合数值 ──

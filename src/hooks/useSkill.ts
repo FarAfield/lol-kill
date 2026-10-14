@@ -14,6 +14,7 @@ import type { Ref, ComputedRef } from 'vue'
 import type { GameController } from '@/services/game-controller'
 import type { ISkill } from '@core/contracts/skill.interface'
 import { SkillType } from '@core/contracts/enums'
+import { lolSkillName } from '@source/theme/lol-mapping'
 
 /** 技能的 UI 展示信息 */
 export interface SkillUIInfo {
@@ -144,6 +145,11 @@ export function useSkill(
     const ctrl = controllerGetter()
     if (!ctrl) return []
 
+    // 依赖挂在控制器的版本号上（欠账 D45）：技能面板读的全是控制器里的
+    // 普通字段（当前玩家、他有哪些技能、此刻能发动哪些），
+    // 不挂它，面板就冻在开局那一刻 —— 恒为空。
+    void ctrl.revision
+
     const player = ctrl.getCurrentPlayer()
     if (!player) return []
 
@@ -162,7 +168,9 @@ export function useSkill(
       const type = skillTypeOf(skill)
       return {
         id: skill.id,
-        name: skill.name,
+        // 换皮只发生在这里（`ISkill` → `SkillUIInfo` 这道边界上，欠账 D27）。
+        // 面板与触发通知都读这一份，所以「技能叫什么」只有一个答案。
+        name: lolSkillName(skill.id, skill.name),
         description: skill.description,
         type,
         usable: usable.has(skill.id),

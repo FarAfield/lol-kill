@@ -86,6 +86,7 @@ import { computed } from 'vue'
 import { NModal, NButton, NText, NSpace, NIcon } from 'naive-ui'
 import type { ICard } from '@core/contracts/card.interface'
 import CardFace from '@/components/card/CardFace.vue'
+import { lolCardName } from '@source/theme/lol-mapping'
 
 const props = defineProps<{
   /** 是否显示 */
@@ -119,13 +120,25 @@ const emit = defineEmits<{
 
 // ── 派生状态 ──
 
-/** 提示图标 */
+/**
+ * 提示图标
+ *
+ * 判据是**换皮之后的名字**（欠账 D27）：弹窗里的文案已经换过了，
+ * 再拿三国杀的牌名去比对，就永远比不中——于是所有响应都显示同一张图标。
+ * 名字从换皮表里查，不在这里另抄一份，改名字的时候图标会跟着走。
+ */
+const RESPONSE_ICONS: ReadonlyArray<readonly [string, string]> = [
+  [lolCardName('shan', '闪'), '🛡️'],
+  [lolCardName('tao', '桃'), '🍑'],
+  [lolCardName('wuXieKeJi', '无懈可击'), '✨'],
+  [lolCardName('sha', '杀'), '⚔️'],
+]
+
 const promptIcon = computed(() => {
   const p = props.prompt
-  if (p.includes('闪')) return '🛡️'
-  if (p.includes('桃')) return '🍑'
-  if (p.includes('无懈')) return '✨'
-  if (p.includes('杀')) return '⚔️'
+  for (const [name, icon] of RESPONSE_ICONS) {
+    if (p.includes(name)) return icon
+  }
   return '📜'
 })
 
@@ -134,7 +147,7 @@ const confirmLabel = computed(() => {
   if (!props.selectedCardId) return '不出'
   const card = props.validCards.find((c) => c.instanceId === props.selectedCardId)
   if (!card) return '确认'
-  return `打出 ${card.name}`
+  return `打出 ${lolCardName(card.id, card.name)}`
 })
 
 // ── 方法 ──

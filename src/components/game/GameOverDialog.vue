@@ -132,6 +132,7 @@ import {
 import { RoleType, Kingdom } from '@core/contracts/enums'
 import type { IGameResult } from '@core/contracts/game.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
+import { lolHeroName, lolHeroTitle } from '@source/theme/lol-mapping'
 
 // ── Props ──
 const props = defineProps<{
@@ -158,6 +159,12 @@ const humanPlayer = computed(() =>
 )
 
 const humanRole = computed(() => humanPlayer.value?.role ?? null)
+
+/** 人类玩家的英雄显示名（换皮，欠账 D27） */
+const humanHeroName = computed(() => {
+  const hero = humanPlayer.value?.heroes[0]
+  return hero ? lolHeroName(hero.id, hero.name) : '你'
+})
 
 const winnerRole = computed(() => props.result?.winner ?? null)
 
@@ -202,15 +209,20 @@ interface RevealedPlayer {
 }
 
 const revealedPlayers = computed<RevealedPlayer[]>(() => {
-  return props.players.map((p) => ({
-    id: p.id,
-    name: p.heroes[0]?.name ?? `玩家${p.seatIndex + 1}`,
-    heroName: p.heroes[0]?.title ?? '',
-    role: p.role ?? RoleType.Ascended,
-    alive: p.alive,
-    isHuman: p.id === props.humanPlayerId,
-    kingdom: p.heroes[0]?.kingdom ?? Kingdom.Demacia,
-  }))
+  return props.players.map((p) => {
+    const hero = p.heroes[0]
+    return {
+      id: p.id,
+      // 换皮（欠账 D27）：这一列是直接拿引擎的 `IPlayer` 拼的，
+      // 没走 Store 那道派生，所以在这里查表——查的还是同一张表。
+      name: hero ? lolHeroName(hero.id, hero.name) : `玩家${p.seatIndex + 1}`,
+      heroName: hero ? lolHeroTitle(hero.id, hero.title) : '',
+      role: p.role ?? RoleType.Ascended,
+      alive: p.alive,
+      isHuman: p.id === props.humanPlayerId,
+      kingdom: hero?.kingdom ?? Kingdom.Demacia,
+    }
+  })
 })
 
 // ── 游戏统计 ──
@@ -221,7 +233,7 @@ const stats = computed(() => {
     totalRounds: result?.totalRounds ?? 0,
     aliveCount: props.players.filter((p) => p.alive).length,
     totalPlayers: props.players.length,
-    playerName: humanPlayer.value?.heroes[0]?.name ?? '你',
+    playerName: humanHeroName.value,
     playerRole: getRoleLabel(humanRole.value),
     durationMs: props.gameStartTime
       ? Date.now() - props.gameStartTime

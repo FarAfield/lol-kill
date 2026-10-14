@@ -47,6 +47,13 @@ export { WhenBuilder, whenOf } from './when'
 export { ContentRegistry } from './content-registry'
 export type { EventContent, ContentEntry } from './content-registry'
 
+// ── 判定事件的数据键（唯一的「本次判定结果牌」）──
+export {
+  JUDGE_RESULT_CARD_KEY,
+  judgeResultCardOf,
+  setJudgeResultCard,
+} from './judge-keys'
+
 // ── 内容写作助手 ──
 export { helpers } from './content-helpers'
 export type { ContentHelpers } from './content-helpers'

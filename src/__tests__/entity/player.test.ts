@@ -92,14 +92,6 @@ describe('Player', () => {
       expect(p.isDying).toBe(false)
     })
 
-    it('attackRange 为基础 1 加武器加成', () => {
-      const p = new Player({ id: 'p0', seatIndex: 0 })
-      expect(p.attackRange).toBe(1)
-      // 装备区写入归 CardSystem；这里只关心派生量怎么读它
-      p.equipCards.push(makeEquip('weapon', EquipSlot.Weapon, 3))
-      expect(p.attackRange).toBe(4)
-    })
-
     it('markAttackUsed 只写账本，不再回答「能不能」（D8 形态甲）', () => {
       const p = new Player({ id: 'p0', seatIndex: 0 })
       // 「本回合还能不能出杀」已从实体上摘掉：它要查 Mod 注册表，

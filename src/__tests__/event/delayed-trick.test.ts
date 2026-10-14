@@ -23,12 +23,25 @@ import type { CompiledHandler } from '@core/contracts/compiled-handler'
 import type { ISkill } from '@core/contracts/skill.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import { Card } from '@core/entity/card'
-import { cardDef, createTestEnv, giveCard, type TestEnv } from '../helpers/game-env'
+import {
+  cardDef,
+  createTestEnv,
+  giveCard,
+  NO_GUICAI_HEROES,
+  ScriptedDecisionService,
+  type TestEnv,
+} from '../helpers/game-env'
+import { setJudgeResultCard } from '@core/event/judge-keys'
 
 let env: TestEnv
 
+// 英雄池钉死为「没人会改判」的那五位：判定阶段翻出来的牌是什么花色，
+// 就该怎么生效。局里一旦有司马懿，【鬼才】会把每一次判定都换成他的手牌，
+// 这一整组断言就不再是「判定 → 生效」，而变成「司马懿的手牌 → 生效」（D44）。
 beforeEach(async () => {
-  env = await createTestEnv()
+  env = await createTestEnv<ScriptedDecisionService>(undefined, {
+    heroes: NO_GUICAI_HEROES,
+  })
 })
 
 // ── 工具 ──
@@ -180,7 +193,7 @@ describe('D16 · 改判有一个能被挂住的时机', () => {
 
     hookSkill(victim!, 'judgeBegin', (raw) => {
       const ctx = raw as { event: { data: Record<string, unknown> } }
-      ctx.event.data['judgeResultCard'] = replacement
+      setJudgeResultCard(ctx.event, replacement)
     })
 
     await runTurnFor(victim!)

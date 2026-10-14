@@ -97,7 +97,10 @@ export const AI_MAX_DELAY = 2000
 
 /** 标准牌堆中各卡牌类型的数量 */
 export const STANDARD_DECK_COMPOSITION: Record<string, number> = {
-  sha: 30,
+  // 三种杀加起来仍是 30 张（原 `sha` 的总数），牌堆厚度不变
+  sha: 22,
+  huoSha: 5, // 火杀（藤甲 +1）
+  leiSha: 3, // 雷杀
   shan: 15,
   tao: 8,
   jiu: 5,

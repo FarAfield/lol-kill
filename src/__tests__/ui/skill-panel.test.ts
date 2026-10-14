@@ -15,10 +15,13 @@
 // 「恒真」和「恒空」这两个原状都长得像「通过」：`true` 是绿的、
 // `[]` 也是绿的。所以每一条都配了对照。
 //
-// **取样时机**：`GameEngine.start()` 会把第一个玩家的整个回合一次跑完
-// （`phaseManager.executeTurn`），跑完已经停在 `phasePost`，
-// UI 那条 `endPhase()` 又交不出回合（见 D38）。因此这里不去「推进到出牌阶段」，
-// 而是让决策服务在**它被问出牌的那一刻**当场取样——那一刻必然是出牌阶段。
+// **取样时机**：让决策服务在**它被问出牌的那一刻**当场取样——
+// 那一刻引擎正停在出牌阶段（`PhaseManager` 的 while 循环里），
+// `getAvailableActions()` 给的就是出牌阶段此刻的答案。
+//
+// 形态丁之后（D38 结清）连「跑完第一个回合」这件事本身也变了：
+// `start()` 只开局，回合一律由 `runGameLoop()` 推进，而整局的结果走
+// `controller.whenFinished()`。取样时机不变——它问的就是「被问到的那一刻」。
 // ============================================================
 
 import { readFileSync } from 'node:fs'
@@ -38,9 +41,19 @@ import type { IPlayer } from '@core/contracts/player.interface'
 
 const PROJECT_ROOT = process.cwd()
 
+/**
+ * 轮次上限压到 2
+ *
+ * `standard5pConfig` 写着 `maxRounds: 100`。形态丁下 `startGame()` 只把循环
+ * 跑起来就返回（欠账 D38），这里要等整局结束（`whenFinished`），
+ * 不设上限就会一直跑到第 100 轮。
+ */
+const MAX_ROUNDS = 2
+
 /** 只有关羽的一局：他带【武圣】（主动技，`enable: [phaseUse, response]`） */
 const GUANYU_ONLY = {
   ...standard5pConfig,
+  maxRounds: MAX_ROUNDS,
   heroes: standardHeroes.filter((h) => h.id === 'guanyu'),
   heroSelectCount: 1,
 }
@@ -48,6 +61,7 @@ const GUANYU_ONLY = {
 /** 只有张飞的一局：他带【咆哮】（锁定技，**没有** `enable`） */
 const ZHANGFEI_ONLY = {
   ...standard5pConfig,
+  maxRounds: MAX_ROUNDS,
   heroes: standardHeroes.filter((h) => h.id === 'zhangfei'),
   heroSelectCount: 1,
 }
@@ -78,7 +92,12 @@ class PhaseUseSampler extends ScriptedDecisionService {
   }
 }
 
-/** 起一局并跑到第一个回合结束，同时收集出牌阶段的取样 */
+/**
+ * 起一局并跑到终局，同时收集每一次「被问出牌」那一刻的取样
+ *
+ * 跑完整局而不是只跑第一个回合：`startGame()` 之后回合是在循环里推进的，
+ * 「回合结束之后不可用」那条断言需要这一局真的走完。
+ */
 async function playOneTurn(
   config: typeof GUANYU_ONLY,
 ): Promise<{ controller: GameController; samples: PhaseUseSampler['samples'] }> {
@@ -88,6 +107,7 @@ async function playOneTurn(
   controller.bindStore(store)
   await controller.createGame(config)
   await controller.startGame()
+  await controller.whenFinished()
 
   return { controller, samples: sampler.samples }
 }
@@ -136,7 +156,10 @@ describe('D36 · 技能面板拿到的是真技能定义', () => {
     const { activeSkills } = useSkill(() => controller)
 
     expect(activeSkills.value.length).toBeGreaterThan(0)
-    expect(activeSkills.value[0]!.name).toBe('武圣')
+    // 面板上显示的是**换皮之后**的名字（欠账 D27：换皮发生在
+    // `ISkill` → `SkillUIInfo` 这道边界上）。写死 '武圣' 过了，
+    // 就等于面板其实没换皮——那时这条会红。
+    expect(activeSkills.value[0]!.name).toBe('诺克萨斯断头台')
   })
 
   it('面板上的技能集合与引擎给的完全一致 —— 面板不许自己另算一份', async () => {

@@ -1,3 +1,5 @@
+export { heroSlot, cardSlot } from './name-slot'
+
 /**
  * 通用确定性 ID 生成器。
  *

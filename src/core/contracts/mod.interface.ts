@@ -85,8 +85,15 @@ export interface NumericModArgsMap {
   attackRange: []
   maxHandcard: []
   maxHp: []
-  distanceFrom: [to: IPlayer]
-  distanceTo: [from: IPlayer]
+  /**
+   * `distanceFrom` / `distanceTo` 都带上「这次用的是哪张牌」
+   *
+   * 没有它，「按牌型豁免距离」这类技能（【奇才】：使用锦囊无距离限制）
+   * 就表达不出来——Mod 只看得到距离数值，不知道这次算距离是为了哪张牌，
+   * 于是只能无条件改，把【杀】的范围也一起放开（欠账 D43）。
+   */
+  distanceFrom: [to: IPlayer, card?: ICard]
+  distanceTo: [from: IPlayer, card?: ICard]
   drawCount: []
   cardUsable: [card: ICard]
   selectTarget: [card: ICard]
@@ -270,22 +277,21 @@ export interface IModQuery {
   drawCount(player: IPlayer, event?: IGameEvent): number
   cardUsable(player: IPlayer, card: ICard, base?: number, event?: IGameEvent): number
   selectTarget(player: IPlayer, card: ICard, base: number, event?: IGameEvent): number
-  /** 我算到他人的距离（供 DistanceSystem 回调） */
-  distanceFrom(from: IPlayer, to: IPlayer, base: number, event?: IGameEvent): number
-  /** 他人算到我的距离（供 DistanceSystem 回调） */
-  distanceTo(to: IPlayer, from: IPlayer, base: number, event?: IGameEvent): number
-
   // ── 供 DistanceSystem / TargetSystem 直接回调的变体 ──
   //
-  // 上面三个带 `event?` 的方法是**内容层**用的；这两个系统要的是
-  // 「拿到基础值、返回修正值」的形状（`attackRangeOf` / `distanceFromOf` /
-  // `distanceToOf` / `selectTargetOf` / `targetEnabledOf` / `targetInRangeOf`）。
-  // 实现早已在 `ModQuery` 上，但接口里没声明——于是 `IModQuery`
-  // 类型上「看不出」它能当 `DistanceMods & TargetMods` 用，
+  // 这两个系统要的是「拿到基础值、返回修正值」的形状（`attackRangeOf` /
+  // `distanceFromOf` / `distanceToOf` / `selectTargetOf` / `targetEnabledOf` /
+  // `targetInRangeOf`）。实现早已在 `ModQuery` 上，但接口里没声明——于是
+  // `IModQuery` 类型上「看不出」它能当 `DistanceMods & TargetMods` 用，
   // 那两个系统只能被测试单独喂一个具体类，生产侧接不上线（欠账 D3 / D4）。
+  //
+  // 这里**没有** `distanceFrom` / `distanceTo` 那两个不带 `Of` 的版本：
+  // 它们与下面两个只是「多收一个 event」的区别，而全仓零调用方——
+  // 同一件事留两个答案，还要各自跟一次接口演进，不如只留一个。
   attackRangeOf(player: IPlayer, base: number): number
-  distanceFromOf(from: IPlayer, to: IPlayer, base: number): number
-  distanceToOf(to: IPlayer, from: IPlayer, base: number): number
+  /** 我算到他人的距离修正；`card` 是**这次为什么要算距离**的那张牌 */
+  distanceFromOf(from: IPlayer, to: IPlayer, base: number, card?: ICard): number
+  distanceToOf(to: IPlayer, from: IPlayer, base: number, card?: ICard): number
   selectTargetOf(source: IPlayer, card: ICard, base: number): number
   targetEnabledOf(source: IPlayer, card: ICard, target: IPlayer): boolean
   targetInRangeOf(source: IPlayer, card: ICard, target: IPlayer): boolean

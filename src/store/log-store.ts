@@ -14,6 +14,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { LogLevel } from '@core/contracts/enums'
 import type { LogEntry, UILogEntry } from '@core/contracts/types'
+import { resolveNameSlots } from '@source/theme/lol-mapping'
 
 /**
  * 日志颜色类别（用于 UI 渲染彩色日志）。
@@ -155,9 +156,18 @@ export const useLogStore = defineStore('log', () => {
    * **墙钟由这里补，不由调用方传**。来自引擎的那份 `LogEntry` 只带
    * `tick`（本局第几步），「现在几点几分」是呈现层自己的事——
    * 它在这一刻才发生，也就该在这一刻被记下。
+   *
+   * **名字也在这里补（欠账 D40）**。引擎文案里写的是占位符，
+   * 这里是「引擎数据 → 屏幕上那行字」的边界，换皮发生在这里，
+   * 且只发生在这里。视图自己写的那几句没有占位符，进了这个函数原样出去。
    */
   function addLog(entry: ViewLogInput): void {
-    const presented: UILogEntry = { tick: 0, ...entry, timestamp: Date.now() }
+    const presented: UILogEntry = {
+      tick: 0,
+      ...entry,
+      message: resolveNameSlots(entry.message),
+      timestamp: Date.now(),
+    }
     entries.value = [...entries.value, presented]
 
     // 超出上限时裁剪旧日志
@@ -174,7 +184,15 @@ export const useLogStore = defineStore('log', () => {
     const now = Date.now()
     entries.value = [
       ...entries.value,
-      ...newEntries.map((entry) => ({ tick: 0, ...entry, timestamp: now }) as UILogEntry),
+      ...newEntries.map(
+        (entry) =>
+          ({
+            tick: 0,
+            ...entry,
+            message: resolveNameSlots(entry.message),
+            timestamp: now,
+          }) as UILogEntry,
+      ),
     ]
     if (entries.value.length > MAX_LOG_ENTRIES) {
       entries.value = entries.value.slice(-MAX_LOG_ENTRIES)

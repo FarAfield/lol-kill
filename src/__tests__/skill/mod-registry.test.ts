@@ -20,6 +20,7 @@ import type { IModDefinition } from '@core/contracts/mod.interface'
 import type { ICard } from '@core/contracts/card.interface'
 import type { IPlayer } from '@core/contracts/player.interface'
 import { TengJia, QingGangJian, PlusOneHorse, MinusOneHorse, ZhuGeLianNu } from '@source/cards/equips'
+import { Sha, HuoSha, LeiSha } from '@source/cards/basic'
 
 async function env() {
   return createTestEnv()
@@ -104,8 +105,8 @@ describe('Phase 11 · ModRegistry 数值修改器', () => {
     const { engine, players } = await env()
     const [a, victim] = players()
 
-    const fire = giveCard(a, cardDef('sha', [CardTag.Strike, CardTag.Fire]))
-    const plain = giveCard(a, cardDef('sha', [CardTag.Strike]))
+    const fire = giveCard(a, HuoSha)
+    const plain = giveCard(a, Sha)
 
     // 装藤甲之前：火杀也是 1 点
     expect(await hit(engine, a, victim, fire)).toBe(1)
@@ -115,7 +116,7 @@ describe('Phase 11 · ModRegistry 数值修改器', () => {
     expect(await hit(engine, a, victim, plain)).toBe(1)
     expect(await hit(engine, a, victim, fire)).toBe(2)
     // 受到的雷属性伤害不受藤甲影响（Mod 只认火）
-    const thunder = giveCard(a, cardDef('sha', [CardTag.Strike, CardTag.Thunder]))
+    const thunder = giveCard(a, LeiSha)
     expect(await hit(engine, a, victim, thunder)).toBe(1)
   })
 
@@ -124,7 +125,7 @@ describe('Phase 11 · ModRegistry 数值修改器', () => {
     const [a, victim, other] = players()
     equip(engine, victim, TengJia)
 
-    const fire = giveCard(a, cardDef('sha', [CardTag.Strike, CardTag.Fire]))
+    const fire = giveCard(a, HuoSha)
     expect(await hit(engine, a, other, fire)).toBe(1)
     expect(await hit(engine, a, victim, fire)).toBe(2)
   })
@@ -151,13 +152,15 @@ describe('Phase 11 · ModRegistry 数值修改器', () => {
     expect(engine.getDistance(p1, p2)).toBe(2) // 1 + 1
   })
 
-  it('武器攻击范围：基础 1，青釭剑 → 3', async () => {
+  it('武器攻击范围：基础 1，青釭剑 → 2（以武器自己写的数为准）', async () => {
     const { engine, players } = await env()
     const [p0] = players()
 
     expect(engine.getAttackRange(p0)).toBe(1)
     equip(engine, p0, QingGangJian)
-    expect(engine.getAttackRange(p0)).toBe(3)
+    // 青釭剑的定义写着「攻击范围 2」。早先是「基础 1 + 武器的数」，
+    // 于是每张武器都凭空多出一格（欠账 D41 顺带修掉的那个 bug）。
+    expect(engine.getAttackRange(p0)).toBe(2)
   })
 
   // ── 出牌次数 ──
@@ -165,7 +168,7 @@ describe('Phase 11 · ModRegistry 数值修改器', () => {
   it('诸葛连弩 → 【杀】的使用次数为 Infinity，其它牌不受影响', async () => {
     const { engine, players } = await env()
     const [p0] = players()
-    const sha = giveCard(p0, cardDef('sha', CardTag.Strike))
+    const sha = giveCard(p0, Sha)
     const trick = giveCard(p0, cardDef('nanManRuQin', [CardTag.Trick, CardTag.BarbarianRaid]))
 
     expect(engine.cardUsableCount(p0, sha)).toBe(1)
@@ -428,7 +431,7 @@ describe('Phase 11 · ModRegistry 数值修改器', () => {
       mods: { damageTo: (v) => v + 1 },
     })
 
-    const fire = giveCard(a, cardDef('sha', [CardTag.Strike, CardTag.Fire]))
+    const fire = giveCard(a, HuoSha)
     equip(engine, victim, TengJia)
 
     expect(await hit(engine, a, victim, fire)).toBe(4) // 1 + 1 + 1 + 藤甲火易伤 1
